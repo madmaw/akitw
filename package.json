@@ -5,17 +5,14 @@
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/madmaw/js13k2021.git"
-  },
-  "scripts": {
-    "roadroller": "roadroller dist/out.min.js -o dist/out.min.rr.js"
+    "url": "git+https://github.com/madmaw/js13ktemplate2023"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/madmaw/js13k2021/issues"
+    "url": "https://github.com/madmaw/js13ktemplate2023/issues"
   },
-  "homepage": "https://github.com/madmaw/js13k2021#readme",
+  "homepage": "https://github.com/madmaw/js13ktemplate2023",
   "devDependencies": {
     "grunt": "^1.6.1",
     "grunt-closure-compiler": "0.0.21",
