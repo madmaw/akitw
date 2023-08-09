@@ -1,3 +1,3 @@
-window.onload = () => {
+window.onload = async () => {
   console.log('hello');
 }

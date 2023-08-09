@@ -283,11 +283,14 @@ module.exports = function (grunt) {
         roadroller: {
           cmd: 'npx roadroller dist/out.min.js -o dist/out.min.rr.js'
         },
+        deploy: {
+          cmd: 'npx gh-pages -d dist'
+        },
         zip: {
           cmd: 'advzip -4 -a index.zip dist/index.html'
         },
         dir: {
-          cmd: 'dir dist\\index.html'
+          cmd: 'stat -c "%N %s" index.zip'
         }
       }     
   });
@@ -338,5 +341,6 @@ module.exports = function (grunt) {
     'exec:dir',
   ]);
   grunt.registerTask('default', ['prod', 'connect', 'watch']);
+  grunt.registerTask('deploy', ['exec:deploy']);
 
 };
