@@ -31,7 +31,7 @@ module.exports = function (grunt) {
           all: ["build", "dist", "dist.zip", "js13k.zip"]
       },
       'closure-compiler': {
-          es2020: {
+          es2021: {
               closurePath: 'libbuild/closure-compiler-v20230502',
               js: 'build/out.js',
               jsOutputFile: 'dist/out.min.js',
@@ -39,8 +39,8 @@ module.exports = function (grunt) {
               reportFile: 'closure.txt',
               options: {
                   compilation_level: 'ADVANCED_OPTIMIZATIONS',
-                  language_in: 'ECMASCRIPT_2020',
-                  language_out: 'ECMASCRIPT_2020',
+                  language_in: 'ECMASCRIPT_2021',
+                  language_out: 'ECMASCRIPT_2021',
                   externs: 'src/externs/externs.js',
                   create_source_map: "true",
               }
@@ -328,7 +328,7 @@ module.exports = function (grunt) {
   grunt.registerTask('dist', [
     'prod', 
     'replace:hax',
-    'closure-compiler:es2020', 
+    'closure-compiler:es2021', 
     'exec:roadroller',
     'copy',
     'cssmin', 
