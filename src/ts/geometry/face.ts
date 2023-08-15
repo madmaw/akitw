@@ -25,7 +25,7 @@ function convexPolygonContainsPoint(
 function dedupePolygon(polygon: ConvexPolygon) {
   return polygon.filter((p1, i) => {
     const p2 = polygon[(i + 1)%polygon.length];
-    const length = vectorNLength(vectorNSubtract(p1, p2));
+    const length = vectorNLength(vectorNScaleThenAdd(p1, p2, -1));
     return length > EPSILON;
   });
 }
@@ -35,8 +35,8 @@ function toFace(
   p2: ReadonlyVector3,
   p3: ReadonlyVector3,
 ): Face {
-  const d2 = vectorNNormalize(vectorNSubtract(p2, p1));
-  const d3 = vectorNNormalize(vectorNSubtract(p3, p1));
+  const d2 = vectorNNormalize(vectorNScaleThenAdd(p2, p1, -1));
+  const d3 = vectorNNormalize(vectorNScaleThenAdd(p3, p1, -1));
   const normal = vectorNNormalize(vector3CrossProduct(d2, d3));
   const [translateToModelCoordinates, rotateToModelCoordinates] = planeToTransforms([
     normal, p1
@@ -47,9 +47,9 @@ function toFace(
     translateToModelCoordinates,
   );
 
-  const fromWorldCoordinates = matrix4Invert(toModelCoordinates);
+  const toPlaneCoordinates = matrix4Invert(toModelCoordinates);
   return {
-    polygons: [[p1, p2, p3].map(p => vector3TransformMatrix4(fromWorldCoordinates, ...p))],
+    polygons: [[p1, p2, p3].map(p => vector3TransformMatrix4(toPlaneCoordinates, ...p))],
     toModelCoordinates,
     rotateToModelCoordinates,
   }
@@ -74,7 +74,7 @@ function measureFace({
     (acc, point) => {
       return Math.max(
         acc,
-        vectorNLength(vectorNSubtract(point, center)),
+        vectorNLength(vectorNScaleThenAdd(point, center, -1)),
       );
     },
     0,

@@ -308,7 +308,7 @@ window.onload = async () => {
   function getModelPoint(modelPointCache: ReadonlyVector3[], point: ReadonlyVector3, toModelCoordinates: ReadonlyMatrix4): ReadonlyVector3 {
     const modelPoint = vector3TransformMatrix4(toModelCoordinates, ...point);
     const cachedModelPoint = modelPointCache.find(cachedPoint => {
-      const d = vectorNLength(vectorNSubtract(cachedPoint, modelPoint));
+      const d = vectorNLength(vectorNScaleThenAdd(cachedPoint, modelPoint, -1));
       return d < EPSILON * 9;
     });
     if (cachedModelPoint != null) {
@@ -329,24 +329,26 @@ window.onload = async () => {
 
       // need to populate the points -> faces, otherwise the smoothing
       // doesn't work
-      const groupPoints = group.map(faces => faces.map(
-        face => {
-          const { polygons, toModelCoordinates } = face;
-          return polygons.map(
-            polygon => {
-              return polygon.map(
-                point => {
-                  const modelPoint = getModelPoint(groupPointCache, point, toModelCoordinates);
-                  const faces = groupPointsToFaces.get(point) || new Set();
-                  faces.add(face);
-                  groupPointsToFaces.set(modelPoint, faces);
-                  return modelPoint;
-                }
-              );
-            }
-          );
-        }
-      )).flat(2);
+      const groupPoints = group.map(
+        faces => faces.map(
+          face => {
+            const { polygons, toModelCoordinates } = face;
+            return polygons.map(
+              polygon => {
+                return polygon.map(
+                  point => {
+                    const modelPoint = getModelPoint(groupPointCache, point, toModelCoordinates);
+                    const faces = groupPointsToFaces.get(point) || new Set();
+                    faces.add(face);
+                    groupPointsToFaces.set(modelPoint, faces);
+                    return modelPoint;
+                  }
+                );
+              }
+            );
+          }
+        ).flat(2),
+      );
 
 
       return group.map<Model>((faces, i) => {
@@ -367,7 +369,7 @@ window.onload = async () => {
           (acc, point) => {
             return Math.max(
               acc,
-              vectorNLength(vectorNSubtract(point, center)),
+              vectorNLength(vectorNScaleThenAdd(point, center)),
             );
           },
           0,
@@ -410,7 +412,7 @@ window.onload = async () => {
               rotateToModelCoordinates,
             }) => {
               const faceNormal = vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
-              return vectorNAdd(acc, faceNormal);
+              return vectorNScaleThenAdd(acc, faceNormal);
             }, [0, 0, 0]);
             const normal = vectorNNormalize(combined);
             // rotate the normal back to the face coordinates
@@ -510,11 +512,12 @@ window.onload = async () => {
         center,
         radius,
       } = models[modelId];
-      const renderId = nextRenderGroupId++;
+      const renderGroupId = nextRenderGroupId++;
       faces.forEach(face => {
         const id = nextEntityId++;
 
-        // TODO generate bounds for face
+        // Note: we use the model bounds here as they will be about the same
+        // for terrain tiles, at least for x/y axis
         const worldToPlaneCoordinates = matrix4Invert(face.toModelCoordinates);
         const rotateToPlaneCoordinates = matrix4Invert(face.rotateToModelCoordinates);
         const entity: StaticEntity = {
@@ -531,7 +534,7 @@ window.onload = async () => {
           bounds,
           face,
           id,
-          renderGroupId: renderId,
+          renderGroupId,
         };
         addEntity(grid, entity);
       });
@@ -559,6 +562,7 @@ window.onload = async () => {
         centerRadius: radius,
       },
       bounds,
+      // TODO make it smaller
       collisionRadius: radius,
       id: nextEntityId++,
       position,
@@ -577,7 +581,7 @@ window.onload = async () => {
   window.onmousemove = (e: MouseEvent) => {
     if (previousPosition) {
       const currentPosition: ReadonlyVector2 = [e.clientX, -e.clientY];
-      const delta = vectorNSubtract(currentPosition, previousPosition);
+      const delta = vectorNScaleThenAdd(currentPosition, previousPosition, -1);
       const axis2d = vector2Rotate(
         Math.PI/2,
         delta
@@ -677,18 +681,25 @@ window.onload = async () => {
                         );
                         const planeVelocityZ = planeVelocity[2];
                         
-                        // heading into the plane
+                        // TODO need to also calculate intersections from below for edge handling
                         if (planeVelocityZ < 0) {
-                          const planePosition = vector3TransformMatrix4(
+                          const planeStartPosition = vector3TransformMatrix4(
                             worldToPlaneCoordinates,
                             ...entity.position,
                           );
-                          const planePositionZ = planePosition[2];
+                          const planeStartPositionZ = planeStartPosition[2];
   
-                          const timeToOverlap = (collisionRadius - planePositionZ)/-planeVelocityZ;
+
+                          const timeToOverlap = (collisionRadius - planeStartPositionZ)/planeVelocityZ;
                           if (timeToOverlap > 0 && (!FLAG_BOUNDED_TIME_CHECK || timeToOverlap <= minCollisionTime)) {
                             const planeIntersectionTime = remainingCollisionTime - timeToOverlap;
-                            if (polygons.some(polygon => vector2PolyContains(polygon, ...planePosition))) {
+                            const planeIntersectionPosition = vectorNScaleThenAdd(
+                              planeStartPosition,
+                              planeVelocity,
+                              planeIntersectionTime,
+                            );
+                            // TODO get 
+                            if (polygons.some(polygon => vector2PolyContains(polygon, ...planeIntersectionPosition))) {
                               collisionTime = planeIntersectionTime - EPSILON; 
                               // TODO account for any rotation transforms
                               collisionNormal = vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
@@ -715,16 +726,18 @@ window.onload = async () => {
                   const inverse = matrix4Invert(matrix);
                   const v = vector3TransformMatrix4(matrix, ...velocity);
                   v[2] *= -1;
-                  entity.position = vectorNAdd(
+                  entity.position = vectorNScaleThenAdd(
                     entity.position,
-                    vectorNScale(velocity, minCollisionTime),
+                    velocity,
+                    minCollisionTime,
                   );
                   (entity as DynamicEntity).velocity = vector3TransformMatrix4(inverse, ...v);
                   remainingCollisionTime -= minCollisionTime;
                 } else {
-                  entity.position = vectorNAdd(
+                  entity.position = vectorNScaleThenAdd(
                     entity.position,
-                    vectorNScale(velocity, remainingCollisionTime),
+                    velocity,
+                    remainingCollisionTime,
                   );
                   remainingCollisionTime = 0;
                 }

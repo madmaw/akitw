@@ -28,7 +28,7 @@ function toFiniteLine(p1: ReadonlyVector3, p2: ReadonlyVector3): FiniteLine {
 }
 
 function lineIntersectsPoints(p1: ReadonlyVector3, p2: ReadonlyVector3, line1: Line): number | false {
-  const delta = vectorNSubtract(p2, p1);
+  const delta = vectorNScaleThenAdd(p2, p1, -1);
   const [dirx, diry] = vectorNNormalize(delta);
   // TODO might be able to just cast
   const [x1, y1] = p1;
@@ -48,7 +48,7 @@ function lineIntersectsPoints(p1: ReadonlyVector3, p2: ReadonlyVector3, line1: L
 }
 
 function lineDeltaAndLength(p1: ReadonlyVector3, p2: ReadonlyVector3, line: Line): [number | undefined, number, ReadonlyVector3] {
-  const delta = vectorNSubtract(p2, p1);
+  const delta = vectorNScaleThenAdd(p2, p1, -1);
   const length = vectorNLength(delta);
   const direction = vectorNNormalize(delta);
   // TODO might be able to just cast

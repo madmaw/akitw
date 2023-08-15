@@ -16,7 +16,7 @@ function round(
           return vector3TransformMatrix4(toWorldCoordinates, ...point);
         });
         return edges
-          ?  vectorNScale(vectorNAdd(worldPoint, nextWorldPoint), .5)
+          ?  vectorNScale(vectorNScaleThenAdd(worldPoint, nextWorldPoint), .5)
           : worldPoint
           ;
       });

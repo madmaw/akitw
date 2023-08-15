@@ -24,7 +24,7 @@ const vector2AngleAndDistance = ([x1, y1]: Vector2, [x2, y2]: Vector2) => {
 const vector2Rotate = (a: number, p: ReadonlyVector2, c: readonly number[] = [0, 0]): ReadonlyVector2 => {
   const sin = Math.sin(a);
   const cos = Math.cos(a);
-  const [ox, oy] = vectorNSubtract(p, c);
+  const [ox, oy] = vectorNScaleThenAdd(p, c, -1);
   const [cx, cy] = c;
   return [
     ox * cos - oy * sin + cx,
@@ -69,22 +69,25 @@ const vectorNLength = <T extends readonly number[]>(v: T): number => {
     return Math.pow(vectorNDotProduct(v, v), .5);
 }
 
-const vectorNMix = <T extends number[]>(v1: T, v2: T, amt: number): T => {
-    return v1.map((v, i) => v * amt + v2[i] * (1 - amt)) as T;
+const vectorNMix = <T extends readonly number[]>(v1: T, v2: T, amt: number): T => {
+    return v1.map((v, i) => v * amt + v2[i] * (1 - amt)) as any;
 }
 
 const vectorNNormalize = <T extends readonly number[]>(v: T): T => {
     return vectorNDivide(v, vectorNLength(v)) as any;
 }
 
-const vectorNSubtract = <T extends readonly number[]>(v1: T, v2: readonly number[]): T => {
-    //return [v1[0] - v2[0], v1[1] - v2[1], v1[2] - v2[2]];
-    return v1.map((v, i) => v - v2[i]) as any;
-}
-
-const vectorNAdd = <T extends readonly number[]>(v1: T, v2: readonly number[]): T => {
-  return v1.map((v, i) => v + v2[i]) as any;
+const vectorNScaleThenAdd = <T extends readonly number[]>(v1: T, v2: readonly number[], scale: number = 1): T => {
+  return v1.map((v, i) => v + v2[i] * scale) as any;
 };
+
+// const vectorNSubtract = <T extends readonly number[]>(v1: T, v2: readonly number[]): T => {
+//     return v1.map((v, i) => v - v2[i]) as any;
+// }
+
+// const vectorNAdd = <T extends readonly number[]>(v1: T, v2: readonly number[]): T => {
+//   return v1.map((v, i) => v + v2[i]) as any;
+// };
 
 const vectorNScale = <T extends readonly number[]>(v: T, s: number): T => {
   return v.map(v => v*s) as any;

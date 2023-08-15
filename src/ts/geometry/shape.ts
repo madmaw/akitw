@@ -25,12 +25,10 @@ function convexShapeExpand(shape: ConvexShape, amount: number): ConvexShape {
   return shape.map(([normal, position]) => {
     return [
       normal,
-      vectorNAdd(
+      vectorNScaleThenAdd(
         position,
-        vectorNScale(
-          normal, 
-          amount,
-        ),
+        normal,
+        amount
       ),
     ];
   });

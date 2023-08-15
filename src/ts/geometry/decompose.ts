@@ -210,16 +210,17 @@ function decomposeConvexPolygon(polygon: ConvexPolygon, lines: readonly Line[]):
         return [];
       }
       // TODO vectorNScaleThenSubtract? (add?)
-      const intersectionPoint = vectorNAdd(
+      const intersectionPoint = vectorNScaleThenAdd(
         p1,
-        vectorNScale(currentDirection, currentIntersectionD)
+        currentDirection,
+        currentIntersectionD,
       );
       return [[intersectionPoint, i1]];
     })
       .flat(1)
       .filter(([p1], i, a) => {
         const [p2] = a[(i+1)%a.length];
-        const d = vectorNLength(vectorNSubtract(p1, p2));
+        const d = vectorNLength(vectorNScaleThenAdd(p1, p2, -1));
         return d > EPSILON;
       });
     if (intersections.length == 2) {
