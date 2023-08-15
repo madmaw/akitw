@@ -1,0 +1,4 @@
+const FLAG_SHOW_GL_ERRORS = true;
+const FLAG_DEBUG_SHORTENED_METHODS = false;
+const FLAG_BOUNDED_TIME_CHECK = true;
+
