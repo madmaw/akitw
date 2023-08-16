@@ -62,7 +62,7 @@ const FRAGMENT_SHADER = `#version 300 es
   }
 `;
 
-// generate some ground
+// // generate some ground
 const baseGroundDepths = [
   [0., 0., 0., 0., 0., 0.],
   [0., .3, .2, .2, 1., 0.],
@@ -72,6 +72,17 @@ const baseGroundDepths = [
   [0., .3, .1, .1, 2., 0.],
   [0., 0., 0., 0., 0., 0.],
 ];
+// generate some ground
+// const baseGroundDepths = [
+//   [0., 0., 0., 0., 0., 0.],
+//   [0., 0., 0., 0., 0., 0.],
+//   [0., 0., 0., 0., 0., 0.],
+//   [0., 0., 0., 0., 0., 0.],
+//   [0., 0., 0., 0., 0., 0.],
+//   [0., 0., 0., 0., 0., 0.],
+//   [0., 0., 0., 0., 0., 0.],
+// ];
+
 function splitGroundDepths(
   groundDepths: readonly (readonly number[])[],
   randomness: number,
@@ -182,7 +193,7 @@ window.onload = async () => {
   const modelShapeFaces = modelShapes.map(shapes => decompose(shapes));
   console.log(modelShapeFaces);
 
-  const randomness = .1;
+  const randomness = .0;
   const groundDepths = new Array(2).fill(0).reduce<readonly (readonly number[])[]>(
     (acc, _, i) => {
       const input = i % 2 ? acc : transpose2DArray(acc);
@@ -236,7 +247,8 @@ window.onload = async () => {
   const gl = Z.getContext('webgl2');
 
   let projectionMatrix: ReadonlyMatrix4;
-  let modelRotationMatrix = matrix4Identity();
+  
+  let cameraRotationMatrix = matrix4Identity();
   let previousPosition: ReadonlyVector2 | undefined;
   let cameraX = worldWidth/2;
   let cameraY = -worldHeight/2;
@@ -549,8 +561,8 @@ window.onload = async () => {
       radius
     } = models[modelId];
     const position: Vector3 = [
-      worldWidth/2 + .2,
-      worldHeight/2 + .2,
+      worldWidth/2,
+      worldHeight/2,
       10,
     ];
     // add in a "player"
@@ -562,8 +574,9 @@ window.onload = async () => {
         centerRadius: radius,
       },
       bounds,
-      // TODO make it smaller
-      collisionRadius: radius,
+      // collision radius must fit within the bounds, so the model render radius will almost certainly
+      // be larger than that
+      collisionRadius: rectNMinimalRadius(bounds) - EPSILON,
       id: nextEntityId++,
       position,
       renderGroupId: nextRenderGroupId++,
@@ -595,7 +608,7 @@ window.onload = async () => {
           rotation,
           ...axis,
         );  
-        modelRotationMatrix = matrix4Multiply(rotationMatrix, modelRotationMatrix);
+        cameraRotationMatrix = matrix4Multiply(rotationMatrix, cameraRotationMatrix);
         previousPosition = currentPosition;
       }
     }
@@ -624,16 +637,16 @@ window.onload = async () => {
 
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
       projectionMatrix,
+      cameraRotationMatrix,
       matrix4Translate(-cameraX, -cameraY, -cameraZ),
     );
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
-    gl.uniformMatrix4fv(uModelRotationMatrix, false, modelRotationMatrix as any);
   
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
     const handledEntities: Record<EntityId, Truthy> = {};
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
-    const toRender: Record<ModelId, ReadonlyMatrix4[]> = {};
+    const toRender: Record<ModelId, [ReadonlyMatrix4, ReadonlyMatrix4][]> = {};
     grid.forEach(gridX => {
       gridX.forEach(tile => {
         for (let entityId in tile) {
@@ -643,7 +656,6 @@ window.onload = async () => {
             const entity = tile[entityId];
             const {
               body: { renderTransform },
-              // TODO test bounds
               bounds,
               renderGroupId: renderId,
             } = entity;
@@ -652,86 +664,195 @@ window.onload = async () => {
               // TODO enforce max speed
               (entity as DynamicEntity).velocity[2] -= cappedDelta/9999;
               let remainingCollisionTime = cappedDelta;
-              while (remainingCollisionTime > 0) {
-                const { velocity, collisionRadius } = entity as DynamicEntity;
+              while (remainingCollisionTime > EPSILON) {
+                const {
+                  position,
+                  velocity,
+                  collisionRadius,
+                } = entity as DynamicEntity;
+                const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
+                const targetEntity = {
+                  position: targetPosition,
+                  bounds,
+                };
                 let minCollisionTime = remainingCollisionTime;
-                let minCollisionNormal: Vector3 | undefined;
+                let minCollisionNormal: Vector3 | Falsey;
                 const checkedEntities: Record<EntityId, Truthy> = {};
                 // update dynamic entity
-                iterateEntityBounds(grid, entity, tile => {
+                iterateEntityBounds(grid, targetEntity, tile => {
                   for (let checkEntityId in tile) {
                     if (!checkedEntities[checkEntityId]) {
                       checkedEntities[checkEntityId] = 1;
                       let collisionTime: number | undefined;
-                      let collisionNormal: Vector3 | undefined;
                       let check = tile[checkEntityId];
                       if (check.face) {
+                        let planeCollisionNormal: ReadonlyVector3 | Falsey;
                         const {
                           rotateToPlaneCoordinates,
                           worldToPlaneCoordinates,
+                          position: checkPosition,
+                          bounds: checkBounds,
                           face: {
                             polygons,
                             rotateToModelCoordinates,
                           },
                         } = check as StaticEntity;
-                        // only check static collisions
-                        const planeVelocity = vector3TransformMatrix4(
-                          rotateToPlaneCoordinates,
-                          ...velocity,
-                        );
-                        const planeVelocityZ = planeVelocity[2];
-                        
-                        // TODO need to also calculate intersections from below for edge handling
-                        if (planeVelocityZ < 0) {
+                        if (rect3Overlaps(targetPosition, bounds, checkPosition, checkBounds)) {
+                          // only check static collisions
+                          const planeVelocity = vector3TransformMatrix4(
+                            rotateToPlaneCoordinates,
+                            ...velocity,
+                          );
+                          const planeVelocityZ = planeVelocity[2];
+                          
+                          // TODO need to also calculate intersections from below for edge handling
                           const planeStartPosition = vector3TransformMatrix4(
                             worldToPlaneCoordinates,
-                            ...entity.position,
+                            ...position,
                           );
                           const planeStartPositionZ = planeStartPosition[2];
-  
 
-                          const timeToOverlap = (collisionRadius - planeStartPositionZ)/planeVelocityZ;
-                          if (timeToOverlap > 0 && (!FLAG_BOUNDED_TIME_CHECK || timeToOverlap <= minCollisionTime)) {
-                            const planeIntersectionTime = remainingCollisionTime - timeToOverlap;
+                          const planeIntersectionTime = planeVelocityZ < 0
+                            ? (collisionRadius - planeStartPositionZ)/planeVelocityZ
+                            // start position z should be -ve
+                            : -(collisionRadius + planeStartPositionZ)/planeVelocityZ;
+                          if (planeIntersectionTime > 0 && (!FLAG_BOUNDED_TIME_CHECK || minCollisionTime == null || planeIntersectionTime <= minCollisionTime)) {
                             const planeIntersectionPosition = vectorNScaleThenAdd(
                               planeStartPosition,
                               planeVelocity,
                               planeIntersectionTime,
                             );
-                            // TODO get 
-                            if (polygons.some(polygon => vector2PolyContains(polygon, ...planeIntersectionPosition))) {
+                            if (
+                              planeVelocityZ < 0
+                              && planeIntersectionTime > 0
+                              && vector2PolygonsContain(polygons, ...planeIntersectionPosition)
+                              && FLAG_QUICK_COLLISIONS
+                            ) {
                               collisionTime = planeIntersectionTime - EPSILON; 
                               // TODO account for any rotation transforms
-                              collisionNormal = vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
+                              planeCollisionNormal = vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
+                            } else {
+                              //const planeIntersectionPositionZ = planeIntersectionPosition[2];
+                              // handle edge collisions
+                              // const intersectionRadius = Math.sqrt(
+                              //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
+                              // );
+                              // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
+                              // const planeTargetPosition = vector3TransformMatrix4(
+                              //   worldToPlaneCoordinates,
+                              //   ...targetPosition,
+                              // );
+                              // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
+                              let minTime = Math.max(0, planeIntersectionTime - EPSILON);
+                              let maxTime = remainingCollisionTime;
+                              for (let i=0; i<MAX_COLLISION_STEPS; i++) {
+                                const testTime = i ? (minTime + maxTime)/2 : maxTime;
+                                const testPlanePosition = vector3TransformMatrix4(
+                                  worldToPlaneCoordinates,
+                                  ...vectorNScaleThenAdd(position, velocity, testTime),
+                                );
+                                const testPlanePositionZ = testPlanePosition[2];
+                                let hit: Booleanish;
+                                if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
+                                  planeCollisionNormal = NORMAL_Z;
+                                  hit = 1;
+                                } else {
+                                  const testIntersectionRadius = Math.sqrt(
+                                    collisionRadius * collisionRadius - testPlanePositionZ * testPlanePositionZ
+                                  );
+                                  const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                                    polygons,
+                                    testPlanePosition,
+                                    testIntersectionRadius,
+                                  );
+                                  if (closestPoint) {
+                                    const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
+                                    let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
+                                    if (rsq < collisionRadius * collisionRadius) {
+                                      const [closestPointX, closestPointY] = closestPoint;
+                                      // const angleZ = Math.atan2(
+                                      //   closestPointX - testPlanePosition[1],
+                                      //   closestPointY - testPlanePosition[0],
+                                      // ); 
+                                      // const cosAngleX = testPlanePositionZ / collisionRadius;
+                                      // const angleX = Math.acos(cosAngleX);
+                                      
+                                      planeCollisionNormal = vectorNNormalize(
+                                        vectorNScaleThenAdd(
+                                          testPlanePosition,
+                                          [closestPointX, closestPointY, polygons[0][0][2]],
+                                          -1,
+                                        ),
+                                      );
+                                      // don't allow bouncing into self
+                                      // TODO this seems kinda wrong (and duplicated)though
+                                      //if (vectorNDotProduct(planeCollisionNormal, planeVelocity) < 0) {
+                                        hit = 1;
+                                      //}
+                                    }
+                                  }
+                                }
+                                if (hit) {
+                                  if (i) {
+                                    maxTime = testTime;
+                                  }
+                                  // first loop is a special case
+                                } else {
+                                  if (!i) {
+                                    // no collision, exit loop
+                                    i = MAX_COLLISION_STEPS;
+                                  } else {
+                                    minTime = testTime;
+                                  }
+                                }
+                              }
+                              if (planeCollisionNormal) {
+                                // don't allow it to bounce deeper into the plane
+                                if (vectorNDotProduct(planeCollisionNormal, planeVelocity) < 0) {
+                                  collisionTime = minTime;
+                                }
+                              }
                             }
-                            // TODO handle edges
                           }
                         }
-                      }
-                      if (collisionNormal && collisionTime < minCollisionTime || !minCollisionNormal) {
-                        minCollisionTime = collisionTime;
-                        minCollisionNormal = collisionNormal;
+                        if (planeCollisionNormal
+                          && (collisionTime < minCollisionTime || !minCollisionNormal)
+                        ) {
+                          minCollisionTime = collisionTime;
+                          minCollisionNormal = vector3TransformMatrix4(
+                            rotateToModelCoordinates,
+                            ...planeCollisionNormal as ReadonlyVector3,
+                          );
+                        }
+                      } else {
+                        // TODO some basic dynamic, sphere collision
                       }
                     }
                   }
                 });
                 if (minCollisionNormal) {
-                  const cosa = vectorNDotProduct(minCollisionNormal, NORMAL_Z);
-                  // assume cosa < 0
-                  const axis = cosa < 1 - EPSILON
-                    ? vectorNNormalize(vector3CrossProduct(minCollisionNormal, NORMAL_Z))
-                    : NORMAL_X;
-                  const a = Math.acos(cosa);
-                  const matrix = matrix4Rotate(a, ...axis);
-                  const inverse = matrix4Invert(matrix);
-                  const v = vector3TransformMatrix4(matrix, ...velocity);
-                  v[2] *= -1;
                   entity.position = vectorNScaleThenAdd(
                     entity.position,
                     velocity,
                     minCollisionTime,
                   );
-                  (entity as DynamicEntity).velocity = vector3TransformMatrix4(inverse, ...v);
+
+                  const bounciness = .5;
+                  const cosa = vectorNDotProduct(NORMAL_Z, minCollisionNormal);
+                  // assume cosa < 0
+                  if (cosa < 1 - EPSILON) {
+                    const axis = vectorNNormalize(vector3CrossProduct(NORMAL_Z, minCollisionNormal))
+                    const a = Math.acos(cosa);
+                    const matrix = matrix4Rotate(a, ...axis);
+                    const inverse = matrix4Invert(matrix);
+                    const v = vector3TransformMatrix4(matrix, ...velocity);
+                    v[2] *= -bounciness;
+                    (entity as DynamicEntity).velocity = vector3TransformMatrix4(inverse, ...v);  
+                  } else {
+                    // just bounce
+                    velocity[2] *= -bounciness;
+                  }
+                  
                   remainingCollisionTime -= minCollisionTime;
                 } else {
                   entity.position = vectorNScaleThenAdd(
@@ -754,10 +875,11 @@ window.onload = async () => {
                 toRender[modelId] = render;
               }
               const transform = matrix4Multiply(
+                // TODO maybe just pass in position as a vec3
                 matrix4Translate(...entity.position),
                 renderTransform,
               );
-              render.push(transform);    
+              render.push([transform, matrix4Identity()]);    
             }
           }
         }
@@ -768,8 +890,9 @@ window.onload = async () => {
       const { vao, indexCount } = models[modelId];
       gl.bindVertexArray(vao);
       const renders = toRender[modelId];
-      renders.forEach(transform => {
+      renders.forEach(([transform, rotation]) => {
         gl.uniformMatrix4fv(uModelViewMatrix, false, transform as any);
+        gl.uniformMatrix4fv(uModelRotationMatrix, false, rotation as any);
         gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);  
       });
     }    

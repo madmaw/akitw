@@ -3,7 +3,7 @@
 type Vector2 = [number, number];
 type ReadonlyVector2 = readonly [number, number];
 type Rect2 = [Vector2, Vector2];
-type ReactonlyRect2 = readonly [ReadonlyVector2, ReadonlyVector2];
+type ReadonlyRect2 = readonly [ReadonlyVector2, ReadonlyVector2];
 
 type Vector3 = [number, number, number];
 type ReadonlyVector3 = readonly [number, number, number];
@@ -97,44 +97,57 @@ const vectorNDivide = <T extends readonly number[]>(v: T, d: number): T => {
     return v.map(v => v/d) as any;
 }
 
-const vector2PolyContains = (
-  poly: readonly (ReadonlyVector3 | ReadonlyVector2)[],
+const vector2PolygonsContain = (
+  polygons: readonly (readonly (ReadonlyVector3 | ReadonlyVector2)[])[],
   x: number,
   y: number,
   // Closure compiler should strip out Z param, which we accept
   // so we can spread a vec3 into this function
   ignoredZ?: number,
 ): boolean => {
-    // from https://stackoverflow.com/questions/22521982/check-if-point-inside-a-polygon
-
-    let inside: boolean;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-        let xi = poly[i][0], yi = poly[i][1];
-        let xj = poly[j][0], yj = poly[j][1];
-
-        let intersect = ((yi > y) != (yj > y))
-            && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) {
-            inside = !inside;
-        }
-    }
-
-    return inside;
+    return polygons.some(polygon => {
+      let w = polygon[polygon.length - 1];
+      return polygon.reduce<boolean | undefined>((inside, v) => {
+        const [xv, yv] = v;
+        const [xw, yw] = w;
+        const intersect = ((yv > y) != (yw > y))
+          && (x < (xw - xv) * (y - yv) / (yw - yv) + xv);
+        w = v;
+        return intersect
+            ? !inside
+            : inside;
+        // TODO undefined can be trimmed
+      }, undefined);
+      // from https://stackoverflow.com/questions/22521982/check-if-point-inside-a-polygon
+      // for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      //     let xi = poly[i][0], yi = poly[i][1];
+      //     let xj = poly[j][0], yj = poly[j][1];
+  
+      //     let intersect = ((yi > y) != (yj > y))
+      //         && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      //     if (intersect) {
+      //         inside = !inside;
+      //     }
+      // }  
+      
+      // return inside;
+    });
 }
 
-const vector2PolyEdgeOverlapsCircle = (poly: Vector2[], c: Vector2, r: number): Vector2 | undefined => {
-  // from https://bl.ocks.org/mbostock/4218871
+const vector2PolygonsEdgeOverlapsCircle = (
+  polygons: readonly (readonly (ReadonlyVector2 | ReadonlyVector3)[])[],
+  c: ReadonlyVector2 | ReadonlyVector3 | ReadonlyVector3,
+  r: number,
+): ReadonlyVector2 | ReadonlyVector3 | undefined => {
   const [cx, cy] = c;
-  let v: Vector2 = poly[poly.length - 1];
-  let minPoint: Vector2 | undefined;
   let minDistanceSquared = r * r;
-
-  for( let i=0; i<poly.length; i++ ) {
-      const w = poly[i];
+  return polygons.reduce<ReadonlyVector2 | ReadonlyVector3 | undefined>((minPoint, polygon) => {
+    let v: ReadonlyVector2 | ReadonlyVector3 = polygon[polygon.length - 1];
+    return polygon.reduce<ReadonlyVector2 | ReadonlyVector3 | undefined>((minPoint, w) => {
       // is it on the side
       const d = vector2SquaredDistance(v, w);
       const t = ((cx - v[0]) * (w[0] - v[0]) + (cy - v[1]) * (w[1] - v[1])) / d;
-      const p: Vector2 = t < 0
+      const p: ReadonlyVector2 | ReadonlyVector3 = t < 0
         ? v
         : t > 1
           ? w
@@ -144,18 +157,42 @@ const vector2PolyEdgeOverlapsCircle = (poly: Vector2[], c: Vector2, r: number): 
 
       v = w;
       if( pointLineDistanceSquared < minDistanceSquared ) {
-          minPoint = p;          
           minDistanceSquared = pointLineDistanceSquared;
+          return p;
       }
-  }
-  return minPoint;
+      return minPoint;
+    }, minPoint);
+    // TODO undefined can be trimmed
+  }, undefined);
+
+  // from https://bl.ocks.org/mbostock/4218871
+  // for( let i=0; i<poly.length; i++ ) {
+  //     const w = poly[i];
+  //     // is it on the side
+  //     const d = vector2SquaredDistance(v, w);
+  //     const t = ((cx - v[0]) * (w[0] - v[0]) + (cy - v[1]) * (w[1] - v[1])) / d;
+  //     const p: ReadonlyVector2 | ReadonlyVector3 = t < 0
+  //       ? v
+  //       : t > 1
+  //         ? w
+  //         : [v[0] + t * (w[0] - v[0]), v[1] + t * (w[1] - v[1])];
+
+  //     const pointLineDistanceSquared = vector2SquaredDistance(c, p);
+
+  //     v = w;
+  //     if( pointLineDistanceSquared < minDistanceSquared ) {
+  //         minPoint = p;          
+  //         minDistanceSquared = pointLineDistanceSquared;
+  //     }
+  // }
+  // return minPoint;
 }
 
 
-const vector2SquaredDistance = (v: Vector2, w: Vector2) => {
+const vector2SquaredDistance = (v: ReadonlyVector2 | ReadonlyVector3, w: ReadonlyVector2 | ReadonlyVector3) => {
     const dx = v[0] - w[0], dy = v[1] - w[1];
     return dx * dx + dy * dy;
-}
+};
 
 const vectorNEquals = <T extends number[]>(v1: T, v2: T) => {
   return !v1.some((v, i) => v != v2[i]);
@@ -176,4 +213,23 @@ const rect3Intersection = (pos1: Vector3, dim1: Vector3, pos2: Vector3, dim2: Ve
     return Math.min(v1b, v2b) - Math.max(v1a, v2a);
   });
 }
+
+const rectNMinimalRadius = (rect: ReadonlyRect2 | ReadonlyRect3): number => {
+  return rect[0].reduce((min, minValue, i) => {
+    const maxValue = rect[1][i];
+    return Math.min(min, Math.abs(minValue), Math.abs(maxValue));
+  }, Math.abs(rect[0][0]));
+}
+
+const rect3Overlaps = (pos1: ReadonlyVector3, bounds1: ReadonlyRect3, pos2: ReadonlyVector3, bounds2: ReadonlyRect3): boolean => {
+  return pos1.every((v1, i) => {
+    const v1a = v1 + bounds1[0][i];
+    const v1b = v1 + bounds1[1][i];
+    const v2 = pos2[i];
+    const v2a = v2 + bounds2[0][i];
+    const v2b = v2 + bounds2[1][i];
+    return v1b > v2a && v2b > v1a;
+    //return Math.min(v1b, v2b) - Math.max(v1a, v2a) > 0;
+  });
+};
 
