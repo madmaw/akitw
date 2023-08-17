@@ -11,30 +11,32 @@ type Entity = StaticEntity | DynamicEntity;
 
 type ModelId = number;
 
-type BaseEntity = {
+type BaseEntity<PartId extends number = number> = {
   readonly renderGroupId: RenderGroupId,
   readonly id: EntityId,
-  readonly body: Part,
+  readonly partTransforms?: Record<PartId, ReadonlyMatrix4>,
+  readonly body: Part<PartId>,
   position: Vector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
 };
 
-type StaticEntity = {
+type StaticEntity<PartId extends number = number> = {
   readonly face: Face,
   readonly rotateToPlaneCoordinates: ReadonlyMatrix4,
   readonly worldToPlaneCoordinates: ReadonlyMatrix4,
   // TODO toWorldCoordinates, rotateToWorldCoordinates
-} & BaseEntity;
+} & BaseEntity<PartId>;
 
-type DynamicEntity = {
+type DynamicEntity<PartId extends number = number> = {
   readonly face?: undefined,
   readonly collisionRadius: number,
   velocity: Vector3,
-} & BaseEntity;
+} & BaseEntity<PartId>;
 
-type Part = {
-  readonly modelId: ModelId,
+type Part<PartId extends number = number> = {
+  readonly id: PartId,
+  readonly modelId?: ModelId,
   readonly centerOffset: ReadonlyVector3,
   readonly centerRadius: number,
   readonly renderTransform: ReadonlyMatrix4,
