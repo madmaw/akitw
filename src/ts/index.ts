@@ -65,25 +65,25 @@ const FRAGMENT_SHADER = `#version 300 es
 `;
 
 // // generate some ground
-// const baseGroundDepths = [
-//   [0., 0., 0., 0., 0., 0.],
-//   [0., .3, .2, .2, 1., 0.],
-//   [0., .3, 0., 0., .4, 0.],
-//   [0., .3, 0., 0., .4, 0.],
-//   [0., .3, 0., 1., .4, 0.],
-//   [0., .3, 1., 2., 3., 0.],
-//   [0., 0., 0., 0., 0., 0.],
-// ];
 const baseGroundDepths = [
-  [.5, .4, .3, .2, .1, .0],
-  [.4, .3, .2, .1, .0, .0],
-  [.3, .2, .1, .0, .0, .0],
-  [.2, .1, .0, .0, .0, .0],
-  [.1, .0, .0, .0, .4, .4],
-  [.0, .0, .4, .4, .4, .4],
-  [.0, .0, .4, .4, .4, .4],
-  [.0, .0, .4, .4, .4, .4],
+  [0., 0., 0., 0., 0., 0.],
+  [0., .3, .2, .2, 1., 0.],
+  [0., .3, 0., 0., .4, 0.],
+  [0., .3, 0., 0., .4, 0.],
+  [0., .3, 0., 1., .4, 0.],
+  [0., .3, 1., 2., 3., 0.],
+  [0., 0., 0., 0., 0., 0.],
 ];
+// const baseGroundDepths = [
+//   [.5, .4, .3, .2, .1, .0],
+//   [.4, .3, .2, .1, .0, .0],
+//   [.3, .2, .1, .0, .0, .0],
+//   [.2, .1, .0, .0, .0, .0],
+//   [.1, .0, .0, .0, .4, .4],
+//   [.0, .0, .4, .4, .4, .4],
+//   [.0, .0, .4, .4, .4, .4],
+//   [.0, .0, .4, .4, .4, .4],
+// ];
 // const baseGroundDepths = [
 //   [.0, .0, .0, .0, .0, .0],
 //   [.0, .0, .0, .0, .0, .0],
@@ -819,17 +819,12 @@ window.onload = async () => {
                 remainingCollisionTime > EPSILON
                 && vectorNLength((entity as DynamicEntity).velocity) > .001
               ) {
-                count++;
                 const {
                   position,
                   velocity,
                   collisionRadius,
                   restitution = 0,
                 } = entity as DynamicEntity;
-                if (count > MAX_COLLISIONS) {
-                  console.log('too many collisions');
-                  break;
-                }
 
                 const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
                 const targetUnionBounds: ReadonlyRect3 = [
@@ -1055,16 +1050,16 @@ window.onload = async () => {
                 if (minCollisionNormal) {
                   const boundedCollisionTime = Math.max(0, minCollisionTime - EPSILON);
 
-                  console.log(
-                    'collision',
-                    count,
-                    (minCollisionEntity as Entity).id,
-                    minCollisionTime,
-                    remainingCollisionTime,
-                    minCollisionNormal,
+                  // console.log(
+                  //   'collision',
+                  //   count,
+                  //   (minCollisionEntity as Entity).id,
+                  //   minCollisionTime,
+                  //   remainingCollisionTime,
+                  //   minCollisionNormal,
 
-                  );
-                  console.log('  velocity b', vectorNLength(velocity), velocity);
+                  // );
+                  // console.log('  velocity b', vectorNLength(velocity), velocity);
                   const inverseFriction = 1;
 
                   entity.position = vectorNScaleThenAdd(
@@ -1082,15 +1077,16 @@ window.onload = async () => {
                   const matrix = matrix4Rotate(a, ...axis);
                   const inverse = matrix4Invert(matrix);
                   const v = vector3TransformMatrix4(matrix, ...velocity);
-                  console.log('  velocity i', vectorNLength(v), v);
+                  // console.log('  velocity i', vectorNLength(v), v);
                   // could vectorNMultiply this
                   v[0] *= inverseFriction;
                   v[1] *= inverseFriction;
-                  // bounce it out
-                  v[2] *= -(count > 3 ? 1 : restitution);
-                  console.log('  velocity s', vectorNLength(v), v);
+                  // bounce it out, want the restitution to increase to 1 (or more!) as we
+                  // keep colliding so we don't end up in a degenerate state
+                  v[2] *= -(restitution + (1 - restitution) * Math.pow(count/(MAX_COLLISIONS - 2), 2));
+                  // console.log('  velocity s', vectorNLength(v), v);
                   (entity as DynamicEntity).velocity = vector3TransformMatrix4(inverse, ...v);
-                  console.log('  velocity a', vectorNLength((entity as DynamicEntity).velocity), (entity as DynamicEntity).velocity);
+                  // console.log('  velocity a', vectorNLength((entity as DynamicEntity).velocity), (entity as DynamicEntity).velocity);
                   
                   remainingCollisionTime -= boundedCollisionTime;
                 } else {
@@ -1101,6 +1097,11 @@ window.onload = async () => {
                   );
                   remainingCollisionTime = 0;
                 }
+                count++;
+                if (count > MAX_COLLISIONS) {
+                  console.log('too many collisions');
+                  break;
+                }  
               }
               addEntity(grid, entity);
             }
