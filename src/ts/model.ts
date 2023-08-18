@@ -4,7 +4,7 @@ type Model = {
   radius: number,
   center: ReadonlyVector3,
   groupPointsToFaces: Map<ReadonlyVector3, Set<Face>>,
-  groupPointCache: ReadonlyVector3[],
+  //groupPointCache: ReadonlyVector3[],
   indexCount: number,
   vao: WebGLVertexArrayObject,
 };

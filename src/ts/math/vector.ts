@@ -202,6 +202,10 @@ const vectorNToPrecision = <T extends number[]>(v: T): T => {
   return v.map(v => Math.round(v / EPSILON) * EPSILON) as T;
 }
 
+const vectorNMultiply = <T extends readonly number[]>(v1: T, v2: readonly number[]): T => {
+  return v1.map((v, i) => v * v2[i]) as any;
+};
+
 const rect3Intersection = (pos1: Vector3, dim1: Vector3, pos2: Vector3, dim2: Vector3) => {
   return pos1.map((v1a, i) => {
     const d1 = dim1[i];

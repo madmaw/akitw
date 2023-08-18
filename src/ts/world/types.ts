@@ -1,7 +1,7 @@
-type World = Record<number, Grid>;
+type World = Grid[];
 
 type GridId = 1;
-type Grid = readonly(readonly Tile[])[];
+type Grid = readonly((Tile | Falsey)[])[];
 
 type Tile = Record<EntityId, Entity>;
 
