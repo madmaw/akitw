@@ -52,10 +52,10 @@ type KeyCode =
     | typeof KEY_GREATER_THAN
     ;
 
-const INPUT_LEFT = KEY_LEFT;
-const INPUT_RIGHT = KEY_RIGHT;
-const INPUT_UP = KEY_UP;
-const INPUT_DOWN = KEY_DOWN;
+const INPUT_LEFT = KEY_A;
+const INPUT_RIGHT = KEY_D;
+const INPUT_UP = KEY_W;
+const INPUT_DOWN = KEY_S;
 const INPUT_RUN = KEY_SHIFT;
 const INPUT_JUMP = KEY_SPACE;
 

@@ -32,6 +32,8 @@ type DynamicEntity<PartId extends number = number> = {
   readonly face?: undefined,
   readonly collisionRadius: number,
   velocity: Vector3,
+  readonly restitution?: number,
+  readonly gravity?: number,
 } & BaseEntity<PartId>;
 
 type Part<PartId extends number = number> = {
