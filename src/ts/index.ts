@@ -2,6 +2,7 @@
 const U_WORLD_POSITION_MATRIX = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
 const U_PROJECTION_MATRIX = 'uProjection';
+const U_CAMERA_POSITION = 'uCameraPosition';
 
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
@@ -59,25 +60,35 @@ const FRAGMENT_SHADER = `#version 300 es
   in vec3 ${V_MODEL_COLOR};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
+  uniform vec3 ${U_CAMERA_POSITION};
 
   out vec4 ${O_COLOR};
 
   void main(void) {
     vec3 n = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(0, 0, 1, 1)).xyz;
+    float d = length(${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz);
 
-    ${O_COLOR} = vec4(${V_MODEL_COLOR} * vec3((dot(n, vec3(-.5, -.5, .7)) + 1.) / 2.), 1);
+    ${O_COLOR} = vec4(
+      mix(
+        ${V_MODEL_COLOR} * vec3((dot(n, vec3(-.5, -.5, .7)) + 1.) / 2.),
+        vec3(${SKY.join()}),
+        pow(min(1., d/${HORIZON}.), 2.)
+      ),
+      1
+    );
   }
 `;
 
 // // generate some ground
 const baseGroundDepths = [
-  [0., 0., 0., 0., 0., 0., 0.],
-  [0., 4., .2, .2, 1., 0., 0.],
-  [0., .3, 0., 0., .4, 0., 0.],
-  [0., .3, 0., 0., .4, 0., 0.],
-  [0., .3, 0., 1., .4, 0., 0.],
-  [0., .3, 1., 2., 3., 0., 0.],
-  [0., 0., 0., 0., 0., 0., 0.],
+  [0., 0., 0., 0., 0., 0., 0., 0.],
+  [0., 0., 0., 0., 0., 0., 0., 0.],
+  [0., 4., .2, .2, 1., 0., 0., 0.],
+  [0., .3, 0., 0., .4, 0., 0., 0.],
+  [0., .3, 0., 0., .4, 0., 0., 0.],
+  [0., .3, 0., 1., .4, 0., 0., 0.],
+  [0., .3, 1., 2., 3., 0., 0., 0.],
+  [0., 0., 0., 0., 0., 0., 0., 0.],
 ];
 // const baseGroundDepths = [
 //   [.5, .4, .3, .2, .1, .0],
@@ -264,7 +275,6 @@ window.onload = async () => {
   function getOrCreateGridTile(tx: number, ty: number, resolution: number): Tile {
     const grid = world[resolution];
     const resolutionScale = Math.pow(2, resolution);
-    const resolutionDimension = Math.pow(2, resolutions - resolution - 1);
     let tile = grid[tx][ty];
     const gx = tx * resolutionScale;
     const gy = ty * resolutionScale;
@@ -272,39 +282,40 @@ window.onload = async () => {
       tile = {};
       grid[tx][ty] = tile;
       // generate terrain
-      const [z00, z01, z10, z11] = create2DArray(2, 2, (ix, iy) =>{
-        const terrainX = (tx + ix) / resolutionDimension;
-        const terrainY = (ty + iy) / resolutionDimension;
-        // for each corner, return the minimum depth, this way the gaps in resolutions will always be hidden
-        // beneath
-        return terrain(terrainX, terrainY);
-      }).flat(2);
+      // create points around the edge at the highest resolution
+      const points = [
+        [1, 0, gx, gy],
+        [0, 1, gx + resolutionScale, gy],
+        [-1, 0, gx + resolutionScale, gy + resolutionScale],
+        [0, -1, gx, gy + resolutionScale],
+      ].map(([dx, dy, sx, sy]) => {
+        return new Array(resolutionScale).fill(0).map<Vector3>((_, i) => {
+          const x = sx + i * dx;
+          const y = sy + i * dy;
+          return [x, y, terrain(x / worldDimension, y / worldDimension)];
+        });
+      }).flat(1);
 
-      const params: [[ReadonlyVector3, ReadonlyVector3, ReadonlyVector3], [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3]] = 
-        (tx+ty) % 2
-        ? [
-          [[0, 0, z00], [1, 0, z10], [1, 1, z11]],
-          [[0, 0, z00], [1, 1, z11], [0, 1, z01]],
-        ]
-        : [
-          [[0, 1, z01], [0, 0, z00], [1, 0, z10]],
-          [[0, 1, z01], [1, 0, z10], [1, 1, z11]],
-        ];
-      const groundFaces = params.map(points => {
-        const scaledPoints = points.map(
-          point => vectorNScaleThenAdd(
-            vectorNMultiply(
-              point,
-              [
-                resolutionScale,
-                resolutionScale,
-                1,
-              ],
-            ),
-            [gx, gy, 0],
-          ),
-        ) as [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3];
-        return toFace(...scaledPoints);
+      // connect points
+      let axisPoint: Vector3;;
+      let workingArray: Vector3[];
+      if (resolution > 1 || !FLAG_LOW_POLY_TERRAIN) {
+        // synthesize a center point
+        const cx = gx + resolutionScale/2;
+        const cy = gy + resolutionScale/2;
+        axisPoint = [cx, cy, terrain(cx / worldDimension, cy / worldDimension)];
+        workingArray = points;
+      } else {
+        const index = resolution ? 1 : (tx+ty)%points.length;
+        //const index = 1;
+        const cut = points.splice(0, index+1);
+        points.push(...cut.slice(0, index));  
+        axisPoint = cut[index]
+        workingArray = points.slice(0, -1);
+      }
+      const groundFaces = workingArray.map((point, i) => {
+        const nextPoint = points[(i+1)%points.length];
+        return toFace(axisPoint, point, nextPoint);
       });
       const resolutionColors: Vector3[] = [
         [.8, .8, 1],
@@ -421,7 +432,7 @@ window.onload = async () => {
         Math.PI/4,
         Z.clientWidth/Z.clientHeight,
         .1,
-        999,
+        HORIZON,
       ),
       matrix4Rotate(
         -Math.PI/2,
@@ -434,7 +445,7 @@ window.onload = async () => {
   window.onresize = onResize;
   onResize();
   gl.enable(gl.DEPTH_TEST);
-  gl.clearColor(.1, .1, .1, 1);
+  gl.clearColor(...SKY, 1);
   gl.enable(gl.CULL_FACE);
 
   const vertexShader = loadShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
@@ -469,10 +480,12 @@ window.onload = async () => {
     uWorldPositionMatrix,
     uWorldRotationMatrix,
     uProjectionMatrix,
+    uCameraPosition,
   ] = [
     U_WORLD_POSITION_MATRIX,
     U_WORLD_ROTATION_MATRIX,
     U_PROJECTION_MATRIX,
+    U_CAMERA_POSITION,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
@@ -889,14 +902,19 @@ window.onload = async () => {
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    const cameraPositionMatrix = matrix4Multiply(
+      matrix4Translate(...player.position),
+      player.partTransforms[MODEL_KNIGHT_BODY],
+      matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
+      matrix4Translate(0, cameraZoom, 0),
+    );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
       projectionMatrix,
-      matrix4Translate(0, -cameraZoom, 0),
-      player.partTransforms[MODEL_KNIGHT_HEAD],
-      matrix4Invert(player.partTransforms[MODEL_KNIGHT_BODY]),
-      matrix4Translate(...vectorNScale(player.position, -1)),
+      matrix4Invert(cameraPositionMatrix),
     );
+    const cameraPosition = vector3TransformMatrix4(cameraPositionMatrix, 0, 0, 0);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
+    gl.uniform3fv(uCameraPosition, cameraPosition);
   
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
@@ -907,7 +925,7 @@ window.onload = async () => {
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/worldDimension).slice(0, 2) as any;
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
-    const [tiles] = reversedWorld.reduce<[[Tile, number][], ReadonlyVector2[]]>(([tiles, cellsToCheck], _, reverseResolution) => {
+    const [tiles] = reversedWorld.reduce<[Tile[], ReadonlyVector2[]]>(([tiles, cellsToCheck], _, reverseResolution) => {
       const scale = 1/Math.pow(2, reverseResolution + 1);
       const resolution = reversedWorld.length - reverseResolution - 1;
       // add in all the tiles within the bounds, but not in the view area
@@ -920,14 +938,14 @@ window.onload = async () => {
           vectorNScaleThenAdd(playerWorldPosition, worldPosition, -1),
           // approximate distance to the edge
         ) - scale/2;
-        const minResolution = Math.pow(Math.max(0, distance), .5) * resolutions;
+        const minResolution = Math.pow(Math.max(0, distance * 2), .5) * resolutions;
         //const minResolution = Math.min(distance * resolutions * 8, 6);
         if (resolution > minResolution && resolution) {
           nextCellsToCheck.push(
             ...offsets.map(offset => vectorNScaleThenAdd(vectorNScale(cell, 2), offset)),
           );
         } else {
-          tiles.push([getOrCreateGridTile(gridX | 0, gridY | 0, resolution), resolution]);
+          tiles.push(getOrCreateGridTile(gridX | 0, gridY | 0, resolution));
         }
       });
       return [tiles, nextCellsToCheck];
@@ -936,7 +954,7 @@ window.onload = async () => {
     // const grid = world[0];
     // const tiles = grid.map((gridX, x) => gridX.map((_, y) => getOrCreateGridTile(x, y, 0))).flat(1);    
 
-    tiles.forEach(([tile, resolution]) => {
+    tiles.forEach((tile) => {
       for (let entityId in tile) {
         if (!handledEntities[entityId]) {
           handledEntities[entityId] = 1;
@@ -1261,7 +1279,7 @@ window.onload = async () => {
               // TODO render transform
               //renderTransform,
               // drop the render down a bit for each resolution to hide edges
-              matrix4Translate(0, 0, -Math.pow(resolution, 2)/30),
+              //matrix4Translate(0, 0, -Math.pow(resolution, 2)/30),
             );
             const rotation = partTransforms?.[entity.body.id] || matrix4Identity();
             render.push([position, rotation]);
