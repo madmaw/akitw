@@ -225,7 +225,23 @@ const rectNMinimalRadius = (rect: ReadonlyRect2 | ReadonlyRect3): number => {
   }, Math.abs(rect[0][0]));
 }
 
-const rect3Overlaps = (pos1: ReadonlyVector3, bounds1: ReadonlyRect3, pos2: ReadonlyVector3, bounds2: ReadonlyRect3): boolean => {
+const rectNContainsVectorN = <T extends readonly number[]>([min, max]: readonly [T, T], v: T): boolean => {
+  return !v.some((v, i) => min[i] > v || max[i] < v);
+};
+
+const rectNExpand = <T extends readonly number[]>([min, max]: readonly [T, T], v: T): readonly [T, T] => {
+  return [
+    v.map((v, i) => Math.min(min[i], v)) as any,
+    v.map((v, i) => Math.max(max[i], v)) as any,
+  ];
+};
+
+const rectNOverlaps =  <T extends readonly number[]>(
+  pos1: T,
+  bounds1: readonly [T, T],
+  pos2: T,
+  bounds2: readonly [T, T],
+): boolean => {
   return pos1.every((v1, i) => {
     const v1a = v1 + bounds1[0][i];
     const v1b = v1 + bounds1[1][i];

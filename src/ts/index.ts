@@ -1,17 +1,19 @@
 
-const U_WORLD_POSITION_MATRIX = "uWorldPosition";
+const U_WORLD_POSITION_MATRIX = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
-const U_PROJECTION_MATRIX = "uProjection";
+const U_PROJECTION_MATRIX = 'uProjection';
 
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
 const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'aVertexModelSmoothingRotation';
+const A_MODEL_COLOR = 'aColor';
 
 const V_MODEL_POSITION = 'vModelPosition';
 const V_WORLD_POSITION = 'vWorldPosition';
 const V_WORLD_NORMAL = 'vWorldNormal';
 const V_MODEL_ROTATION_MATRIX = 'vModelRotation';
 const V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
+const V_MODEL_COLOR = 'vColor';
 
 const O_COLOR = "oColor";
 
@@ -21,6 +23,7 @@ const VERTEX_SHADER = `#version 300 es
   in vec4 ${A_VERTEX_MODEL_POSITION};
   in mat4 ${A_VERTEX_MODEL_ROTATION_MATRIX};
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+  in vec3 ${A_MODEL_COLOR};
 
   uniform mat4 ${U_WORLD_POSITION_MATRIX};
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
@@ -31,7 +34,7 @@ const VERTEX_SHADER = `#version 300 es
   out vec4 ${V_WORLD_NORMAL};
   out mat4 ${V_MODEL_ROTATION_MATRIX};
   out mat4 ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
-
+  out vec3 ${V_MODEL_COLOR};
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
@@ -39,6 +42,7 @@ const VERTEX_SHADER = `#version 300 es
     ${V_WORLD_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_ROTATION_MATRIX} * vec4(0., 0., 1., 1.);
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
     ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX} = ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+    ${V_MODEL_COLOR} = ${A_MODEL_COLOR};
 
     gl_Position = ${U_PROJECTION_MATRIX} * ${V_WORLD_POSITION};
   }
@@ -52,6 +56,7 @@ const FRAGMENT_SHADER = `#version 300 es
   in vec4 ${V_WORLD_NORMAL};
   in mat4 ${V_MODEL_ROTATION_MATRIX};
   in mat4 ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+  in vec3 ${V_MODEL_COLOR};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
 
@@ -60,7 +65,7 @@ const FRAGMENT_SHADER = `#version 300 es
   void main(void) {
     vec3 n = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(0, 0, 1, 1)).xyz;
 
-    ${O_COLOR} = vec4(vec3((dot(n, vec3(-.5, -.5, .7)) + 1.) / 2.), 1);
+    ${O_COLOR} = vec4(${V_MODEL_COLOR} * vec3((dot(n, vec3(-.5, -.5, .7)) + 1.) / 2.), 1);
   }
 `;
 
@@ -204,55 +209,22 @@ window.onload = async () => {
   console.log(modelShapesFaces);
 
   const terrain = weightedAverageTerrainFactory(baseGroundDepths, 1.2, .5);
-  //const scale = 4;
-  // const groundDepths = create2DArray(baseGroundDepths.length * scale, baseGroundDepths[0].length * scale, (x, y) =>{
-  //   return terrain(x/(baseGroundDepths.length * scale), y/(baseGroundDepths[0].length * scale)) * scale;
-  // });
 
-  // // turn the depths into faces
-  // const groundFaces = groundDepths.map(
-  //   (groundDepthsX, x) => {
-  //     return groundDepthsX.map<[Face, Face]>(
-  //       (z00, y) => {
-  //         const z10 = groundDepths[x+1]?.[y] || 0;
-  //         const z01 = groundDepths[x][y+1] || 0;
-  //         const z11 = groundDepths[x+1]?.[y+1] || 0;
-          
-  //         const params: [[ReadonlyVector3, ReadonlyVector3, ReadonlyVector3], [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3]] = 
-  //           (x+y) % 2
-  //           ? [
-  //             [[x, y, z00], [x+1, y, z10], [x+1, y+1, z11]],
-  //             [[x, y, z00], [x+1, y+1, z11], [x, y+1, z01]],
-  //           ]
-  //           : [
-  //             [[x, y+1, z01], [x, y, z00], [x+1, y, z10]],
-  //             [[x, y+1, z01], [x+1, y, z10], [x+1, y+1, z11]],
-  //           ];
-  //         return params.map(points => {
-  //           return toFace(...points);
-  //         }) as [Face, Face];
-  //       },
-  //     );
-  //   },
-  // );  
-
-  const resolutions = 4;
-  const worldWidth = baseGroundDepths.length * Math.pow(2, resolutions - 1);
-  const worldHeight = baseGroundDepths[0].length * Math.pow(2, resolutions - 1);
+  const resolutions = 8;
+  const worldDimension = Math.pow(2, resolutions);
   // TODO if this is 1, we can get rid of it
   // That said, it probably shouldn't be 1 as we want more detail on each tile
-  const worldTerrainScale = 2;
+  const worldTerrainScale = 1;
 
-  const world: World = new Array(resolutions).fill(0).map((_, i) => {
-    const divisor = Math.pow(2, i);
-    const resolutionWidth = worldWidth / divisor | 0;
-    const resolutionHeight = worldHeight / divisor | 0;
+  const world: World = new Array(resolutions).fill(0).map((_, resolution) => {
+    const resolutionDimension = Math.pow(2, resolutions - resolution);
     return create2DArray<Tile | Falsey>(
-      resolutionWidth,
-      resolutionHeight,
+      resolutionDimension,
+      resolutionDimension,
       () => 0,
     );
   });
+  const reversedWorld = [...world].reverse();
 
   function iterateEntityBounds(
     resolution: number,
@@ -260,17 +232,16 @@ window.onload = async () => {
     f: (tile: Tile, x: number, y: number) => void,
   ) {
     const divisor = Math.pow(2, resolution);
-    const resolutionWidth = worldWidth / divisor | 0;
-    const resolutionHeight = worldHeight / divisor | 0;
+    const resolutionDimension = Math.pow(2, resolutions - resolution);
     const [px, py] = position;
     for (
       let x = Math.max(0, (px + minx)/divisor | 0);
-      x < Math.min(resolutionWidth, (px + maxx)/divisor);
+      x < Math.min(resolutionDimension, (px + maxx)/divisor);
       x++
     ) {
       for (
         let y = Math.max(0, (py + miny)/divisor | 0);
-        y < Math.min(resolutionHeight, (py + maxy)/divisor);
+        y < Math.min(resolutionDimension, (py + maxy)/divisor);
         y++
       ) {
         const tile = getOrCreateGridTile(x, y, resolution);
@@ -295,17 +266,18 @@ window.onload = async () => {
   const groundPointCache: Record<number, Record<number, ReadonlyVector3>> = {};
   function getOrCreateGridTile(tx: number, ty: number, resolution: number): Tile {
     const grid = world[resolution];
-    const resolutionWidth = grid.length;
-    const resolutionHeight = grid[0].length;
     const resolutionScale = Math.pow(2, resolution);
+    const resolutionDimension = Math.pow(2, resolutions - resolution - 1);
     let tile = grid[tx][ty];
+    const gx = tx * resolutionScale;
+    const gy = ty * resolutionScale;
     if (!tile) {
       tile = {};
       grid[tx][ty] = tile;
       // generate terrain
       const groundDepths = create2DArray(worldTerrainScale+1, worldTerrainScale+1, (ix, iy) =>{
-        const terrainX = (tx + ix/worldTerrainScale) / resolutionWidth;
-        const terrainY = (ty + iy/worldTerrainScale) / resolutionHeight;
+        const terrainX = (tx + ix/worldTerrainScale) / resolutionDimension;
+        const terrainY = (ty + iy/worldTerrainScale) / resolutionDimension;
         return terrain(terrainX, terrainY);
       });
       const groundFaces = groundDepths.slice(0, -1).map(
@@ -337,11 +309,7 @@ window.onload = async () => {
                         1,
                       ],
                     ),
-                    [
-                      tx * resolutionScale,
-                      ty * resolutionScale,
-                      0,
-                    ],
+                    [gx, gy, 0],
                   ),
                 ) as [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3];
                 return toFace(...scaledPoints);
@@ -350,6 +318,14 @@ window.onload = async () => {
           );
         },
       ).flat(2);
+      const resolutionColors: Vector3[] = [
+        [.8, .8, 1],
+        [.8, 1, .8],
+        [1, .8, .8],
+        [1, .9, 1],
+        [1, 1, .9],
+        [.9, 1, 1],
+      ];
       const {
         faces,
         bounds,
@@ -370,7 +346,7 @@ window.onload = async () => {
           xGroundPointCache[iy] = cachedResult;
           return cachedResult;
         },
-        (_, [x, y]) => {
+        (_, groundPoint) => {
           // get some samples
           const offsets: ReadonlyVector2[] = [[-EPSILON, 0], [EPSILON, -EPSILON], [EPSILON, EPSILON]];
           // const offsets: ReadonlyVector2[] = [
@@ -378,21 +354,28 @@ window.onload = async () => {
           //   [1/(worldWidth * worldTerrainScale), -1/(worldHeight * worldTerrainScale)],
           //   [1/(worldWidth * worldTerrainScale), 1/(worldHeight * worldTerrainScale)],
           // ];
-          const points = offsets.map<Vector3>(offset => {
-            const point = vectorNScaleThenAdd<Vector2>([x/worldWidth, y/worldHeight], offset);
+          const [p0, p1, p2] = offsets.map<Vector3>(offset => {
+            const point = vectorNScaleThenAdd(offset, groundPoint, 1/worldDimension);
             
             return [
               ...point,
               // this division appears to be right... but why?
-              terrain(...point)/worldWidth,
+              terrain(...point)/worldDimension,
             ];
           }) as [Vector3, Vector3, Vector3];
-          const face = toFace(...points);
-          const { rotateToModelCoordinates } = face;
+          //const face = toFace(...points);
+          //const { rotateToModelCoordinates } = face;
           // could also use cross product
-          return vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
+          //return vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
+          return vectorNNormalize(
+            vector3CrossProduct(
+              vectorNNormalize(vectorNScaleThenAdd(p1, p0, -1)),
+              vectorNNormalize(vectorNScaleThenAdd(p2, p0, -1)),
+            ),
+          );
           //return vector3TransformMatrix4(_.rotateToModelCoordinates, 0, 0, 1);
         },
+        resolutionColors[resolution % resolutionColors.length],
       );
       const renderGroupId = nextRenderGroupId++;
       faces.forEach(face => {
@@ -402,6 +385,15 @@ window.onload = async () => {
         // for terrain tiles, at least for x/y axis
         const worldToPlaneCoordinates = matrix4Invert(face.toModelCoordinates);
         const rotateToPlaneCoordinates = matrix4Invert(face.rotateToModelCoordinates);
+        // if the resolution > 0 we are only using this for rendering, so make sure the bounds fit within the
+        // current tile
+        const fittedBounds: ReadonlyRect3 = resolution
+          ? [
+            [gx + EPSILON, gy + EPSILON, bounds[0][2]],
+            [gx + resolutionScale - EPSILON, gy + resolutionScale - EPSILON, bounds[1][2]],
+          ]
+          : bounds;
+
         const entity: StaticEntity = {
           body: {
             // terrain is always at position 0, so offset == center
@@ -414,7 +406,7 @@ window.onload = async () => {
           position: [0, 0, 0],
           worldToPlaneCoordinates,
           rotateToPlaneCoordinates,
-          bounds,
+          bounds: fittedBounds,
           face,
           id,
           renderGroupId,
@@ -476,10 +468,12 @@ window.onload = async () => {
     aModelPosition,
     aModelRotationMatrix,
     aModelSmoothingRotationMatrix,
+    aModelColor,
   ] = [
     A_VERTEX_MODEL_POSITION,
     A_VERTEX_MODEL_ROTATION_MATRIX,
     A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX,
+    A_MODEL_COLOR,
   ].map(
     attribute => gl.getAttribLocation(program, attribute)
   );
@@ -500,6 +494,7 @@ window.onload = async () => {
     faces: readonly Face[],
     toModelPoint: (v: ReadonlyVector3, transform: ReadonlyMatrix4) => ReadonlyVector3,
     toSurfaceNormal: (face: Face, point: ReadonlyVector3) => ReadonlyVector3,
+    color: ReadonlyVector3,
   ): Model & { id: number } {
     const groupPointsToFaces = new Map<ReadonlyVector3, Set<Face>>();
 
@@ -550,6 +545,7 @@ window.onload = async () => {
       modelPoints,
       planeTransforms,
       smoothingTransforms,
+      colors,
       indices,
     ] = faces.reduce<[
       // model positions
@@ -558,9 +554,11 @@ window.onload = async () => {
       ReadonlyMatrix4[],
       // smoothing transformation
       ReadonlyMatrix4[],
+      // colors
+      ReadonlyVector3[],
       // indices
       number[],
-    ]>(([modelPoints, planeTransforms, smoothingTransforms, indices], face) => {
+    ]>(([modelPoints, planeTransforms, smoothingTransforms, colors, indices], face) => {
       const {
         polygons,
         rotateToModelCoordinates,
@@ -601,7 +599,11 @@ window.onload = async () => {
           )
           : matrix4Identity();
         return transform;
-        //return matrix4Identity();
+        return matrix4Identity();
+      });
+
+      const newColors = modelPointsUnique.map(() => {
+        return color;
       });
   
   
@@ -623,9 +625,10 @@ window.onload = async () => {
         [...modelPoints, ...modelPointsUnique],
         [...planeTransforms, ...newPlaneTransforms],
         [...smoothingTransforms, ...newSmoothingTransforms],
+        [...colors, ...newColors],
         [...indices, ...newIndices],
       ];
-    }, [[], [], [], []]);
+    }, [[], [], [], [], []]);
 
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
@@ -634,6 +637,7 @@ window.onload = async () => {
       [aModelPosition, modelPoints],
       [aModelRotationMatrix, planeTransforms],
       [aModelSmoothingRotationMatrix, smoothingTransforms],
+      [aModelColor, colors],
     ] as const).forEach(([attribute, vectors]) => {
       var buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -692,7 +696,8 @@ window.onload = async () => {
       face => {
         // TODO smooth some models/planes
         return vector3TransformMatrix4(face.rotateToModelCoordinates, 0, 0, 1);
-      },  
+      },
+      [1, 1, 1],
     );
   });
 
@@ -712,7 +717,7 @@ window.onload = async () => {
     const renderGroupId = nextRenderGroupId++;
 
     faces.forEach(face => {
-      const position: Vector3 = [worldWidth/2 + (i - arr.length/2) * 7, worldHeight/2, 0];
+      const position: Vector3 = [worldDimension/2 + (i - arr.length/2) * 3, worldDimension/2, 0];
       const worldToPlaneCoordinates = matrix4Multiply(
         matrix4Invert(face.toModelCoordinates),
         matrix4Translate(...vectorNScale(position, -1)),
@@ -764,8 +769,8 @@ window.onload = async () => {
     collisionRadius: rectNMinimalRadius(bounds) - EPSILON,
     id: nextEntityId++,
     position: [
-      worldWidth/2,
-      worldHeight/2,
+      worldDimension/2,
+      worldDimension/2,
       4,
     ],
     renderGroupId: nextRenderGroupId++,
@@ -892,7 +897,7 @@ window.onload = async () => {
     );
     player.velocity[0] = targetLateralVelocity[0];
     player.velocity[1] = targetLateralVelocity[1];     
-    player.velocity[2] = inputs[INPUT_JUMP] ? .01 : player.velocity[2];
+    player.velocity[2] = inputs[INPUT_JUMP] ? .001 : player.velocity[2];
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -912,10 +917,38 @@ window.onload = async () => {
     const toRender: Record<ModelId, [ReadonlyMatrix4, ReadonlyMatrix4][]> = {};
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
-    const grid = world[0];
-    const tiles = grid.map((gridX, x) => gridX.map((_, y) => getOrCreateGridTile(x, y, 0))).flat(1);
+    const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/worldDimension).slice(0, 2) as any;
+    const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
+    const [tiles] = reversedWorld.reduce<[[Tile, number][], ReadonlyVector2[]]>(([tiles, cellsToCheck], _, reverseResolution) => {
+      const scale = 1/Math.pow(2, reverseResolution + 1);
+      const resolution = reversedWorld.length - reverseResolution - 1;
+      // add in all the tiles within the bounds, but not in the view area
+      //const gridScale = Math.pow(2, resolution);
+      let nextCellsToCheck: ReadonlyVector2[] = [];
+      cellsToCheck.forEach((cell) => {
+        const [gridX, gridY] = cell;
+        const worldPosition = vectorNScale(vectorNScaleThenAdd(cell, [.5, .5]), scale);
+        const distance = vectorNLength(
+          vectorNScaleThenAdd(playerWorldPosition, worldPosition, -1),
+          // approximate distance to the edge
+        ) - scale/2;
+        //const minResolution = Math.pow(Math.max(0, distance), .9) * resolutions * 2;
+        const minResolution = distance * resolutions;
+        if (resolution > minResolution && resolution) {
+          nextCellsToCheck.push(
+            ...offsets.map(offset => vectorNScaleThenAdd(vectorNScale(cell, 2), offset)),
+          );
+        } else {
+          tiles.push([getOrCreateGridTile(gridX | 0, gridY | 0, resolution), resolution]);
+        }
+      });
+      return [tiles, nextCellsToCheck];
+    }, [[], offsets]);
 
-    tiles.forEach(tile => {
+    // const grid = world[0];
+    // const tiles = grid.map((gridX, x) => gridX.map((_, y) => getOrCreateGridTile(x, y, 0))).flat(1);    
+
+    tiles.forEach(([tile, resolution]) => {
       for (let entityId in tile) {
         if (!handledEntities[entityId]) {
           handledEntities[entityId] = 1;
@@ -943,10 +976,11 @@ window.onload = async () => {
               } = entity as DynamicEntity;
 
               const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
-              const targetUnionBounds: ReadonlyRect3 = [
-                velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime) as Vector3,
-                velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime) as Vector3,
-              ];
+              const targetUnionBounds = rectNExpand(bounds, targetPosition);
+              // const targetUnionBounds: ReadonlyRect3 = [
+              //   velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime) as Vector3,
+              //   velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime) as Vector3,
+              // ];
               const targetEntity = {
                 position: targetPosition,
                 bounds: targetUnionBounds,
@@ -977,7 +1011,7 @@ window.onload = async () => {
                       } = check as StaticEntity;
 
                       
-                      if (rect3Overlaps(targetPosition, targetUnionBounds, checkPosition, checkBounds)) {
+                      if (rectNOverlaps(targetPosition, targetUnionBounds, checkPosition, checkBounds)) {
                         // only check static collisions
                         const planeVelocity = vector3TransformMatrix4(
                           rotateToPlaneCoordinates,
@@ -1018,7 +1052,7 @@ window.onload = async () => {
 
                           // do they already overlap
                           if (FLAG_CHECK_STARTS_OVERLAPPING) {
-                            if (rect3Overlaps(position, bounds, checkPosition, checkBounds)) {
+                            if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
                               if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadius/planeVelocityZ) {
                                 if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
                                   console.log('started inside');
@@ -1238,6 +1272,8 @@ window.onload = async () => {
               matrix4Translate(...entity.position),
               // TODO render transform
               //renderTransform,
+              // drop the render down a bit for each resolution to hide edges
+              matrix4Translate(0, 0, -Math.pow(resolution, 2)/30),
             );
             const rotation = partTransforms?.[entity.body.id] || matrix4Identity();
             render.push([position, rotation]);
