@@ -43,7 +43,7 @@ function weightedAverageTerrainFactory(
       }
     }
     return totalWeight > 0
-      ? totalWeightedDepth/totalWeight
+      ? totalWeightedDepth/totalWeight * 4
       : 0;
   };
 }

@@ -210,12 +210,9 @@ window.onload = async () => {
 
   const terrain = weightedAverageTerrainFactory(baseGroundDepths, 1.2, .5);
 
-  const resolutions = 8;
+  const resolutions = 7;
   const worldDimension = Math.pow(2, resolutions);
-  // TODO if this is 1, we can get rid of it
-  // That said, it probably shouldn't be 1 as we want more detail on each tile
-  const worldTerrainScale = 1;
-
+  
   const world: World = new Array(resolutions).fill(0).map((_, resolution) => {
     const resolutionDimension = Math.pow(2, resolutions - resolution);
     return create2DArray<Tile | Falsey>(
@@ -275,49 +272,40 @@ window.onload = async () => {
       tile = {};
       grid[tx][ty] = tile;
       // generate terrain
-      const groundDepths = create2DArray(worldTerrainScale+1, worldTerrainScale+1, (ix, iy) =>{
-        const terrainX = (tx + ix/worldTerrainScale) / resolutionDimension;
-        const terrainY = (ty + iy/worldTerrainScale) / resolutionDimension;
+      const [z00, z01, z10, z11] = create2DArray(2, 2, (ix, iy) =>{
+        const terrainX = (tx + ix) / resolutionDimension;
+        const terrainY = (ty + iy) / resolutionDimension;
+        // for each corner, return the minimum depth, this way the gaps in resolutions will always be hidden
+        // beneath
         return terrain(terrainX, terrainY);
+      }).flat(2);
+
+      const params: [[ReadonlyVector3, ReadonlyVector3, ReadonlyVector3], [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3]] = 
+        (tx+ty) % 2
+        ? [
+          [[0, 0, z00], [1, 0, z10], [1, 1, z11]],
+          [[0, 0, z00], [1, 1, z11], [0, 1, z01]],
+        ]
+        : [
+          [[0, 1, z01], [0, 0, z00], [1, 0, z10]],
+          [[0, 1, z01], [1, 0, z10], [1, 1, z11]],
+        ];
+      const groundFaces = params.map(points => {
+        const scaledPoints = points.map(
+          point => vectorNScaleThenAdd(
+            vectorNMultiply(
+              point,
+              [
+                resolutionScale,
+                resolutionScale,
+                1,
+              ],
+            ),
+            [gx, gy, 0],
+          ),
+        ) as [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3];
+        return toFace(...scaledPoints);
       });
-      const groundFaces = groundDepths.slice(0, -1).map(
-        (groundDepthsX, x) => {
-          return groundDepthsX.slice(0, -1).map<[Face, Face]>(
-            (z00, y) => {
-              const z10 = groundDepths[x+1][y];
-              const z01 = groundDepths[x][y+1];
-              const z11 = groundDepths[x+1][y+1];
-              
-              const params: [[ReadonlyVector3, ReadonlyVector3, ReadonlyVector3], [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3]] = 
-                (x+y) % 2
-                ? [
-                  [[x, y, z00], [x+1, y, z10], [x+1, y+1, z11]],
-                  [[x, y, z00], [x+1, y+1, z11], [x, y+1, z01]],
-                ]
-                : [
-                  [[x, y+1, z01], [x, y, z00], [x+1, y, z10]],
-                  [[x, y+1, z01], [x+1, y, z10], [x+1, y+1, z11]],
-                ];
-              return params.map(points => {
-                const scaledPoints = points.map(
-                  point => vectorNScaleThenAdd(
-                    vectorNMultiply(
-                      point,
-                      [
-                        resolutionScale/worldTerrainScale,
-                        resolutionScale/worldTerrainScale,
-                        1,
-                      ],
-                    ),
-                    [gx, gy, 0],
-                  ),
-                ) as [ReadonlyVector3, ReadonlyVector3, ReadonlyVector3];
-                return toFace(...scaledPoints);
-              }) as [Face, Face];
-            },
-          );
-        },
-      ).flat(2);
       const resolutionColors: Vector3[] = [
         [.8, .8, 1],
         [.8, 1, .8],
@@ -337,7 +325,7 @@ window.onload = async () => {
         (v, transform) => {
           const uncachedResult = vector3TransformMatrix4(transform, ...v);
           // z is always the same for a given x/y
-          const [x, y] = vectorNScale(uncachedResult, worldTerrainScale);
+          const [x, y] = uncachedResult;
           const ix = x + .1 | 0;
           const iy = y + .1 | 0;
           const xGroundPointCache = groundPointCache[ix] || {};
@@ -932,8 +920,8 @@ window.onload = async () => {
           vectorNScaleThenAdd(playerWorldPosition, worldPosition, -1),
           // approximate distance to the edge
         ) - scale/2;
-        //const minResolution = Math.pow(Math.max(0, distance), .9) * resolutions * 2;
-        const minResolution = distance * resolutions;
+        const minResolution = Math.pow(Math.max(0, distance), .5) * resolutions;
+        //const minResolution = Math.min(distance * resolutions * 8, 6);
         if (resolution > minResolution && resolution) {
           nextCellsToCheck.push(
             ...offsets.map(offset => vectorNScaleThenAdd(vectorNScale(cell, 2), offset)),
