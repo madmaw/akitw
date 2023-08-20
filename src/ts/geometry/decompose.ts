@@ -127,9 +127,14 @@ function calculateLines(
       vector3CrossProduct(intersectionDirection, rotatedCompareNormal),
     );
     const intersectionProportion = rotatedCompareOffset[2]/planeDirection[2];
-    const [ipx, ipy] = rotatedCompareOffset.map((v, i) => (
-      v - intersectionProportion * planeDirection[i]
-    ));
+    const [ipx, ipy] = vectorNScaleThenAdd(
+      rotatedCompareOffset,
+      planeDirection,
+      -intersectionProportion,
+    );
+    // const [ipx, ipy] = rotatedCompareOffset.map((v, i) => (
+    //   v - intersectionProportion * planeDirection[i]
+    // ));
     // NOTE: these are actually vec3s
     const [idx, idy] = intersectionDirection;
     return [[

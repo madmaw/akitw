@@ -48,8 +48,17 @@ function toFace(
   );
 
   const toPlaneCoordinates = matrix4Invert(toModelCoordinates);
+  const polygon = [p1, p2, p3].map(p => vector3TransformMatrix4(toPlaneCoordinates, ...p));
+  // const center = polygon.reduce((total, p) => vectorNScaleThenAdd(total, p, 1/3));
+  // const expandedPolygon = polygon.map(p => {
+  //   const d = vectorNScaleThenAdd(p, center, -1);
+  //   return vectorNScaleThenAdd(center, d, 1);
+  // });
+
+
   return {
-    polygons: [[p1, p2, p3].map(p => vector3TransformMatrix4(toPlaneCoordinates, ...p))],
+    polygons: [polygon],
+    //polygons: [expandedPolygon],
     toModelCoordinates,
     rotateToModelCoordinates,
   }

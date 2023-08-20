@@ -1,9 +1,13 @@
 type World = Grid[];
 
 type GridId = 1;
-type Grid = readonly((Tile | Falsey)[])[];
+type Grid = readonly(Tile[])[];
 
-type Tile = Record<EntityId, Entity>;
+type Tile = {
+  entities: Record<EntityId, Entity>,
+  populated?: Booleanish,
+  resolution: number,
+};
 
 type RenderGroupId = number;
 type EntityId = number;
@@ -19,6 +23,7 @@ type BaseEntity<PartId extends number = number> = {
   position: Vector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
+  logs?: any[][];
 };
 
 type StaticEntity<PartId extends number = number> = {
@@ -26,6 +31,9 @@ type StaticEntity<PartId extends number = number> = {
   readonly rotateToPlaneCoordinates: ReadonlyMatrix4,
   readonly worldToPlaneCoordinates: ReadonlyMatrix4,
   // TODO toWorldCoordinates, rotateToWorldCoordinates
+  // only render if is in this tile
+  readonly renderTile?: Tile,
+
 } & BaseEntity<PartId>;
 
 type DynamicEntity<PartId extends number = number> = {
@@ -34,6 +42,7 @@ type DynamicEntity<PartId extends number = number> = {
   velocity: Vector3,
   readonly restitution?: number,
   readonly gravity?: number,
+  readonly renderTile?: undefined,
 } & BaseEntity<PartId>;
 
 type Part<PartId extends number = number> = {

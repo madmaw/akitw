@@ -2,4 +2,4 @@ const FLAG_SHOW_GL_ERRORS = true;
 const FLAG_DEBUG_SHORTENED_METHODS = false;
 const FLAG_QUICK_COLLISIONS = true;
 const FLAG_CHECK_STARTS_OVERLAPPING = true;
-const FLAG_LOW_POLY_TERRAIN = false;
+const FLAG_LOW_POLY_TERRAIN = true;

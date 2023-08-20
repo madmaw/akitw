@@ -7,4 +7,4 @@ const HORIZON = 99;
 const SKY: Vector3 = [.7, .8, 1];
 
 const MAX_COLLISION_STEPS = 4;
-const MAX_COLLISIONS = 4;
+const MAX_COLLISIONS = 8;
