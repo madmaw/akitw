@@ -6,5 +6,5 @@ const DEFAULT_GRAVITY = .00001;
 const HORIZON = 99;
 const SKY: Vector3 = [.7, .8, 1];
 
-const MAX_COLLISION_STEPS = 4;
+const MAX_COLLISION_STEPS = 9;
 const MAX_COLLISIONS = 8;

@@ -23,6 +23,8 @@ type BaseEntity<PartId extends number = number> = {
   position: Vector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
+  // all the resolutions that this entity renders in
+  readonly resolutions: number[],
   logs?: any[][];
 };
 

@@ -3,18 +3,11 @@ type Terrain = (x: number, y: number) => number;
 function weightedAverageTerrainFactory(
   depths: number[][],
   sampleRadius: number,
-  randomness: number,
+  scale: number,
 ): Terrain {
   // TODO can be a constant
   const width = depths.length;
   const height = depths[0].length;
-  const randomBits: number[][] = create2DArray(
-    width,
-    height, 
-    () => {
-      return Math.random() * randomness;
-    },
-  );
   return function(wx: number, wy: number) {
     const tx = wx * width;
     const ty = wy * height;
@@ -34,8 +27,7 @@ function weightedAverageTerrainFactory(
           && y < height
           && sampleRadiusSquared > distanceSquared
         ) {
-          const randomDepth = randomBits[x][y];
-          const depth = depths[x][y] + randomDepth;
+          const depth = depths[x][y];
           const weight = Math.pow(1 - Math.sqrt(distanceSquared)/Math.sqrt(sampleRadiusSquared), 2);
           totalWeightedDepth += weight * depth;
           totalWeight += weight;
@@ -43,7 +35,7 @@ function weightedAverageTerrainFactory(
       }
     }
     return totalWeight > 0
-      ? totalWeightedDepth/totalWeight * 4
+      ? totalWeightedDepth/totalWeight * scale
       : 0;
   };
 }
