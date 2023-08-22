@@ -6,7 +6,6 @@ const U_CAMERA_POSITION = 'uCameraPosition';
 const U_MATERIAL_TEXTURE = 'uMaterialTexture';
 const U_TIME = 'uTime';
 
-const A_VERTEX_PLANE_POSITION = 'aVertexPlanePosition';
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
 const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'aVertexModelSmoothingRotation';
@@ -27,7 +26,6 @@ const O_COLOR = "oColor";
 const VERTEX_SHADER = `#version 300 es
   precision lowp float;
 
-  in vec4 ${A_VERTEX_PLANE_POSITION};
   in vec4 ${A_VERTEX_MODEL_POSITION};
   in mat4 ${A_VERTEX_MODEL_ROTATION_MATRIX};
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
@@ -648,14 +646,12 @@ window.onload = async () => {
   gl.useProgram(program);
 
   const [
-    aPlanePosition,
     aModelPosition,
     aModelRotationMatrix,
     aModelSmoothingRotationMatrix,
     aModelTexturePositionMatrix,
     aModelColor,
   ] = [
-    A_VERTEX_PLANE_POSITION,
     A_VERTEX_MODEL_POSITION,
     A_VERTEX_MODEL_ROTATION_MATRIX,
     A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX,
@@ -740,7 +736,6 @@ window.onload = async () => {
     );
 
     const [
-      planePoints,
       modelPoints,
       modelRotations,
       smoothingTransforms,
@@ -748,8 +743,6 @@ window.onload = async () => {
       colors,
       indices,
     ] = faces.reduce<[
-      // plane positions
-      ReadonlyVector4[],
       // model positions
       ReadonlyVector3[],
       // plane to model transformation
@@ -763,7 +756,6 @@ window.onload = async () => {
       // indices
       number[],
     ]>(([
-      planePoints,
       modelPoints,
       modelRotations,
       smoothingTransforms,
@@ -842,7 +834,6 @@ window.onload = async () => {
       }, []);
   
       return [
-        [...planePoints, ...newPlanePoints],
         [...modelPoints, ...modelPointsUnique],
         [...modelRotations, ...newModelRotations],
         [...smoothingTransforms, ...newSmoothingTransforms],
@@ -850,13 +841,12 @@ window.onload = async () => {
         [...colors, ...newColors],
         [...indices, ...newIndices],
       ];
-    }, [[], [], [], [], [], [], []]);
+    }, [[], [], [], [], [], []]);
 
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
   
     ([
-      [aPlanePosition, planePoints],
       [aModelPosition, modelPoints],
       [aModelRotationMatrix, modelRotations],
       [aModelSmoothingRotationMatrix, smoothingTransforms],
