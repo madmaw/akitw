@@ -127,7 +127,7 @@ const FRAGMENT_SHADER = `#version 300 es
     float inverseBrightness = min(${V_MODEL_COLOR}.w*2.,1.);
     vec4 color = mix(
       vec4(${V_MODEL_COLOR}.xyz, 1),
-      vec4(1, 0, 0, 1),
+      vec4(.1, .4, .2, 1),
       abs(tm.a * 2. - 1.)
     );
     float lighting = max(
@@ -298,8 +298,8 @@ window.onload = async () => {
       // TODO clouds
     },
     featureMaterial(
-      spikeFeatureFactory(.05, .05),
-      12,
+      spikeFeatureFactory(.02, .02),
+      8,
       // spikeFeatureFactory(1, 1),
       // 64,
       99999,
@@ -313,8 +313,9 @@ window.onload = async () => {
   const textureImages = materials.map(material => {
     const materialCanvas = document.createElement('canvas');
     //document.body.appendChild(materialCanvas);
-    materialCanvas.width = MATERIAL_TEXTURE_DIMENSION;
-    materialCanvas.height = MATERIAL_TEXTURE_DIMENSION; 
+    const dimension = MATERIAL_TEXTURE_DIMENSION;
+    materialCanvas.width = dimension;
+    materialCanvas.height = dimension; 
     const ctx = materialCanvas.getContext(
       '2d',
       FLAG_FAST_READ_CANVASES
@@ -329,7 +330,7 @@ window.onload = async () => {
     ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
 
     material && material(ctx, MATERIAL_TEXTURE_DIMENSION);
-    return materialCanvas;
+    return materialCanvas;  
   });
   
 
@@ -451,7 +452,7 @@ window.onload = async () => {
       const groundFaces = workingArray.map((point, i) => {
         const nextPoint = points[(i+1)%points.length];
         return toFace<PlaneMetadata>(axisPoint, point, nextPoint, {
-          color1: [0, 1, 0, .5],
+          color1: [.2, .3, .0, .5],
           textureCoordinateTransform: matrix4Identity(),
         });
       });
@@ -529,7 +530,7 @@ window.onload = async () => {
               centerRadius: radius,
               modelId,
               renderTransform: matrix4Identity(),
-              textures: new Map([[uMaterialTexture, [TEXTURE_GRASS_MIPMAP]]]),
+              textures: new Map([[uMaterialTexture, [resolution > 1 ? TEXTURE_GRASS_MIPMAP: TEXTURE_GRASS]]]),
             },
           },
           position: [0, 0, 0],
@@ -955,7 +956,6 @@ window.onload = async () => {
         renderTransform: matrix4Identity(),
         centerOffset: center,
         centerRadius: radius,
-        textures: new Map([[uMaterialTexture, [TEXTURE_GRASS]]])
       },
     },
     bounds,
@@ -1132,7 +1132,7 @@ window.onload = async () => {
     //
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
-    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX_MIPMAP);
+    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
     //gl.uniform1i(uMaterialTexture, TEXTURE_GRASS);
 
     gl.bindVertexArray(skyCylinderModel.vao);
