@@ -18,8 +18,8 @@ const V_MODEL_ROTATION_MATRIX = 'vModelRotation';
 const V_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
 const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = 'vInverseModelSmoothingRotation';
 const V_MODEL_COLOR = 'vColor';
-const V_MODEL_PLANE_NORMAL = 'vModelPlaneNormal';
-const V_MODEL_TEXTURE_POSITION_MATRIX = 'vModelTexturePosition'
+const V_WORLD_PLANE_NORMAL = 'vWorldPlaneNormal';
+const V_WORLD_TEXTURE_POSITION_MATRIX = 'vWorldTexturePosition'
 
 const O_COLOR = "oColor";
 
@@ -37,23 +37,23 @@ const VERTEX_SHADER = `#version 300 es
   uniform mat4 ${U_PROJECTION_MATRIX};
   
   out vec4 ${V_WORLD_POSITION};
-  out mat4 ${V_MODEL_TEXTURE_POSITION_MATRIX};
+  out mat4 ${V_WORLD_TEXTURE_POSITION_MATRIX};
   out vec4 ${V_MODEL_POSITION};
   out mat4 ${V_MODEL_ROTATION_MATRIX};
   out mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
   out mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   out vec3 ${V_MODEL_COLOR};
-  out vec4 ${V_MODEL_PLANE_NORMAL};
+  out vec4 ${V_WORLD_PLANE_NORMAL};
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
-    ${V_MODEL_TEXTURE_POSITION_MATRIX} = ${A_MODEL_TEXTURE_POSITION_MATRIX};
+    ${V_WORLD_TEXTURE_POSITION_MATRIX} = ${U_WORLD_ROTATION_MATRIX} * ${A_MODEL_TEXTURE_POSITION_MATRIX};
     ${V_WORLD_POSITION} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
-    ${V_MODEL_PLANE_NORMAL} = ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
+    ${V_WORLD_PLANE_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
     
     ${V_MODEL_SMOOTHING_ROTATION_MATRIX} = ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
-    ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} = inverse(${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX});
+    ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} = inverse(${V_MODEL_SMOOTHING_ROTATION_MATRIX});
     ${V_MODEL_COLOR} = ${A_MODEL_COLOR};
 
     gl_Position = ${U_PROJECTION_MATRIX} * ${V_WORLD_POSITION};
@@ -67,14 +67,14 @@ const MATERIAL_DEPTH_SCALE = 256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RA
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
 
-  in mat4 ${V_MODEL_TEXTURE_POSITION_MATRIX};
+  in mat4 ${V_WORLD_TEXTURE_POSITION_MATRIX};
   in vec4 ${V_WORLD_POSITION};
   in vec4 ${V_MODEL_POSITION};
   in mat4 ${V_MODEL_ROTATION_MATRIX};
   in mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
   in mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   in vec3 ${V_MODEL_COLOR};
-  in vec4 ${V_MODEL_PLANE_NORMAL};
+  in vec4 ${V_WORLD_PLANE_NORMAL};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
@@ -85,11 +85,9 @@ const FRAGMENT_SHADER = `#version 300 es
 
   void main(void) {
     vec3 distance = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
-    vec4 d = inverse(${U_WORLD_ROTATION_MATRIX})
-      * ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX}
-      * vec4(normalize(distance), 1);
+    vec4 d = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(distance), 1);
     // NOTE: c will be positive for camera facing surfaces
-    float c = dot(${V_MODEL_PLANE_NORMAL}.xyz, d.xyz);
+    float c = dot(${V_WORLD_PLANE_NORMAL}.xyz, d.xyz);
     float depth = ${MATERIAL_DEPTH_RANGE/2};
     // material
     vec4 tm;
@@ -98,7 +96,7 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 p;
     for (int count = 0; count < ${NUM_STEPS}; count++) {
       depth -= ${STEP};
-      p = ${V_MODEL_TEXTURE_POSITION_MATRIX} * vec4(${V_MODEL_POSITION}.xyz + d.xyz * depth / c, 1);
+      p = ${V_WORLD_TEXTURE_POSITION_MATRIX} * vec4(${V_WORLD_POSITION}.xyz + d.xyz * depth / c, 1);
       vec4 tm1 = texture(
         ${U_MATERIAL_TEXTURE},
         p.xy
@@ -114,7 +112,7 @@ const FRAGMENT_SHADER = `#version 300 es
         if (abs(divisor) > .0) {  
           float si = s0 * ${STEP}/divisor;
           depth += ${STEP} - si;
-          p = ${V_MODEL_TEXTURE_POSITION_MATRIX} * vec4(${V_MODEL_POSITION}.xyz + d.xyz * (d0 - si) / c, 1);
+          p = ${V_WORLD_TEXTURE_POSITION_MATRIX} * vec4(${V_WORLD_POSITION}.xyz + d.xyz * (d0 - si) / c, 1);
           count = ${NUM_STEPS};
         }
       }
