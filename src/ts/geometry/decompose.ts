@@ -1,19 +1,19 @@
-function decompose(shapes: readonly Shape[]): readonly Face[] {
+function decompose<T>(shapes: readonly Shape<T>[]): readonly Face<T>[] {
   const allPlanes = decomposeShapesToPlanes(shapes);
   const faces = decomposeShapesToFaces(shapes, allPlanes);
   return faces;
 }
 
-function decomposeShapesToPlanes(shapes: readonly Shape[]): readonly Plane[] {
+function decomposeShapesToPlanes<T>(shapes: readonly Shape<T>[]): readonly Plane<T>[] {
   return shapes.map(([shape, subtractions]) => {
     return [...shape, ...subtractions.flat(1)];
   }).flat(1);
 }
 
-function decomposeShapesToFaces(
-  shapes: readonly Shape[],
-  allPlanes: readonly Plane[],
-): readonly Face[] {
+function decomposeShapesToFaces<T>(
+  shapes: readonly Shape<T>[],
+  allPlanes: readonly Plane<T>[],
+): readonly Face<T>[] {
   return shapes.map((shape, i) => {
     const [addition, subtractions] = shape;
     // break the shape into faces
@@ -24,7 +24,7 @@ function decomposeShapesToFaces(
         const faces = isSubtraction
           ? convexShape.map(flipPlane)
           : convexShape;
-        return faces.map<Face[]>(plane => {
+        return faces.map<Face<T>[]>(plane => {
           const [translate, rotateToModelCoordinates] = planeToTransforms(plane);
           const toModelCoordinates = matrix4Multiply(translate, rotateToModelCoordinates);
           const inverseRotate = matrix4Invert(rotateToModelCoordinates);
@@ -87,10 +87,11 @@ function decomposeShapesToFaces(
               });
             });
           if (polygons.length) {
-            const face: Face = {
+            const face: Face<T> = {
               polygons,
               rotateToModelCoordinates,
               toModelCoordinates,
+              t: plane[2],
             };
             return [
               face,
@@ -103,7 +104,7 @@ function decomposeShapesToFaces(
 }
 
 function calculateLines(
-  planes: readonly Plane[],
+  planes: readonly Plane<any>[],
   inverseRotate: ReadonlyMatrix4,
   inverse: ReadonlyMatrix4,
 ): readonly Line[] {

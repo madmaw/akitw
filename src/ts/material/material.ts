@@ -1,5 +1,5 @@
 
-type Material = (ctx: CanvasRenderingContext2D) => void;
+type Material = (ctx: CanvasRenderingContext2D, size: number) => void;
 
 type ImageDataMaterial = (imageData: ImageData) => void;
 
@@ -22,16 +22,16 @@ type FeatureFactory = (r: number, z: number) => Feature;
 
 
 // x, y, scale
-type Distribution = () => readonly [number, number, number];
+type Distribution = (size: number) => readonly [number, number, number];
 
 function randomDistributionFactory(
   scaleRandomness: number,
   pow: number,
 ): Distribution {
-  return function(): [number, number, number] {
+  return function(size: number): [number, number, number] {
     return [
-      Math.random() * MATERIAL_TEXTURE_DIMENSION,
-      Math.random() * MATERIAL_TEXTURE_DIMENSION,
+      Math.random() * size,
+      Math.random() * size,
       (1 - scaleRandomness) + scaleRandomness * Math.pow(Math.random(), pow),
     ];
   }
@@ -49,11 +49,11 @@ function clusteredDistributionFactory(
   steps: number,
 ): Distribution {
   const clusters: Cluster[] = [];
-  return function() {
+  return function(size: number) {
     if (!clusters.length) {
       clusters.push([
-        Math.random() * MATERIAL_TEXTURE_DIMENSION,
-        Math.random() * MATERIAL_TEXTURE_DIMENSION,
+        Math.random() * size,
+        Math.random() * size,
         (1 - scaleRandomness) + Math.random() * scaleRandomness,
         steps,
       ]);
@@ -82,11 +82,11 @@ function clusteredDistributionFactory(
 function evenDistributionFactory(d: number): Distribution {
   let x = 0;
   let y = 0;
-  return function () {
+  return function (size: number) {
     const ox = x;
     const oy = y;
-    x += d;
-    if (x > MATERIAL_TEXTURE_DIMENSION - d) {
+    x += d * size/MATERIAL_TEXTURE_DIMENSION;
+    if (x > size - d) {
       x = 0;
       y += d;
     }
@@ -104,22 +104,22 @@ function featureMaterial(
   quantity: number,
   distribution: Distribution,
 ): Material {
-  return function(ctx: CanvasRenderingContext2D) {
-    const imageData = ctx.getImageData(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+  return function(ctx: CanvasRenderingContext2D, size: number) {
+    const imageData = ctx.getImageData(0, 0, size, size);
     const z = imageData.data[2];
 
     for(let i=0; i<quantity; i++) {
-      const [x, y, scale] = distribution();
-      const dimension = baseDimension * scale;
+      const [x, y, scale] = distribution(size);
+      const dimension = (baseDimension * scale)*size/MATERIAL_TEXTURE_DIMENSION;
       const r = dimension/2;
       const feature = f(r, z);
 
       for (let dx = -1; dx < dimension + 1; dx++) {
-        const px = x + dx + MATERIAL_TEXTURE_DIMENSION | 0;
+        const px = x + dx + size | 0;
         for (let dy = -1; dy < dimension + 1; dy++) {
-          const py = y + dy + MATERIAL_TEXTURE_DIMENSION | 0;
-          let index = ((py % MATERIAL_TEXTURE_DIMENSION) * MATERIAL_TEXTURE_DIMENSION
-            + (px % MATERIAL_TEXTURE_DIMENSION)) * 4;
+          const py = y + dy + size | 0;
+          let index = ((py % size) * size
+            + (px % size)) * 4;
           const ox = dx - r + .5;
           const oy = dy - r + .5;
           const z = imageData.data[index + 2];

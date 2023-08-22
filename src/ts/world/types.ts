@@ -28,8 +28,13 @@ type BaseEntity<PartId extends number = number> = {
   logs?: any[][];
 };
 
+type PlaneMetadata = {
+  readonly textureCoordinateTransform?: ReadonlyMatrix4,
+  readonly color1: ReadonlyVector4,
+};
+
 type StaticEntity<PartId extends number = number> = {
-  readonly face: Face,
+  readonly face: Face<PlaneMetadata>,
   readonly rotateToPlaneCoordinates: ReadonlyMatrix4,
   readonly worldToPlaneCoordinates: ReadonlyMatrix4,
   // TODO toWorldCoordinates, rotateToWorldCoordinates

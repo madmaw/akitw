@@ -1,24 +1,27 @@
 // normal, point
-type Plane = readonly [ReadonlyVector3, ReadonlyVector3];
+type Plane<T> = readonly [ReadonlyVector3, ReadonlyVector3, T];
 
-function toPlane(nx: number, ny: number, nz: number, d: number): Plane {
+function toPlane<T>(nx: number, ny: number, nz: number, d: number, t: T): Plane<T> {
   const normal = vectorNNormalize<ReadonlyVector3>([nx, ny, nz]);
   const position = vectorNScale<ReadonlyVector3>(normal, d);
   return [
     normal,
     position,
+    t,
   ];
 }
 
-function flipPlane([normal, offset]: Plane): Plane {
-  return [vectorNScale(normal, -1), offset]
+function flipPlane<T>([normal, offset, t]: Plane<T>): Plane<T> {
+  return [vectorNScale(normal, -1), offset, t]
 }
 
 /**
  * returns translation and rotation matrices in that order, these matrices convert 
  * plane coordinates to world coordinates
  */
-function planeToTransforms([normal, offset]: Plane): [ReadonlyMatrix4, ReadonlyMatrix4] {
+function planeToTransforms(
+  [normal, offset]: [ReadonlyVector3, ReadonlyVector3] | Plane<any>,
+): [ReadonlyMatrix4, ReadonlyMatrix4] {
   const cosRadians = vectorNDotProduct(NORMAL_Z, normal);
   const axis = Math.abs(cosRadians) < 1 - EPSILON 
       ? vectorNNormalize(

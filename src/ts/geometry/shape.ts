@@ -1,14 +1,14 @@
-type ConvexShape = readonly Plane[];
+type ConvexShape<T> = readonly Plane<T>[];
 
-type Shape = readonly [
+type Shape<T> = readonly [
   // body
-  ConvexShape,
+  ConvexShape<T>,
   // subtractions
-  readonly ConvexShape[],
+  readonly ConvexShape<T>[],
 ];
 
-function convexShapeContainPoint(
-  shape: ConvexShape,
+function convexShapeContainPoint<T>(
+  shape: ConvexShape<T>,
   point: ReadonlyVector3,
   threshold = -EPSILON
 ): boolean {
@@ -21,8 +21,8 @@ function convexShapeContainPoint(
   });
 }
 
-function convexShapeExpand(shape: ConvexShape, amount: number): ConvexShape {
-  return shape.map(([normal, position]) => {
+function convexShapeExpand<T>(shape: ConvexShape<T>, amount: number): ConvexShape<T> {
+  return shape.map(([normal, position, t]) => {
     return [
       normal,
       vectorNScaleThenAdd(
@@ -30,6 +30,7 @@ function convexShapeExpand(shape: ConvexShape, amount: number): ConvexShape {
         normal,
         amount
       ),
+      t,
     ];
   });
 }

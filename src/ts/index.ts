@@ -30,7 +30,7 @@ const VERTEX_SHADER = `#version 300 es
   in mat4 ${A_VERTEX_MODEL_ROTATION_MATRIX};
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
   in mat4 ${A_MODEL_TEXTURE_POSITION_MATRIX};
-  in vec3 ${A_MODEL_COLOR};
+  in vec4 ${A_MODEL_COLOR};
 
   uniform mat4 ${U_WORLD_POSITION_MATRIX};
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
@@ -42,12 +42,13 @@ const VERTEX_SHADER = `#version 300 es
   out mat4 ${V_MODEL_ROTATION_MATRIX};
   out mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
   out mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
-  out vec3 ${V_MODEL_COLOR};
+  out vec4 ${V_MODEL_COLOR};
   out vec4 ${V_WORLD_PLANE_NORMAL};
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
-    ${V_WORLD_TEXTURE_POSITION_MATRIX} = ${U_WORLD_ROTATION_MATRIX} * ${A_MODEL_TEXTURE_POSITION_MATRIX};
+    //${V_WORLD_TEXTURE_POSITION_MATRIX} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_MODEL_TEXTURE_POSITION_MATRIX};
+    ${V_WORLD_TEXTURE_POSITION_MATRIX} = ${A_MODEL_TEXTURE_POSITION_MATRIX} * inverse(${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX});
     ${V_WORLD_POSITION} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
     ${V_WORLD_PLANE_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
@@ -62,7 +63,7 @@ const VERTEX_SHADER = `#version 300 es
 
 const STEP = .001;
 const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
-const MATERIAL_DEPTH_SCALE = 256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE);
+const MATERIAL_DEPTH_SCALE = (256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE)).toFixed(1);
 
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
@@ -73,7 +74,7 @@ const FRAGMENT_SHADER = `#version 300 es
   in mat4 ${V_MODEL_ROTATION_MATRIX};
   in mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
   in mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
-  in vec3 ${V_MODEL_COLOR};
+  in vec4 ${V_MODEL_COLOR};
   in vec4 ${V_WORLD_PLANE_NORMAL};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
@@ -121,23 +122,18 @@ const FRAGMENT_SHADER = `#version 300 es
         p.xy
       );  
     }
-
     vec2 n = tm.xy * 2. - 1.;
     vec3 m = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(n, pow(1. - length(n), 2.), 1)).xyz;
+    float inverseBrightness = min(${V_MODEL_COLOR}.w*2.,1.);
     vec4 color = mix(
-      vec4(${V_MODEL_COLOR}, 1),
+      vec4(${V_MODEL_COLOR}.xyz, 1),
       vec4(1, 0, 0, 1),
       abs(tm.a * 2. - 1.)
     );
     float lighting = max(
-      0., 
+      1. - inverseBrightness, 
       (dot(m, normalize(vec3(1, 2, 3)))+1.)/2.
     ) * .5;
-    // vec3 n = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(0, 0, 1, 1)).xyz;
-    // vec3 color =  texture(
-    //   ${U_MATERIAL_TEXTURE},
-    //   ${V_MODEL_POSITION}.xy/ 9.
-    // ).xyz;
 
     vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z, .1));
     float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z, 0., 1.), 9.);
@@ -151,11 +147,12 @@ const FRAGMENT_SHADER = `#version 300 es
           vec3(.8, .7, .5),
           sandiness
         ),
-        vec3(0, .2, .4),
+        vec3(${WATER.join()}),
         wateriness
       ),
+      // fog
       vec3(${SKY.join()}),
-      pow(min(1., length(waterDistance)/${HORIZON}.), 2.)
+      pow(min(1., length(waterDistance)/${MAX_FOG_DEPTH}.), 1.) * max(wateriness, inverseBrightness)
     );
     ${O_COLOR} = vec4(sqrt(fc), 1);
   }
@@ -163,108 +160,63 @@ const FRAGMENT_SHADER = `#version 300 es
 
 window.onload = async () => {
 
-  // frame
-  const shape1: ConvexShape = [
-    //toPlane(0, 0, 1, 1),
-    toPlane(0, 0, -1, 2),
-    toPlane(1, 0, 1, 2),
-    toPlane(-1, 0, 1, 2),
-    toPlane(1, 0, 0, 2),
-    toPlane(-1, 0, 0, 2),
-    toPlane(0, 1, 0, 2),
-    toPlane(0, -1, 0, 2),
-  ];
-
-  // windows
-  const shape2: ConvexShape = [
-    toPlane(1, 0, 0, 1.2),
-    toPlane(-1, 0, 0, 1.2),
-    toPlane(0, 1, 0, 0),
-    toPlane(0, -1, 0, .5),
-    toPlane(0, 0, 1, .3),
-    toPlane(0, 0, -1, .3),
-  ];
-
-  // door
-  const shape3: ConvexShape = [
-    toPlane(1, 0, 0, .2),
-    toPlane(-1, 0, 0, .2),
-    toPlane(0, 1, 0, 0),
-    toPlane(0, -1, 0, .8),
-    toPlane(0, 0, 1, 0.8),
-    toPlane(0, 0, -1, 1.3),
-  ];
-
-  // interior
-  const shape4: ConvexShape = [
-    toPlane(0, 0, 1, .8),
-    toPlane(0, 0, -1, .8),
-    toPlane(1, 1, 0, .8),
-    toPlane(-1, 1, 0, .8),
-    toPlane(1, 0, 0, .8),
-    toPlane(-1, 0, 0, .8),
-    //toPlane(0, 1, 0, .8),
-    toPlane(0, -1, 0, .8),
-  ];
-
-  // chimney
-  const shape5: ConvexShape = [
-    toPlane(1, 0, 0, .4),
-    toPlane(-1, 0, 0, .4),
-    toPlane(0, 1, 0, 1.8),
-    toPlane(0, -1, 0, .8),
-    toPlane(0, 0, 1, 1),
-    //toPlane(0, 0, 1, 2),
-    toPlane(0, 0, -1, -.2),
-  ];
-  
-  // chimney hole
-  const shape6: ConvexShape = [
-    toPlane(1, 0, 0, .2),
-    toPlane(-1, 0, 0, .2),
-    toPlane(0, 1, 0, 1.9),
-    toPlane(0, -1, 0, 1.1),
-    toPlane(0, 0, 1, .8),
-    toPlane(0, 0, -1, -.4),
-  ];
+  const defaultPlaneMetadata: PlaneMetadata = {
+    color1: [.5, .5, .5, .5],
+  }
 
   // cube
-  const cube: ConvexShape = [
-    toPlane(0, 0, 1, .2),
-    toPlane(0, 0, -1, .2),
-    toPlane(1, 0, 0, .2),
-    toPlane(-1, 0, 0, .2),
-    toPlane(0, 1, 0, .2),
-    toPlane(0, -1, 0, .2),
+  const cube: ConvexShape<PlaneMetadata> = [
+    toPlane(0, 0, 1, .2, defaultPlaneMetadata),
+    toPlane(0, 0, -1, .2, defaultPlaneMetadata),
+    toPlane(1, 0, 0, .2, defaultPlaneMetadata),
+    toPlane(-1, 0, 0, .2, defaultPlaneMetadata),
+    toPlane(0, 1, 0, .2, defaultPlaneMetadata),
+    toPlane(0, -1, 0, .2, defaultPlaneMetadata),
   ];
 
-  const cubeSmall: ConvexShape = [
-    toPlane(0, 0, 1, .01),
-    toPlane(0, 0, -1, .01),
-    toPlane(1, 0, 0, .01),
-    toPlane(-1, 0, 0, .01),
-    toPlane(0, 1, 0, .01),
-    toPlane(0, -1, 0, .01),
+  const cubeSmall: ConvexShape<PlaneMetadata> = [
+    toPlane(0, 0, 1, .01, defaultPlaneMetadata),
+    toPlane(0, 0, -1, .01, defaultPlaneMetadata),
+    toPlane(1, 0, 0, .01, defaultPlaneMetadata),
+    toPlane(-1, 0, 0, .01, defaultPlaneMetadata),
+    toPlane(0, 1, 0, .01, defaultPlaneMetadata),
+    toPlane(0, -1, 0, .01, defaultPlaneMetadata),
   ];
 
-  const cubeBig: ConvexShape = [
-    toPlane(0, 0, 1, .9),
-    toPlane(0, 0, -1, .9),
-    toPlane(1, 0, 0, .9),
-    toPlane(-1, 0, 0, .9),
-    toPlane(0, 1, 0, .9),
-    toPlane(0, -1, 0, .9),
+  const cubeBig: ConvexShape<PlaneMetadata> = [
+    toPlane(0, 0, 1, .9, defaultPlaneMetadata),
+    toPlane(0, 0, -1, .9, defaultPlaneMetadata),
+    toPlane(1, 0, 0, .9, defaultPlaneMetadata),
+    toPlane(-1, 0, 0, .9, defaultPlaneMetadata),
+    toPlane(0, 1, 0, .9, defaultPlaneMetadata),
+    toPlane(0, -1, 0, .9, defaultPlaneMetadata),
   ];
 
-  const skyCylinderRadius = HORIZON/1.5;
-  const skyCylinder: ConvexShape = new Array(8).fill(0).map((_, i, arr) => {
+  const skyCylinderRadius = HORIZON*.6;
+  const skyCylinder: ConvexShape<PlaneMetadata> = new Array(12).fill(0).map((_, i, arr) => {
     const a = Math.PI * 2 * i / arr.length;
     const sin = Math.sin(a);
     const cos = Math.cos(a);
-    return toPlane(cos, sin, 0, skyCylinderRadius);
+    const unrotate = matrix4Multiply(
+      // y <-> z (only need z -> y but not sure which dir does that)
+      // TODO just rotate around X instead
+      matrix4Rotate(-Math.PI/2, 1, 0, 0),
+      matrix4Scale(.5/skyCylinderRadius),
+      matrix4Rotate(-a, 0, 0, 1),
+    );
+    return toPlane<PlaneMetadata>(cos, sin, 0, skyCylinderRadius, {
+      textureCoordinateTransform: unrotate,
+      color1: [...SKY, 0],
+    });
   }).concat([
-    toPlane(0, 0, 1, skyCylinderRadius),
-    toPlane(0, 0, -1, skyCylinderRadius),
+    toPlane(0, 0, 1, skyCylinderRadius, {
+      textureCoordinateTransform: matrix4Scale(.5/skyCylinderRadius),
+      color1: [...SKY, 0],
+    }),
+    toPlane(0, 0, -1, skyCylinderRadius, {
+      textureCoordinateTransform: undefined,
+      color1: [...SKY, 0],
+    }),
   ]);
 
   // const shapes: readonly Shape[] = ([
@@ -332,16 +284,17 @@ window.onload = async () => {
     }
   }
 
-  const materials: Material[] = [
+  // material, flags = generate linear, generate mipmap
+  const materials: (Material | Falsey)[] = [
     // empty
-    ,
+    0,
     // skybox
-    ctx => {
-      const gradient = ctx.createLinearGradient(0, 0, 0, MATERIAL_TEXTURE_DIMENSION/2);
-      gradient.addColorStop(0, 'rgb(128,128,128)');
-      gradient.addColorStop(.5, 'rgba(128,128,128,.5)');
+    (ctx, size) => {
+      const gradient = ctx.createLinearGradient(0, 0, 0, size/2);
+      gradient.addColorStop(0, 'rgb(128,128,128,.5)');
+      gradient.addColorStop(.5, 'rgba(128,128,128)');
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+      ctx.fillRect(0, 0, size, size);
       // TODO clouds
     },
     featureMaterial(
@@ -359,6 +312,7 @@ window.onload = async () => {
   // make some textures
   const textureImages = materials.map(material => {
     const materialCanvas = document.createElement('canvas');
+    //document.body.appendChild(materialCanvas);
     materialCanvas.width = MATERIAL_TEXTURE_DIMENSION;
     materialCanvas.height = MATERIAL_TEXTURE_DIMENSION; 
     const ctx = materialCanvas.getContext(
@@ -374,8 +328,8 @@ window.onload = async () => {
     //ctx.fillStyle = 'red';
     ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
 
-    material?.(ctx);
-    return materialCanvas;  
+    material && material(ctx, MATERIAL_TEXTURE_DIMENSION);
+    return materialCanvas;
   });
   
 
@@ -496,16 +450,11 @@ window.onload = async () => {
       }
       const groundFaces = workingArray.map((point, i) => {
         const nextPoint = points[(i+1)%points.length];
-        return toFace(axisPoint, point, nextPoint);
+        return toFace<PlaneMetadata>(axisPoint, point, nextPoint, {
+          color1: [0, 1, 0, .5],
+          textureCoordinateTransform: matrix4Identity(),
+        });
       });
-      const resolutionColors: Vector3[] = [
-        [.2, .8, .6],
-        // [.8, 1, .9],
-        // [.6, 1, .8],
-        // [.4, 1, .7],
-        // [.1, .6, .5],
-        // [0, .4, .4],
-      ];
       const {
         faces,
         bounds,
@@ -557,7 +506,6 @@ window.onload = async () => {
           );
           //return vector3TransformMatrix4(_.rotateToModelCoordinates, 0, 0, 1);
         },
-        resolutionColors[resolution % resolutionColors.length],
       );
       const renderGroupId = nextRenderGroupId++;
       faces.forEach(face => {
@@ -581,7 +529,7 @@ window.onload = async () => {
               centerRadius: radius,
               modelId,
               renderTransform: matrix4Identity(),
-              textures: new Map([[uMaterialTexture, [TEXTURE_GRASS]]]),
+              textures: new Map([[uMaterialTexture, [TEXTURE_GRASS_MIPMAP]]]),
             },
           },
           position: [0, 0, 0],
@@ -684,12 +632,11 @@ window.onload = async () => {
 
   const models: Model[] = [];
   function appendModel(
-    faces: readonly Face[],
+    faces: readonly Face<PlaneMetadata>[],
     toModelPoint: (v: ReadonlyVector3, transform: ReadonlyMatrix4) => ReadonlyVector3,
-    toSurfaceNormal: (face: Face, point: ReadonlyVector3) => ReadonlyVector3,
-    color: ReadonlyVector3,
+    toSurfaceNormal: (face: Face<PlaneMetadata>, point: ReadonlyVector3) => ReadonlyVector3,
   ): Model & { id: number } {
-    const groupPointsToFaces = new Map<ReadonlyVector3, Set<Face>>();
+    const groupPointsToFaces = new Map<ReadonlyVector3, Set<Face<PlaneMetadata>>>();
 
     // need to populate the points -> faces, otherwise the smoothing
     // doesn't work
@@ -751,7 +698,7 @@ window.onload = async () => {
       // model position to texture position
       ReadonlyMatrix4[],
       // colors
-      ReadonlyVector3[],
+      ReadonlyVector4[],
       // indices
       number[],
     ]>(([
@@ -766,6 +713,10 @@ window.onload = async () => {
         polygons,
         rotateToModelCoordinates,
         toModelCoordinates,
+        t: {
+          textureCoordinateTransform,
+          color1,
+        }
       } = face;
       const rotateFromModelCoordinates = matrix4Invert(rotateToModelCoordinates);
       const fromModelCoordinates = matrix4Invert(toModelCoordinates);
@@ -778,10 +729,8 @@ window.onload = async () => {
       const modelPointsUnique = [...modelPointsSet];
 
       const newModelTextureTransforms = modelPointsUnique.map<ReadonlyMatrix4>(() => {
-        // TODO obtain from plane metadata (also have plane metadata)
-        //return rotateFromModelCoordinates;
-        return fromModelCoordinates;
-        //return matrix4Identity();
+        // obtain from plane metadata 
+        return textureCoordinateTransform || fromModelCoordinates;
       });
 
       const newModelRotations = new Array<ReadonlyMatrix4>(modelPointsUnique.length)
@@ -806,7 +755,7 @@ window.onload = async () => {
       });
 
       const newColors = modelPointsUnique.map(() => {
-        return color;
+        return color1;
       });
   
   
@@ -884,18 +833,17 @@ window.onload = async () => {
   }
 
   const [
+    skyCylinderModel,
     cubeModel,
     cubeSmallModel,
     cubeBigModel,
-    cylinderModel,
   ] = ([
+    [[skyCylinder, []]],
     [[cube, []]],
     [[cubeSmall, []]],
     [[cubeBig, []]],
-    [[skyCylinder, []]],
-  ] as Shape[][])
-    .map(shapes => decompose(shapes))
-    .map(modelShapeFaces => {
+  ] as Shape<PlaneMetadata>[][]).map((shapes, i) => {
+    let modelShapeFaces = decompose(shapes);
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
       modelShapeFaces,
@@ -915,37 +863,46 @@ window.onload = async () => {
         // TODO smooth some models/planes
         return vector3TransformMatrix4(face.rotateToModelCoordinates, 0, 0, 1);
       },
-      [1, 1, 1],
     );
   });
 
-  textureImages.forEach((image, i) => {  
-    gl.activeTexture(gl.TEXTURE0 + i);
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    // gl.texParameteri(
-    //   gl.TEXTURE_2D,
-    //   gl.TEXTURE_MIN_FILTER,
-    //   //images.length > 1 ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR,
-    //   //gl.LINEAR,
-    //   gl.NEAREST
-    // );
-
+  let textureId = gl.TEXTURE0;
+  textureImages.forEach(image => {
+    // need mipmap and non-mipmap versions of some textures (so we do all textures)
+    new Array(2).fill(0).forEach((_, i) => {
+      gl.activeTexture(textureId++);
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      if (i) {
+        gl.generateMipmap(gl.TEXTURE_2D);
+      } else {
+        // gl.texParameteri(
+        //   gl.TEXTURE_2D,
+        //   gl.TEXTURE_MAG_FILTER,
+        //   gl.NEAREST,
+        // );
+        gl.texParameteri(
+          gl.TEXTURE_2D,
+          gl.TEXTURE_MIN_FILTER,
+          gl.LINEAR,
+        );
+      }
+    });
   });
 
 
 
   // add in the cube
 
-  new Array(2).fill(0).forEach((_, i, arr) => {
+  new Array(2).fill(0).forEach((_, i) => {
     const {
+      id,
       faces,
       bounds,
       center,
       radius,
-    } = cubeModel;
+    } = cubeBigModel;
     const renderGroupId = nextRenderGroupId++;
     const cx = WORLD_DIMENSION/2 + i * 2;
     const cy = WORLD_DIMENSION/2;
@@ -962,7 +919,7 @@ window.onload = async () => {
         centerOffset: center,
         centerRadius: radius,
         renderTransform: matrix4Identity(),
-        modelId: cubeModel.id,
+        modelId: id,
       };
       const entity: StaticEntity = {
         resolutionBodies: {
@@ -983,21 +940,22 @@ window.onload = async () => {
   });
 
 
-  const modelId = 0;
   const { 
+    id,
     bounds,
     center,
     radius
-  } = models[modelId];
+  } = cubeModel;
   // add in a "player"
   const player: DynamicEntity<KnightPartIds> = {
     resolutionBodies: {
       [0]: {
         id: 0,
-        modelId,
+        modelId: id,
         renderTransform: matrix4Identity(),
         centerOffset: center,
         centerRadius: radius,
+        textures: new Map([[uMaterialTexture, [TEXTURE_GRASS]]])
       },
     },
     bounds,
@@ -1060,12 +1018,12 @@ window.onload = async () => {
     }
   };
   window.onclick = (e: MouseEvent) => {
-    const modelId = 1;
     const {
+      id,
       bounds,
       center,
       radius,
-    } = models[modelId];
+    } = cubeSmallModel;
 
     const velocity: Vector3 = vector3TransformMatrix4(
       matrix4Multiply(
@@ -1082,7 +1040,7 @@ window.onload = async () => {
       resolutionBodies: {
         [0]: {
           id: 0,
-          modelId,
+          modelId: id,
           centerOffset: center,
           centerRadius: radius,
           renderTransform: matrix4Identity(),
@@ -1168,19 +1126,30 @@ window.onload = async () => {
     gl.uniform3fv(uCameraPosition, cameraPosition);
     gl.uniform1f(uTime, now);
 
-    // draw the sky cylinder
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    //
+    // draw the sky cylinder
+    //
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
-    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
+    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX_MIPMAP);
+    //gl.uniform1i(uMaterialTexture, TEXTURE_GRASS);
 
-    gl.bindVertexArray(cylinderModel.vao);
-    gl.uniformMatrix4fv(uWorldPositionMatrix, false, cameraPositionMatrix as any);
+    gl.bindVertexArray(skyCylinderModel.vao);
+    gl.uniformMatrix4fv(
+      uWorldPositionMatrix,
+      false,
+      matrix4Translate(...(player.position.slice(0, 2) as Vector2), 0) as any,
+    );
+    //gl.uniformMatrix4fv(uWorldPositionMatrix, false, matrix4Translate(WORLD_DIMENSION/2, 0, 0) as any);
     gl.uniformMatrix4fv(uWorldRotationMatrix, false, matrix4Identity() as any);
-    gl.drawElements(gl.TRIANGLES, cylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
+    gl.drawElements(gl.TRIANGLES, skyCylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
 
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.CULL_FACE);
+    //
+    // end sky cylinder
+    //
 
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away

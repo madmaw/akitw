@@ -14,8 +14,10 @@ const DEPTH_RESOLUTIONS = 6;
 const DEPTH_DIMENSION = Math.pow(2, DEPTH_RESOLUTIONS);
 const WORLD_DEPTH_SCALE = WORLD_DIMENSION/DEPTH_DIMENSION;
 
-const HORIZON = WORLD_DIMENSION * 2;
-const SKY: Vector3 = [.7, .8, 1];
+const HORIZON = WORLD_DIMENSION * 9;
+const MAX_FOG_DEPTH = HORIZON/2;
+const SKY: ReadonlyVector3 = [.7, .8, 1];
+const WATER: ReadonlyVector3 = [0, .2, .4];
 
 const MAX_COLLISION_STEPS = 9;
 const MAX_COLLISIONS = 8;

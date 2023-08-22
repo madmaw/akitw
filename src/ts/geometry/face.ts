@@ -1,7 +1,8 @@
-type Face = {
+type Face<T> = {
   readonly toModelCoordinates: ReadonlyMatrix4,
   readonly rotateToModelCoordinates: ReadonlyMatrix4,
   readonly polygons: readonly ConvexPolygon[],
+  t: T,
 };
 
 // the expectation is that z is always 0
@@ -30,11 +31,12 @@ function dedupePolygon(polygon: ConvexPolygon) {
   });
 }
 
-function toFace(
+function toFace<T>(
   p1: ReadonlyVector3,
   p2: ReadonlyVector3,
   p3: ReadonlyVector3,
-): Face {
+  t: T,
+): Face<T> {
   const d2 = vectorNNormalize(vectorNScaleThenAdd(p2, p1, -1));
   const d3 = vectorNNormalize(vectorNScaleThenAdd(p3, p1, -1));
   const normal = vectorNNormalize(vector3CrossProduct(d2, d3));
@@ -63,13 +65,14 @@ function toFace(
     polygons: [adjustedPolygon],
     toModelCoordinates,
     rotateToModelCoordinates,
+    t,
   }
 }
 
 function measureFace({
   polygons,
   toModelCoordinates,
-}: Face): [Rect3, Vector3, number] {
+}: Face<any>): [Rect3, Vector3, number] {
   const allPoints = polygons.map(polygon => polygon.map(point => {
     return vector3TransformMatrix4(toModelCoordinates, ...point);
   })).flat(1);

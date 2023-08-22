@@ -1,12 +1,12 @@
 // not used
-function round(
+function round<undefined>(
   // base shape to round
-  shape: ConvexShape,
+  shape: ConvexShape<any>,
   // the radius to round to, or, if negative, to subtract from the base shape
   r: number,
   // corners or edges
   edges?: boolean,
-): ConvexShape {
+): ConvexShape<undefined> {
   const faces = decompose([[shape, []]]);
   const normals = faces.flatMap(({ polygons, toModelCoordinates: toWorldCoordinates }) => {
     return polygons.flatMap((polygon) => {
@@ -31,6 +31,7 @@ function round(
     return toPlane(
       x, y, z,
       r > 0 ? r : vectorNLength(normal) + r,
+      undefined,
     );
   });
   return [...shape, ...newPlanes];
