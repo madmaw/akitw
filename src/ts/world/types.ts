@@ -19,12 +19,12 @@ type BaseEntity<PartId extends number = number> = {
   readonly renderGroupId: RenderGroupId,
   readonly id: EntityId,
   readonly partTransforms?: Record<PartId, ReadonlyMatrix4>,
-  readonly body: Part<PartId>,
+  // all the resolutions that this entity renders in
+  // to the bodies that we will render those in 
+  readonly resolutionBodies: Record<number, Part<PartId>>;
   position: Vector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
-  // all the resolutions that this entity renders in
-  readonly resolutions: number[],
   logs?: any[][];
 };
 
@@ -53,4 +53,6 @@ type Part<PartId extends number = number> = {
   readonly centerOffset: ReadonlyVector3,
   readonly centerRadius: number,
   readonly renderTransform: ReadonlyMatrix4,
+  // uniform to texture id(s) for that uniform
+  textures?: Map<WebGLUniformLocation, number[]>;
 };

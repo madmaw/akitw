@@ -3,17 +3,23 @@ const U_WORLD_POSITION_MATRIX = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
 const U_PROJECTION_MATRIX = 'uProjection';
 const U_CAMERA_POSITION = 'uCameraPosition';
+const U_MATERIAL_TEXTURE = 'uMaterialTexture';
+const U_TIME = 'uTime';
 
+const A_VERTEX_PLANE_POSITION = 'aVertexPlanePosition';
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
 const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'aVertexModelSmoothingRotation';
 const A_MODEL_COLOR = 'aColor';
+const A_MODEL_TEXTURE_POSITION_MATRIX = 'aModelTexturePosition';
 
+const V_TEXTURE_POSITION = 'vPlanePosition';
 const V_MODEL_POSITION = 'vModelPosition';
 const V_WORLD_POSITION = 'vWorldPosition';
-const V_WORLD_NORMAL = 'vWorldNormal';
 const V_MODEL_ROTATION_MATRIX = 'vModelRotation';
-const V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
+const V_WORLD_TO_PLANE_ROTATION_MATRIX = 'vWorldToPlaneRotation';
+const V_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
+const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = 'vInverseModelSmoothingRotation';
 const V_MODEL_COLOR = 'vColor';
 
 const O_COLOR = "oColor";
@@ -21,9 +27,11 @@ const O_COLOR = "oColor";
 const VERTEX_SHADER = `#version 300 es
   precision lowp float;
 
+  in vec4 ${A_VERTEX_PLANE_POSITION};
   in vec4 ${A_VERTEX_MODEL_POSITION};
   in mat4 ${A_VERTEX_MODEL_ROTATION_MATRIX};
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+  in mat4 ${A_MODEL_TEXTURE_POSITION_MATRIX};
   in vec3 ${A_MODEL_COLOR};
 
   uniform mat4 ${U_WORLD_POSITION_MATRIX};
@@ -32,84 +40,129 @@ const VERTEX_SHADER = `#version 300 es
   
   out vec4 ${V_WORLD_POSITION};
   out vec4 ${V_MODEL_POSITION};
-  out vec4 ${V_WORLD_NORMAL};
+  out vec4 ${V_TEXTURE_POSITION};
   out mat4 ${V_MODEL_ROTATION_MATRIX};
-  out mat4 ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+  out mat4 ${V_WORLD_TO_PLANE_ROTATION_MATRIX};
+  out mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
+  out mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   out vec3 ${V_MODEL_COLOR};
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
+    ${V_TEXTURE_POSITION} = ${A_MODEL_TEXTURE_POSITION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
     ${V_WORLD_POSITION} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
-    ${V_WORLD_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_ROTATION_MATRIX} * vec4(0., 0., 1., 1.);
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
-    ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX} = ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+    ${V_WORLD_TO_PLANE_ROTATION_MATRIX} = inverse(${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_ROTATION_MATRIX});
+    
+    ${V_MODEL_SMOOTHING_ROTATION_MATRIX} = ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+    ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} = inverse(${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX});
     ${V_MODEL_COLOR} = ${A_MODEL_COLOR};
 
     gl_Position = ${U_PROJECTION_MATRIX} * ${V_WORLD_POSITION};
   }
 `;
 
+const STEP = .001;
+const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
+const MATERIAL_DEPTH_SCALE = 256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE);
+
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
 
+  in vec4 ${V_TEXTURE_POSITION};
   in vec4 ${V_WORLD_POSITION};
   in vec4 ${V_MODEL_POSITION};
-  in vec4 ${V_WORLD_NORMAL};
   in mat4 ${V_MODEL_ROTATION_MATRIX};
-  in mat4 ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
+  in mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
+  in mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   in vec3 ${V_MODEL_COLOR};
+  in mat4 ${V_WORLD_TO_PLANE_ROTATION_MATRIX};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
+  uniform sampler2D ${U_MATERIAL_TEXTURE};
+  uniform float ${U_TIME};
 
   out vec4 ${O_COLOR};
 
   void main(void) {
-    vec3 n = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(0, 0, 1, 1)).xyz;
-    float d = length(${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz);
+    vec3 distance = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
+    vec4 d = ${V_WORLD_TO_PLANE_ROTATION_MATRIX}
+      * ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX}
+      * vec4(normalize(distance), 1);
+    // NOTE: c will be positive for camera facing surfaces
+    float c = dot(vec3(0, 0, 1), d.xyz);
+    float depth = ${MATERIAL_DEPTH_RANGE/2};
+    // material
+    vec4 tm;
 
-    ${O_COLOR} = vec4(
-      mix(
-        (${V_WORLD_POSITION}.z > -.5 ? ${V_MODEL_COLOR} : vec3(0, 0, 1)) * vec3((dot(n, vec3(-.5, -.5, .7)) + 1.) / 2.),
-        vec3(${SKY.join()}),
-        pow(min(1., d/${HORIZON}.), 2.)
-      ),
-      1
+    // distances
+    vec4 p;
+    for (int count = 0; count < ${NUM_STEPS}; count++) {
+      depth -= ${STEP};
+      p = ${V_TEXTURE_POSITION} + d * depth / c;
+      vec4 tm1 = texture(
+        ${U_MATERIAL_TEXTURE},
+        p.xy
+      );
+
+      float surfaceDepth = (tm1.z - .5) * ${MATERIAL_DEPTH_SCALE}; 
+      if (surfaceDepth > depth) {
+        float d0 = depth + ${STEP};
+        float s0 = d0 - (tm.z - .5) * ${MATERIAL_DEPTH_SCALE};
+        float s1 = d0 - surfaceDepth;
+        float divisor = ${STEP} - s1 + s0;
+        // make sure it's not almost parallel, if it is, defer until next iteration
+        if (abs(divisor) > .0) {  
+          float si = s0 * ${STEP}/divisor;
+          depth += ${STEP} - si;
+          p = ${V_TEXTURE_POSITION} + d * (d0 - si) / c;  
+          count = ${NUM_STEPS};
+        }
+      }
+      tm = texture(
+        ${U_MATERIAL_TEXTURE},
+        p.xy
+      );  
+    }
+    vec2 n = tm.xy * 2. - 1.;
+    vec3 m = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(n, pow(1. - length(n), 2.), 1)).xyz;
+    vec4 color = mix(
+      vec4(${V_MODEL_COLOR}, 1),
+      vec4(0, .6, .4, 1),
+      abs(tm.a * 2. - 1.)
     );
+    float lighting = max(
+      0., 
+      (dot(m, normalize(vec3(1, 2, 3)))+1.)/2.
+    ) * .5;
+    // vec3 n = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(0, 0, 1, 1)).xyz;
+    // vec3 color =  texture(
+    //   ${U_MATERIAL_TEXTURE},
+    //   ${V_MODEL_POSITION}.xy/ 9.
+    // ).xyz;
+
+    vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z, .1));
+    float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z, 0., 1.), 9.);
+    vec3 sandDistance = distance * (1. - max(0., .2-${V_WORLD_POSITION}.z)/max(distance.z, .1));
+    float sandiness = 1. - pow(1. - clamp(distance.z - sandDistance.z, 0., 1.), 9.);
+
+    vec3 fc = mix(
+      mix(
+        mix(
+          color.xyz * lighting,
+          vec3(.8, .7, .5),
+          sandiness
+        ),
+        vec3(0, .2, .4),
+        wateriness
+      ),
+      vec3(${SKY.join()}),
+      pow(min(1., length(waterDistance)/${HORIZON}.), 2.)
+    );
+    ${O_COLOR} = vec4(sqrt(fc), 1);
   }
 `;
-
-// // generate some ground
-const baseGroundDepths = [
-  [0., 0., 0., 0., 0., 0., 0., 0.],
-  [0., 0., 0., 0., 0., 0., 0., 0.],
-  [0., 4., .2, .2, 1., 0., 0., 0.],
-  [0., .3, 0., 0., .4, 0., 0., 0.],
-  [0., .3, 0., 0., .4, 0., 0., 0.],
-  [0., .3, 0., 1., .4, 0., 0., 0.],
-  [0., .3, 1., 2., 3., 0., 0., 0.],
-  [0., 0., 0., 0., 0., 0., 0., 0.],
-];
-// const baseGroundDepths = [
-//   [.5, .4, .3, .2, .1, .0],
-//   [.4, .3, .2, .1, .0, .0],
-//   [.3, .2, .1, .0, .0, .0],
-//   [.2, .1, .0, .0, .0, .0],
-//   [.1, .0, .0, .0, .4, .4],
-//   [.0, .0, .4, .4, .4, .4],
-//   [.0, .0, .4, .4, .4, .4],
-//   [.0, .0, .4, .4, .4, .4],
-// ];
-// const baseGroundDepths = [
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-//   [.0, .0, .0, .0, .0, .0],
-// ];
 
 window.onload = async () => {
 
@@ -206,40 +259,40 @@ window.onload = async () => {
     toPlane(0, -1, 0, .9),
   ];
 
+  const skyCylinderRadius = HORIZON/1.5;
+  const skyCylinder: ConvexShape = new Array(8).fill(0).map((_, i, arr) => {
+    const a = Math.PI * 2 * i / arr.length;
+    const sin = Math.sin(a);
+    const cos = Math.cos(a);
+    return toPlane(cos, sin, 0, skyCylinderRadius);
+  }).concat([
+    toPlane(0, 0, 1, skyCylinderRadius),
+    toPlane(0, 0, -1, skyCylinderRadius),
+  ]);
+
   // const shapes: readonly Shape[] = ([
   //   [shape5, [shape6]],
   //   [shape1, [shape2, shape3, shape4, shape6]],
   // ] as const);
-  const modelShapes: Shape[][] = [
-    [[cube, []]],
-    [[cubeSmall, []]],
-    [[cubeBig, []]],
-  ];
 
-  const modelShapesFaces = modelShapes.map(shapes => decompose(shapes));
-  console.log(modelShapesFaces);
+  //console.log(modelShapesFaces);
 
-  const resolutions = 7;
-  const worldDimension = Math.pow(2, resolutions);
-
-  const depthResolutions = 5;
-  const depthDimension = Math.pow(2, depthResolutions);
-  const worldDepthScale = worldDimension/depthDimension;
-
-  const playerStartZ = 9;
-
-  const depths = create2DArray<number>(depthDimension + 1, depthDimension + 1, (x, y) => {
+  const depths = create2DArray<number>(DEPTH_DIMENSION + 1, DEPTH_DIMENSION + 1, (x, y) => {
     // pin edges to below sea level
-    if (x == 0 || y == 0 || x == depthDimension || y == depthDimension) {
+    const dx = DEPTH_DIMENSION/2 - x;
+    const dy = DEPTH_DIMENSION/2 - y;
+    if (Math.abs(dx) == DEPTH_DIMENSION/2 || Math.abs(dy) == DEPTH_DIMENSION/2) {
       return -1;
     }
-    if (x == depthDimension/2 && y == depthDimension/2) {
-      return playerStartZ * depthDimension/worldDimension;
+    const r = Math.sqrt(dx * dx + dy * dy);
+    if(r > DEPTH_DIMENSION/2 - 4 && r < DEPTH_DIMENSION/2 - 3) {
+      return .2;
     }
   });
-  for (let i=0; i<depthResolutions; i++) {
-    const chunkDimension = Math.pow(2, depthResolutions - i);
-    const chunkCount = depthDimension / chunkDimension;
+  console.log(depths);
+  for (let i=0; i<DEPTH_RESOLUTIONS; i++) {
+    const chunkDimension = Math.pow(2, DEPTH_RESOLUTIONS - i);
+    const chunkCount = DEPTH_DIMENSION / chunkDimension;
      
     for (let chunkX = 0; chunkX < chunkCount; chunkX++) {
       for (let chunkY = 0; chunkY < chunkCount; chunkY++) {
@@ -263,30 +316,76 @@ window.onload = async () => {
         ]
         toSetFrom.forEach(([[x, y], from]) => {
           if (depths[x][y] == null) {
-            const dx = x - depthDimension/2;
-            const dy = y - depthDimension/2;
-            const dcenterSquared = (dx * dx + dy * dy)*4/(depthDimension*depthDimension);
-            const inverseRandomness = Math.pow(i, 9) * Math.pow(dcenterSquared, .5);
-            const targetDepth = Math.pow(Math.max(0, 1 - dcenterSquared), 2) * 2;
-            
-            const rnd = Math.random() * 2 - 1;
-            const depth = from.reduce((acc, [x, y]) => {
+            const dx = x - DEPTH_DIMENSION/2;
+            const dy = y - DEPTH_DIMENSION/2;
+            const averageDepth = from.reduce((acc, [x, y]) => {
               return acc + depths[x][y];
-            }, targetDepth)/(from.length+1) + Math.pow(Math.abs(rnd), inverseRandomness) * rnd * 9;
+            }, 0)/from.length;
+            const dcenterSquared = (dx * dx + dy * dy)*4/(DEPTH_DIMENSION*DEPTH_DIMENSION);
+            const inverseRandomness = Math.pow(i, 2+dcenterSquared * 2) * Math.pow(1 / (Math.abs(averageDepth)+1), .5);
+            const targetDepth = Math.pow(Math.max(0, 1 - dcenterSquared), 9) * 7;
+            
+            const rnd = 1 - Math.random() * Math.min(2, 1 + dcenterSquared);
+            //const rnd = Math.random();
+            const depth = (averageDepth * 2 + targetDepth)/3 + Math.pow(Math.abs(rnd), inverseRandomness) * rnd * 9;
             depths[x][y] = depth;
-            //depths[x][y] = targetDepth;
           }
         })
       }
     }
   }
-  console.log(depths);
 
-  const terrain = weightedAverageTerrainFactory(depths, 1.7, worldDepthScale);
+  const materials: Material[] = [
+    // empty
+    ,
+    // skybox
+    ctx => {
+      const gradient = ctx.createLinearGradient(0, 0, 0, MATERIAL_TEXTURE_DIMENSION/2);
+      gradient.addColorStop(0, 'rgb(128,128,128)');
+      gradient.addColorStop(.5, 'rgba(128,128,128,.5)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+      // TODO clouds
+    },
+    featureMaterial(
+      spikeFeatureFactory(.05, .05),
+      12,
+      // spikeFeatureFactory(1, 1),
+      // 64,
+      99999,
+      randomDistributionFactory(
+        0,
+        2,
+      ),
+    ),
+  ];
+  // make some textures
+  const textureImages = materials.map(material => {
+    const materialCanvas = document.createElement('canvas');
+    materialCanvas.width = MATERIAL_TEXTURE_DIMENSION;
+    materialCanvas.height = MATERIAL_TEXTURE_DIMENSION; 
+    const ctx = materialCanvas.getContext(
+      '2d',
+      FLAG_FAST_READ_CANVASES
+        ? {
+          willReadFrequently: true,
+        }
+        : undefined
+    );
+    // nx = 0, ny = 0, depth = 0, feature color = 0
+    ctx.fillStyle = 'rgba(128,128,128,.5)';
+    //ctx.fillStyle = 'red';
+    ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
 
+    material?.(ctx);
+    return materialCanvas;  
+  });
   
-  const world: World = new Array(resolutions).fill(0).map((_, resolution) => {
-    const resolutionDimension = Math.pow(2, resolutions - resolution);
+
+  const terrain = weightedAverageTerrainFactory(depths);
+  
+  const world: World = new Array(RESOLUTIONS).fill(0).map((_, resolution) => {
+    const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
     return create2DArray<Tile>(
       resolutionDimension,
       resolutionDimension,
@@ -300,14 +399,21 @@ window.onload = async () => {
   const reversedWorld = [...world].reverse();
 
   function iterateEntityBounds(
-    inResolutions: number[],
-    { position, bounds: [[minx, miny], [maxx, maxy]] }: Pick<Entity, 'position' | 'bounds'>,
+    { 
+      resolutionBodies,
+      position,
+      bounds: [[minx, miny], [maxx, maxy]],
+     }: Pick<Entity, 'position' | 'bounds'> & {
+      resolutionBodies: Record<number, any>,
+     },
     f: (tile: Tile, x: number, y: number) => void,
     populate?: Booleanish,
   ) {
-    for (let resolution of inResolutions) {
+    for (let resolutionString in resolutionBodies) {
+      // in JS strings can be numbers
+      const resolution: number = parseInt(resolutionString) as any;
       const divisor = Math.pow(2, resolution);
-      const resolutionDimension = Math.pow(2, resolutions - resolution);
+      const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
       const [px, py] = position;
       for (
         let x = Math.max(0, (px + minx)/divisor | 0);
@@ -329,13 +435,13 @@ window.onload = async () => {
   }
   
   function addEntity(entity: Entity) {
-    iterateEntityBounds(entity.resolutions, entity, tile => {
+    iterateEntityBounds(entity, tile => {
       tile.entities[entity.id] = entity;
     });
   }
   
   function removeEntity(entity: Entity) {
-    iterateEntityBounds(entity.resolutions, entity, tile => {
+    iterateEntityBounds(entity, tile => {
       delete tile.entities[entity.id];
     });
   }
@@ -348,6 +454,7 @@ window.onload = async () => {
     let tile = grid[tx][ty];
     const gx = tx * resolutionScale;
     const gy = ty * resolutionScale;
+
     if (!tile.populated) {
       grid[tx][ty] = tile;
       tile.populated = 1;
@@ -366,8 +473,8 @@ window.onload = async () => {
             x,
             y,
             terrain(
-              x / worldDimension,
-              y / worldDimension,
+              x / WORLD_DIMENSION,
+              y / WORLD_DIMENSION,
             )
           ];
         });
@@ -380,7 +487,7 @@ window.onload = async () => {
         // synthesize a center point
         const cx = gx + resolutionScale/2;
         const cy = gy + resolutionScale/2;
-        axisPoint = [cx, cy, terrain(cx / worldDimension, cy / worldDimension)];
+        axisPoint = [cx, cy, terrain(cx / WORLD_DIMENSION, cy / WORLD_DIMENSION)];
         workingArray = points;
       } else {
         const index = resolution ? 1 : (tx+ty)%points.length;
@@ -395,12 +502,12 @@ window.onload = async () => {
         return toFace(axisPoint, point, nextPoint);
       });
       const resolutionColors: Vector3[] = [
-        [.8, .8, 1],
-        [.8, 1, .8],
-        [1, .8, .8],
-        [1, .9, 1],
-        [1, 1, .9],
-        [.9, 1, 1],
+        [.2, .8, .6],
+        // [.8, 1, .9],
+        // [.6, 1, .8],
+        // [.4, 1, .7],
+        // [.1, .6, .5],
+        // [0, .4, .4],
       ];
       const {
         faces,
@@ -422,21 +529,23 @@ window.onload = async () => {
           xGroundPointCache[iy] = cachedResult;
           return cachedResult;
         },
-        (_, groundPoint) => {
+        (_, modelPoint) => {
           // get some samples
-          const offsets: ReadonlyVector2[] = [[-EPSILON, 0], [EPSILON, -EPSILON], [EPSILON, EPSILON]];
+          const offsets: ReadonlyVector2[] = [
+            [-1/WORLD_DIMENSION, 0],
+            [.7/WORLD_DIMENSION, -.7/WORLD_DIMENSION],
+            [.7/WORLD_DIMENSION, .7/WORLD_DIMENSION]];
           // const offsets: ReadonlyVector2[] = [
           //   [-1/(worldWidth * worldTerrainScale), 0],
           //   [1/(worldWidth * worldTerrainScale), -1/(worldHeight * worldTerrainScale)],
           //   [1/(worldWidth * worldTerrainScale), 1/(worldHeight * worldTerrainScale)],
           // ];
           const [p0, p1, p2] = offsets.map<Vector3>(offset => {
-            const point = vectorNScaleThenAdd(offset, groundPoint, 1/worldDimension);
+            const point = vectorNScaleThenAdd(offset, modelPoint, 1/WORLD_DIMENSION);
             
             return [
-              ...point,
-              // this division appears to be right... but why?
-              terrain(...point)/worldDimension,
+              ...vectorNScale(point, WORLD_DIMENSION),
+              terrain(...point),
             ];
           }) as [Vector3, Vector3, Vector3];
           //const face = toFace(...points);
@@ -467,13 +576,16 @@ window.onload = async () => {
         ];
             
         const entity: StaticEntity = {
-          body: {
-            // terrain is always at position 0, so offset == center
-            id: 0,
-            centerOffset: center,
-            centerRadius: radius,
-            modelId,
-            renderTransform: matrix4Identity(),
+          resolutionBodies: {
+            [resolution]: {
+              // terrain is always at position 0, so offset == center
+              id: 0,
+              centerOffset: center,
+              centerRadius: radius,
+              modelId,
+              renderTransform: matrix4Identity(),
+              textures: new Map([[uMaterialTexture, [TEXTURE_GRASS]]]),
+            },
           },
           position: [0, 0, 0],
           worldToPlaneCoordinates,
@@ -483,7 +595,6 @@ window.onload = async () => {
           id,
           renderGroupId,
           renderTile: tile,
-          resolutions: [resolution],
         };
         addEntity(entity);
       });
@@ -519,9 +630,7 @@ window.onload = async () => {
   };
   window.onresize = onResize;
   onResize();
-  gl.enable(gl.DEPTH_TEST);
   gl.clearColor(...SKY, 1);
-  gl.enable(gl.CULL_FACE);
 
   const vertexShader = loadShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
   const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -539,14 +648,18 @@ window.onload = async () => {
   gl.useProgram(program);
 
   const [
+    aPlanePosition,
     aModelPosition,
     aModelRotationMatrix,
     aModelSmoothingRotationMatrix,
+    aModelTexturePositionMatrix,
     aModelColor,
   ] = [
+    A_VERTEX_PLANE_POSITION,
     A_VERTEX_MODEL_POSITION,
     A_VERTEX_MODEL_ROTATION_MATRIX,
     A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX,
+    A_MODEL_TEXTURE_POSITION_MATRIX,
     A_MODEL_COLOR,
   ].map(
     attribute => gl.getAttribLocation(program, attribute)
@@ -556,14 +669,23 @@ window.onload = async () => {
     uWorldRotationMatrix,
     uProjectionMatrix,
     uCameraPosition,
+    uMaterialTexture,
+    uTime,
   ] = [
     U_WORLD_POSITION_MATRIX,
     U_WORLD_ROTATION_MATRIX,
     U_PROJECTION_MATRIX,
     U_CAMERA_POSITION,
+    U_MATERIAL_TEXTURE,
+    U_TIME,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
+
+  const fallbackTextures: Map<WebGLUniformLocation, number[]> = new Map([
+    [uMaterialTexture, [TEXTURE_EMPTY]],
+  ]);
+  const allTextureUniforms = [...fallbackTextures.keys()];
 
   const models: Model[] = [];
   function appendModel(
@@ -618,51 +740,73 @@ window.onload = async () => {
     );
 
     const [
+      planePoints,
       modelPoints,
-      planeTransforms,
+      modelRotations,
       smoothingTransforms,
+      modelTextureTransforms,
       colors,
       indices,
     ] = faces.reduce<[
+      // plane positions
+      ReadonlyVector4[],
       // model positions
       ReadonlyVector3[],
-      // plane transformation
+      // plane to model transformation
       ReadonlyMatrix4[],
       // smoothing transformation
+      ReadonlyMatrix4[],
+      // model position to texture position
       ReadonlyMatrix4[],
       // colors
       ReadonlyVector3[],
       // indices
       number[],
-    ]>(([modelPoints, planeTransforms, smoothingTransforms, colors, indices], face) => {
+    ]>(([
+      planePoints,
+      modelPoints,
+      modelRotations,
+      smoothingTransforms,
+      modelTextureTransforms,
+      colors,
+      indices,
+    ], face) => {
       const {
         polygons,
         rotateToModelCoordinates,
         toModelCoordinates,
       } = face;
       const rotateFromModelCoordinates = matrix4Invert(rotateToModelCoordinates);
+      const fromModelCoordinates = matrix4Invert(toModelCoordinates);
   
       const polygonPoints = polygons.flat(1);
       const modelPointsSet = polygonPoints.reduce((acc, point) => {
         return acc.add(toModelPoint(point, toModelCoordinates));
       }, new Set<ReadonlyVector3>());
-      const modelPointsUnique = [...modelPointsSet];
 
-      const newPlaneTransforms = new Array<ReadonlyMatrix4>(modelPointsUnique.length)
+      const modelPointsUnique = [...modelPointsSet];
+      // TODO: attach textures properly
+      const dx = Math.random();
+      const dy = Math.random();
+
+      const newPlanePoints = modelPointsUnique.map<ReadonlyVector4>(modelPoint => {
+        const [x, y] = vector3TransformMatrix4(fromModelCoordinates, ...modelPoint);
+        return [x, y, dx, dy];
+        //return [modelPoint[0], modelPoint[1], 0, 0];
+      });
+
+      // just use the plane coordinates
+      const newModelTextureTransforms = modelPointsUnique.map<ReadonlyMatrix4>(() => {
+        // TODO obtain from plane metadata (also have plane metadata)
+        return fromModelCoordinates;
+      });
+
+      const newModelRotations = new Array<ReadonlyMatrix4>(modelPointsUnique.length)
         .fill(rotateToModelCoordinates);
 
       const newSmoothingTransforms = modelPointsUnique.map(modelPoint => {
         const normal = toSurfaceNormal(face, modelPoint);
-        // TODO, pass in the smoothing function
-        // const faces = groupPointsToFaces.get(worldPoint);
-        // const combined = [...faces].reduce<ReadonlyVector3>((acc, {
-        //   rotateToModelCoordinates,
-        // }) => {
-        //   const faceNormal = vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
-        //   return vectorNScaleThenAdd(acc, faceNormal);
-        // }, [0, 0, 0]);
-        // const normal = vectorNNormalize(combined);
-        // // rotate the normal back to the face coordinates
+        // rotate the normal back to the face coordinates
         const planeNormal = vector3TransformMatrix4(rotateFromModelCoordinates, ...normal);
         const cosa = vectorNDotProduct(NORMAL_Z, planeNormal);
         const a = Math.acos(cosa);
@@ -698,21 +842,25 @@ window.onload = async () => {
       }, []);
   
       return [
+        [...planePoints, ...newPlanePoints],
         [...modelPoints, ...modelPointsUnique],
-        [...planeTransforms, ...newPlaneTransforms],
+        [...modelRotations, ...newModelRotations],
         [...smoothingTransforms, ...newSmoothingTransforms],
+        [...modelTextureTransforms, ...newModelTextureTransforms],
         [...colors, ...newColors],
         [...indices, ...newIndices],
       ];
-    }, [[], [], [], [], []]);
+    }, [[], [], [], [], [], [], []]);
 
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
   
     ([
+      [aPlanePosition, planePoints],
       [aModelPosition, modelPoints],
-      [aModelRotationMatrix, planeTransforms],
+      [aModelRotationMatrix, modelRotations],
       [aModelSmoothingRotationMatrix, smoothingTransforms],
+      [aModelTexturePositionMatrix, modelTextureTransforms],
       [aModelColor, colors],
     ] as const).forEach(([attribute, vectors]) => {
       var buffer = gl.createBuffer();
@@ -738,7 +886,9 @@ window.onload = async () => {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
-    const model = {
+    const model: Model & {
+      id: number,
+    } = {
       bounds,
       faces,
       center,
@@ -752,10 +902,21 @@ window.onload = async () => {
     return model;
   }
 
-
-  modelShapesFaces.map(modelShapeFaces => {
+  const [
+    cubeModel,
+    cubeSmallModel,
+    cubeBigModel,
+    cylinderModel,
+  ] = ([
+    [[cube, []]],
+    [[cubeSmall, []]],
+    [[cubeBig, []]],
+    [[skyCylinder, []]],
+  ] as Shape[][])
+    .map(shapes => decompose(shapes))
+    .map(modelShapeFaces => {
     const modelPointCache: ReadonlyVector3[] = [];
-    appendModel(
+    return appendModel(
       modelShapeFaces,
       (point, toModelCoordinates) => {
         const modelPoint = vector3TransformMatrix4(toModelCoordinates, ...point);
@@ -777,12 +938,26 @@ window.onload = async () => {
     );
   });
 
-  console.log('models', models);
+  textureImages.forEach((image, i) => {  
+    gl.activeTexture(gl.TEXTURE0 + i);
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    // gl.texParameteri(
+    //   gl.TEXTURE_2D,
+    //   gl.TEXTURE_MIN_FILTER,
+    //   //images.length > 1 ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR,
+    //   //gl.LINEAR,
+    //   gl.NEAREST
+    // );
+
+  });
+
+
 
   // add in the cube
 
-  const cubeModelId = 2;
-  const cubeModel = models[cubeModelId];
   new Array(2).fill(0).forEach((_, i, arr) => {
     const {
       faces,
@@ -791,21 +966,28 @@ window.onload = async () => {
       radius,
     } = cubeModel;
     const renderGroupId = nextRenderGroupId++;
+    const cx = WORLD_DIMENSION/2 + i * 2;
+    const cy = WORLD_DIMENSION/2;
+    const position: Vector3 = [cx, cy, terrain(cx/WORLD_DIMENSION, cy/WORLD_DIMENSION)];
 
     faces.forEach(face => {
-      const position: Vector3 = [worldDimension/2 + i * 2, worldDimension/2, 2];
       const worldToPlaneCoordinates = matrix4Multiply(
         matrix4Invert(face.toModelCoordinates),
         matrix4Translate(...vectorNScale(position, -1)),
       );
       const rotateToPlaneCoordinates = matrix4Invert(face.rotateToModelCoordinates);
+      const body: Part = {
+        id: 0,
+        centerOffset: center,
+        centerRadius: radius,
+        renderTransform: matrix4Identity(),
+        modelId: cubeModel.id,
+      };
       const entity: StaticEntity = {
-        body: {
-          id: 0,
-          centerOffset: center,
-          centerRadius: radius,
-          renderTransform: matrix4Identity(),
-          modelId: cubeModelId,
+        resolutionBodies: {
+          [0]: body,
+          [1]: body,
+          [2]: body,
         },
         face,
         position,
@@ -814,7 +996,6 @@ window.onload = async () => {
         renderGroupId,
         rotateToPlaneCoordinates,
         worldToPlaneCoordinates,
-        resolutions: [0, 1, 2],
       };
       addEntity(entity);
     });
@@ -829,12 +1010,14 @@ window.onload = async () => {
   } = models[modelId];
   // add in a "player"
   const player: DynamicEntity<KnightPartIds> = {
-    body: {
-      id: 0,
-      modelId,
-      renderTransform: matrix4Identity(),
-      centerOffset: center,
-      centerRadius: radius,
+    resolutionBodies: {
+      [0]: {
+        id: 0,
+        modelId,
+        renderTransform: matrix4Identity(),
+        centerOffset: center,
+        centerRadius: radius,
+      },
     },
     bounds,
     partTransforms: {
@@ -846,14 +1029,13 @@ window.onload = async () => {
     collisionRadius: rectNMinimalRadius(bounds) - EPSILON,
     id: nextEntityId++,
     position: [
-      worldDimension/2,
-      worldDimension/2,
-      depths[depthDimension/2][depthDimension/2] * worldDepthScale + radius,
+      WORLD_DIMENSION*.5,
+      WORLD_DIMENSION*.1,
+      terrain(.5, .1) + radius,
     ],
     renderGroupId: nextRenderGroupId++,
-    velocity: [0.01, 0.003, 0],
+    velocity: [0, 0, 0],
     gravity: DEFAULT_GRAVITY,
-    resolutions: [0],
   };
   addEntity(player);
 
@@ -916,12 +1098,14 @@ window.onload = async () => {
 
     // fire a ball 
     const ball: DynamicEntity = {
-      body: {
-        id: 0,
-        modelId,
-        centerOffset: center,
-        centerRadius: radius,
-        renderTransform: matrix4Identity(),
+      resolutionBodies: {
+        [0]: {
+          id: 0,
+          modelId,
+          centerOffset: center,
+          centerRadius: radius,
+          renderTransform: matrix4Identity(),
+        },
       },
       bounds,
       id: nextEntityId++,
@@ -930,16 +1114,23 @@ window.onload = async () => {
       velocity,
       renderGroupId: nextRenderGroupId++,
       restitution: 1,
-      resolutions: [0],
       //gravity: DEFAULT_GRAVITY,
     };
 
     addEntity(ball);
   };
   window.onwheel = (e: WheelEvent) => {
-    const v = e.deltaY/100;
+    const v = e.deltaY/999;
     // TODO 
-    cameraZoom -= v;
+    if (Math.abs(cameraZoom) < 1) {
+      cameraZoom -= v;
+    } else {
+      if (v < 0 && cameraZoom > 0 || v > 0 && cameraZoom < 0) {
+        cameraZoom /= Math.abs(v);
+      } else {
+        cameraZoom *= Math.abs(v);
+      }  
+    }
   };
   const inputs: Partial<Record<KeyCode, number>>= {};
   window.onkeydown = (e: KeyboardEvent) => {
@@ -954,15 +1145,17 @@ window.onload = async () => {
   function animate(now: number) {
     const delta = now - then;
     then = now;
-    lastFrameTimes.push(delta);
-    //const cappedDelta = Math.min(delta, 40);
     const cappedDelta = 16;
-    const recentFrameTimes = lastFrameTimes.slice(-30);
-    const spf = recentFrameTimes.reduce((acc, n) => {
-      return acc + n/recentFrameTimes.length;
-    }, 0);
-    if (spf > 0 && fps) {
-      fps.innerText = `${Math.round(1000/spf)}`;
+    //const cappedDelta = Math.min(delta, 40);
+    if (FLAG_SHOW_FPS) {
+      lastFrameTimes.push(delta);
+      const recentFrameTimes = lastFrameTimes.slice(-30);
+      const spf = recentFrameTimes.reduce((acc, n) => {
+        return acc + n/recentFrameTimes.length;
+      }, 0);
+      if (spf > 0 && fps) {
+        fps.innerText = `${Math.round(1000/spf)}`;
+      }  
     }
 
     const targetUnrotatedLateralVelocity = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [keyCode, vector]) => {
@@ -978,30 +1171,44 @@ window.onload = async () => {
     player.velocity[1] = targetLateralVelocity[1];     
     player.velocity[2] = inputs[INPUT_JUMP] ? .001 : player.velocity[2];
 
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    const cameraPositionMatrix = matrix4Multiply(
-      matrix4Translate(...player.position),
+    const cameraPositionMatrix = matrix4Translate(...player.position);
+    const cameraPositionAndRotationMatrix = matrix4Multiply(
+      cameraPositionMatrix,
       player.partTransforms[MODEL_KNIGHT_BODY],
       matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
       matrix4Translate(0, cameraZoom, 0),
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
       projectionMatrix,
-      matrix4Invert(cameraPositionMatrix),
+      matrix4Invert(cameraPositionAndRotationMatrix),
     );
-    const cameraPosition = vector3TransformMatrix4(cameraPositionMatrix, 0, 0, 0);
+    const cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, cameraPosition);
-  
+    gl.uniform1f(uTime, now);
+
+    // draw the sky cylinder
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
+
+    gl.bindVertexArray(cylinderModel.vao);
+    gl.uniformMatrix4fv(uWorldPositionMatrix, false, cameraPositionMatrix as any);
+    gl.uniformMatrix4fv(uWorldRotationMatrix, false, matrix4Identity() as any);
+    gl.drawElements(gl.TRIANGLES, cylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
     const handledEntities: Record<EntityId, Truthy> = {};
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
-    const toRender: Record<ModelId, [ReadonlyMatrix4, ReadonlyMatrix4][]> = {};
+    const toRender: Record<ModelId, [ReadonlyMatrix4, ReadonlyMatrix4, Map<WebGLUniformLocation, number[]>][]> = {};
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
-    const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/worldDimension).slice(0, 2) as any;
+    const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/WORLD_DIMENSION).slice(0, 2) as any;
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
     const [tiles] = reversedWorld.reduce<[Set<Tile>, ReadonlyVector2[]]>(([tiles, cellsToCheck], _, reverseResolution) => {
       const scale = 1/Math.pow(2, reverseResolution + 1);
@@ -1016,7 +1223,7 @@ window.onload = async () => {
           vectorNScaleThenAdd(playerWorldPosition, worldPosition, -1),
           // approximate distance to the edge
         ) - scale/2;
-        const minResolution = Math.pow(Math.max(0, distance * 2), .5) * resolutions;
+        const minResolution = Math.pow(Math.max(0, distance * 2), .4) * RESOLUTIONS - .5;
         //const minResolution = Math.min(distance * resolutions * 8, 6);
         if (resolution > minResolution && resolution) {
           nextCellsToCheck.push(
@@ -1041,11 +1248,9 @@ window.onload = async () => {
           const {
             bounds,
             renderGroupId: renderId,
+            resolutionBodies,
             renderTile,
             partTransforms,
-            body: {
-              modelId,
-            },  
             face,
           } = entity;
 
@@ -1054,10 +1259,12 @@ window.onload = async () => {
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
             entity.logs = entity.logs?.slice(-30) || [];
             removeEntity(entity);
+            const collidedEntities: Record<EntityId, Truthy> = {};
+            let duplicateCollisionCount = 1;
             // TODO enforce max speed
             let remainingCollisionTime = cappedDelta;
-            let count = 0;
-            while (remainingCollisionTime > EPSILON) {
+            let collisionCount = 0;
+            while (remainingCollisionTime > EPSILON && collisionCount < MAX_COLLISIONS) {
               const {
                 position,
                 velocity,
@@ -1073,16 +1280,16 @@ window.onload = async () => {
               const targetEntity = {
                 position: targetPosition,
                 bounds: targetUnionBounds,
+                resolutionBodies: { 0: 1, 1: 1 },
               };
               let minCollisionTime = remainingCollisionTime;
               let minCollisionNormal: Vector3 | Falsey;
               let minCollisionEntity: Entity | Falsey;
               const checkedEntities: Record<EntityId, Truthy> = {};
               // update dynamic entity
-              iterateEntityBounds([0, 1], targetEntity, tile => {
+              iterateEntityBounds(targetEntity, tile => {
                 for (let checkEntityId in tile.entities) {
                   if (!checkedEntities[checkEntityId]) {
-
                     checkedEntities[checkEntityId] = 1;
                     let collisionTime: number | undefined;
                     let check = tile.entities[checkEntityId];
@@ -1107,178 +1314,165 @@ window.onload = async () => {
                           ...velocity,
                         );
                         const planeVelocityZ = planeVelocity[2];
-                        if (!planeVelocity) {
-                          console.log('no velocity');
-                          continue;
-                        }
-                        //if (planeVelocityZ >= 0) {
-                          // TODO is this right?
-                          // it's not right
-                          // it might be right
-                          // it's right
-                          // TODO don't use continue
-                          //continue;
-                        //}
-                        
-                        // TODO need to also calculate intersections from below for edge handling
-                        // NOTE: the z coordinate here is incorrect, do not use this vector in
-                        // 3d transformations (2d is fine)
-                        const startPlanePosition = vector3TransformMatrix4(
-                          worldToPlaneCoordinates,
-                          ...position,
-                        );
-                        const planeZ = polygons[0][0][2];
-                        const startPlanePositionZ = startPlanePosition[2] - planeZ;
-
-                        const minPlaneIntersectionTime = planeVelocityZ < 0
-                          ? (collisionRadius - startPlanePositionZ)/planeVelocityZ
-                          // start position z should be -ve
-                          : (-startPlanePositionZ - collisionRadius)/planeVelocityZ;
-                        const maxPlaneIntersectionTime = planeVelocityZ < 0
-                          ? (collisionRadius + startPlanePositionZ)/-planeVelocityZ
-                          : (collisionRadius - startPlanePositionZ)/planeVelocityZ;
-
-                        // do they already overlap
-                        if (FLAG_CHECK_STARTS_OVERLAPPING) {
-                          let inside: Booleanish;
-                          if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
-                            if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadius*2/planeVelocityZ) {
-                              if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
-                                inside = 1;
-                                entity.logs.push(['inside center']);
-                              } else {
-                                const startIntersectionRadius = Math.sqrt(
-                                  collisionRadius * collisionRadius - startPlanePositionZ * startPlanePositionZ
-                                );
-                                const closestPoint = vector2PolygonsEdgeOverlapsCircle(
-                                  polygons,
-                                  startPlanePosition,
-                                  startIntersectionRadius,
-                                );
-                                if (closestPoint) {
-                                  const [dx, dy] = vectorNScaleThenAdd(closestPoint, startPlanePosition, -1);
-                                  let distanceSquared = dx * dx + dy * dy + startPlanePositionZ * startPlanePositionZ;
-                                  if (distanceSquared < startIntersectionRadius * startIntersectionRadius) {
-                                    inside = 1;
-                                    entity.logs.push(['inside edge', Math.sqrt(distanceSquared), startIntersectionRadius, collisionRadius]);
-                                  }
-                                }
-                              }
-                            }
-                          }
-                          if (inside) {
-                            entity.logs.forEach(log => console.log(...log));
-                            console.log('inside', entity.position, check.id, ...toPoints(check), minPlaneIntersectionTime);
-                            entity.logs = [];
-                          }
-                        }
-
-                          
-                        if (
-                          maxPlaneIntersectionTime >= 0
-                          && minPlaneIntersectionTime <= remainingCollisionTime
-                        ) {
-
-                          const intersectionPlanePosition = vectorNScaleThenAdd(
-                            startPlanePosition,
-                            planeVelocity,
-                            minPlaneIntersectionTime,
+                        // avoid divide by 0
+                        if (planeVelocityZ) {
+                          // NOTE: the z coordinate here is incorrect, do not use this vector in
+                          // 3d transformations (2d is fine)
+                          const startPlanePosition = vector3TransformMatrix4(
+                            worldToPlaneCoordinates,
+                            ...position,
                           );
-                          if (
-                            planeVelocityZ < 0
-                            && vector2PolygonsContain(polygons, ...intersectionPlanePosition)
-                            && FLAG_QUICK_COLLISIONS
-                          ) {
-                            if (minPlaneIntersectionTime > 0) {
-                              collisionTime = minPlaneIntersectionTime; 
-                              planeCollisionNormal = NORMAL_Z;  
-                            }
-                          } else {
-                            //const planeIntersectionPositionZ = planeIntersectionPosition[2];
-                            // handle edge collisions
-                            // const intersectionRadius = Math.sqrt(
-                            //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
-                            // );
-                            // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
-                            // const planeTargetPosition = vector3TransformMatrix4(
-                            //   worldToPlaneCoordinates,
-                            //   ...targetPosition,
-                            // );
-                            // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
-                            //let minTime = 0;
-                            let minTime = Math.max(0, minPlaneIntersectionTime);
-                            let maxTime = Math.min(maxPlaneIntersectionTime, remainingCollisionTime);
-                            for (let i=0; i<MAX_COLLISION_STEPS; i++) {
-                              const testTime = i ? (minTime + maxTime)/2 : maxTime;
-                              const testPlanePosition = vector3TransformMatrix4(
-                                worldToPlaneCoordinates,
-                                ...vectorNScaleThenAdd(position, velocity, testTime),
-                              );
-                              const testPlanePositionZ = testPlanePosition[2] - planeZ;
-                              let hit: Booleanish;
-                              if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
-                                planeCollisionNormal = NORMAL_Z;
-                                hit = 1;
-                              } else {
-                                const testIntersectionRadius = Math.sqrt(
-                                  collisionRadius * collisionRadius - testPlanePositionZ * testPlanePositionZ
-                                );
-                                const closestPoint = vector2PolygonsEdgeOverlapsCircle(
-                                  polygons,
-                                  testPlanePosition,
-                                  testIntersectionRadius,
-                                );
-                                if (closestPoint) {
-                                  const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
-                                  let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
-                                  if (rsq < collisionRadius * collisionRadius) {
-                                    const [closestPointX, closestPointY] = closestPoint;
-                                    // const angleZ = Math.atan2(
-                                    //   closestPointX - testPlanePosition[1],
-                                    //   closestPointY - testPlanePosition[0],
-                                    // ); 
-                                    // const cosAngleX = testPlanePositionZ / collisionRadius;
-                                    // const angleX = Math.acos(cosAngleX);
-                                    
-                                    planeCollisionNormal = vectorNNormalize(
-                                      vectorNScaleThenAdd(
-                                        testPlanePosition,
-                                        [closestPointX, closestPointY, planeZ],
-                                        -1,
-                                      ),
-                                    );
-                                    //planeCollisionNormal = NORMAL_Z;
-                                    hit = 1;
+                          const planeZ = polygons[0][0][2];
+                          const startPlanePositionZ = startPlanePosition[2] - planeZ;
+
+                          const minPlaneIntersectionTime = planeVelocityZ < 0
+                            ? (collisionRadius - startPlanePositionZ)/planeVelocityZ
+                            // start position z should be -ve
+                            : (-startPlanePositionZ - collisionRadius)/planeVelocityZ;
+                          const maxPlaneIntersectionTime = planeVelocityZ < 0
+                            ? (collisionRadius + startPlanePositionZ)/-planeVelocityZ
+                            : (collisionRadius - startPlanePositionZ)/planeVelocityZ;
+
+                          // do they already overlap
+                          if (FLAG_CHECK_STARTS_OVERLAPPING) {
+                            let inside: Booleanish;
+                            if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
+                              if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadius*2/planeVelocityZ) {
+                                if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
+                                  inside = 1;
+                                  if (FLAG_DEBUG_PHYSICS) {
+                                    entity.logs.push(['inside center']);
+                                  }
+                                } else {
+                                  const startIntersectionRadius = Math.sqrt(
+                                    collisionRadius * collisionRadius - startPlanePositionZ * startPlanePositionZ
+                                  );
+                                  const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                                    polygons,
+                                    startPlanePosition,
+                                    startIntersectionRadius,
+                                  );
+                                  if (closestPoint) {
+                                    const [dx, dy] = vectorNScaleThenAdd(closestPoint, startPlanePosition, -1);
+                                    let distanceSquared = dx * dx + dy * dy + startPlanePositionZ * startPlanePositionZ;
+                                    if (distanceSquared < startIntersectionRadius * startIntersectionRadius) {
+                                      inside = 1;
+                                      if (FLAG_DEBUG_PHYSICS) {
+                                        entity.logs.push(['inside edge', Math.sqrt(distanceSquared), startIntersectionRadius, collisionRadius]);
+                                      }
+                                    }
                                   }
                                 }
                               }
-                              if (hit) {
-                                if (i) {
-                                  maxTime = testTime;
-                                }
-                                // first loop is a special case
-                              } else {
-                                if (!i) {
-                                  // no collision, exit loop
-                                  i = MAX_COLLISION_STEPS;
+                            }
+                            if (inside && FLAG_DEBUG_PHYSICS) {
+                              entity.logs.forEach(log => console.log(...log));
+                              console.log('inside', entity.position, check.id, ...toPoints(check), minPlaneIntersectionTime);
+                              entity.logs = [];
+                            }
+                          }
+
+                            
+                          if (
+                            maxPlaneIntersectionTime >= 0
+                            && minPlaneIntersectionTime <= remainingCollisionTime
+                          ) {
+
+                            const intersectionPlanePosition = vectorNScaleThenAdd(
+                              startPlanePosition,
+                              planeVelocity,
+                              minPlaneIntersectionTime,
+                            );
+                            if (
+                              planeVelocityZ < 0
+                              && vector2PolygonsContain(polygons, ...intersectionPlanePosition)
+                              && FLAG_QUICK_COLLISIONS
+                            ) {
+                              if (minPlaneIntersectionTime > 0) {
+                                collisionTime = minPlaneIntersectionTime; 
+                                planeCollisionNormal = NORMAL_Z;  
+                              }
+                            } else {
+                              //const planeIntersectionPositionZ = planeIntersectionPosition[2];
+                              // handle edge collisions
+                              // const intersectionRadius = Math.sqrt(
+                              //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
+                              // );
+                              // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
+                              // const planeTargetPosition = vector3TransformMatrix4(
+                              //   worldToPlaneCoordinates,
+                              //   ...targetPosition,
+                              // );
+                              // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
+                              //let minTime = 0;
+                              let minTime = Math.max(0, minPlaneIntersectionTime);
+                              let maxTime = Math.min(maxPlaneIntersectionTime, remainingCollisionTime);
+                              for (let i=0; i<MAX_COLLISION_STEPS; i++) {
+                                const testTime = i ? (minTime + maxTime)/2 : maxTime;
+                                const testPlanePosition = vector3TransformMatrix4(
+                                  worldToPlaneCoordinates,
+                                  ...vectorNScaleThenAdd(position, velocity, testTime),
+                                );
+                                const testPlanePositionZ = testPlanePosition[2] - planeZ;
+                                let hit: Booleanish;
+                                if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
+                                  planeCollisionNormal = NORMAL_Z;
+                                  hit = 1;
                                 } else {
-                                  minTime = testTime;
+                                  const testIntersectionRadius = Math.sqrt(
+                                    collisionRadius * collisionRadius - testPlanePositionZ * testPlanePositionZ
+                                  );
+                                  const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                                    polygons,
+                                    testPlanePosition,
+                                    testIntersectionRadius,
+                                  );
+                                  if (closestPoint) {
+                                    const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
+                                    let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
+                                    if (rsq < collisionRadius * collisionRadius) {
+                                      const [closestPointX, closestPointY] = closestPoint;
+                                      // const angleZ = Math.atan2(
+                                      //   closestPointX - testPlanePosition[1],
+                                      //   closestPointY - testPlanePosition[0],
+                                      // ); 
+                                      // const cosAngleX = testPlanePositionZ / collisionRadius;
+                                      // const angleX = Math.acos(cosAngleX);
+                                      
+                                      planeCollisionNormal = vectorNNormalize(
+                                        vectorNScaleThenAdd(
+                                          testPlanePosition,
+                                          [closestPointX, closestPointY, planeZ],
+                                          -1,
+                                        ),
+                                      );
+                                      //planeCollisionNormal = NORMAL_Z;
+                                      hit = 1;
+                                    }
+                                  }
+                                }
+                                if (hit) {
+                                  if (i) {
+                                    maxTime = testTime;
+                                  }
+                                  // first loop is a special case
+                                } else {
+                                  if (!i) {
+                                    // no collision, exit loop
+                                    i = MAX_COLLISION_STEPS;
+                                  } else {
+                                    minTime = testTime;
+                                  }
                                 }
                               }
-                            }
-                            if (planeCollisionNormal) {
-                              // don't allow it to bounce deeper into the plane
-                              const cosa = vectorNDotProduct(planeCollisionNormal, NORMAL_Z);
-                              const a = Math.acos(cosa);
-                              const axis = a > EPSILON
-                                ? vectorNNormalize(vector3CrossProduct(planeCollisionNormal, NORMAL_Z))
-                                : NORMAL_X;
-                              const matrix = matrix4Rotate(a, ...axis);
-                              const v = vector3TransformMatrix4(matrix, ...planeVelocity);
-                              if (v[2] < 0 || true) {
-                                collisionTime = minTime;
-                              } else {
-                                planeCollisionNormal = 0;
+                              if (planeCollisionNormal) {
+                                // if the collisionNormal is already aligned with the velocity
+                                // just ignore it
+                                if (vectorNDotProduct(planeVelocity, planeCollisionNormal) < 0) {
+                                  collisionTime = minTime;
+                                } else {
+                                  planeCollisionNormal = 0;
+                                }
                               }
                             }
                           }
@@ -1302,36 +1496,44 @@ window.onload = async () => {
                 }
               }, 1);
               if (minCollisionNormal) {
+                const minCollisionEntityId = (minCollisionEntity as Entity).id;
+                if (collidedEntities[minCollisionEntityId]) {
+                  duplicateCollisionCount++;
+                }
+                collidedEntities[minCollisionEntityId] = 1;
+
                 const boundedCollisionTime = Math.max(0, minCollisionTime - EPSILON);
 
-                entity.logs.push([
-                  'collision',
-                  count,
-                  minCollisionTime,
-                  minCollisionNormal,
-                  remainingCollisionTime,
-                  position,
-                  targetUnionBounds,
-                ]);
-                entity.logs.push([
-                  '  with',
-                  (minCollisionEntity as Entity).id,
-                  ...toPoints(minCollisionEntity),
-                  vector3TransformMatrix4((minCollisionEntity as Entity).face.rotateToModelCoordinates, 0, 0, 1),
-                ])
-                // console.log(
-                //   'collision',
-                //   count,
-                //   (minCollisionEntity as Entity).id,
-                //   minCollisionTime,
-                //   remainingCollisionTime,
-                //   minCollisionNormal,
+                if (FLAG_DEBUG_PHYSICS) {
+                  entity.logs.push([
+                    'collision',
+                    collisionCount,
+                    minCollisionTime,
+                    minCollisionNormal,
+                    remainingCollisionTime,
+                    position,
+                    targetUnionBounds,
+                  ]);
+                  entity.logs.push([
+                    '  with',
+                    (minCollisionEntity as Entity).id,
+                    ...toPoints(minCollisionEntity),
+                    vector3TransformMatrix4((minCollisionEntity as Entity).face.rotateToModelCoordinates, 0, 0, 1),
+                  ]);  
+                  // console.log(
+                  //   'collision',
+                  //   count,
+                  //   (minCollisionEntity as Entity).id,
+                  //   minCollisionTime,
+                  //   remainingCollisionTime,
+                  //   minCollisionNormal,
 
-                // );
-                entity.logs.push([
-                  '  velocity b', vectorNLength(velocity), velocity
-                ]);
-                // console.log('  velocity b', vectorNLength(velocity), velocity);
+                  // );
+                  entity.logs.push([
+                    '  velocity b', vectorNLength(velocity), velocity
+                  ]);
+                  // console.log('  velocity b', vectorNLength(velocity), velocity);
+                }
                 const inverseFriction = 1;
 
                 entity.position = vectorNScaleThenAdd(
@@ -1349,31 +1551,38 @@ window.onload = async () => {
                 const rotate = matrix4Rotate(a, ...axis);
                 const unrotate = matrix4Rotate(-a, ...axis);
                 const v = vector3TransformMatrix4(rotate, ...velocity);
-                entity.logs.push(['  velocity i', vectorNLength(v), v]);
+                if (FLAG_DEBUG_PHYSICS) {
+                  entity.logs.push(['  velocity i', vectorNLength(v), v]);
+                }
                 // console.log('  velocity i', vectorNLength(v), v);
                 const outputV = vectorNMultiply(v, [
                   inverseFriction,
                   inverseFriction,
                   // bounce it out, want the restitution to increase to 1 (or more!) as we
                   // keep colliding so we don't end up in a degenerate state
-                  -(restitution + (1 - restitution) * Math.pow(count/(MAX_COLLISIONS - 2), 2)),
+                  -restitution,
                 ]);
 
                 // avoid rounding errors by ensuring that any collision bounces out at 
                 // at least EPSILON velocity
                 if (FLAG_SAFE_UNROTATED_VELOCITY) {
-                  outputV[2] = Math.max(outputV[2], EPSILON);
+                  outputV[2] = Math.max(outputV[2], EPSILON/9 * duplicateCollisionCount);
                 }
-                // console.log('  velocity s', vectorNLength(v), v);
-                entity.logs.push(['  velocity s', vectorNLength(outputV), outputV]);
+                if (FLAG_DEBUG_PHYSICS) {
+                  // console.log('  velocity s', vectorNLength(v), v);
+                  entity.logs.push(['  velocity s', vectorNLength(outputV), outputV]);
+                }
 
                 (entity as DynamicEntity).velocity = vector3TransformMatrix4(unrotate, ...outputV);
-                // console.log('  velocity a', vectorNLength((entity as DynamicEntity).velocity), (entity as DynamicEntity).velocity);
-                entity.logs.push([
-                  '  velocity a',
-                  vectorNLength((entity as DynamicEntity).velocity),
-                  [...(entity as DynamicEntity).velocity],
-                ]);
+                if (FLAG_DEBUG_PHYSICS) {
+                  // console.log('  velocity a', vectorNLength((entity as DynamicEntity).velocity), (entity as DynamicEntity).velocity);
+                  entity.logs.push([
+                    '  velocity a',
+                    vectorNLength((entity as DynamicEntity).velocity),
+                    [...(entity as DynamicEntity).velocity],
+                  ]);
+
+                }
                 
                 remainingCollisionTime -= boundedCollisionTime;
               } else {
@@ -1384,16 +1593,17 @@ window.onload = async () => {
                 );
                 remainingCollisionTime = 0;
               }
-              count++;
-              if (count > MAX_COLLISIONS) {
+              collisionCount++;
+              if (collisionCount > MAX_COLLISIONS && FLAG_DEBUG_PHYSICS) {
                 entity.logs.forEach(log => console.log(...log));
                 console.log('too many collisions');
                 entity.logs = [];
-                break;
               }  
             }
             addEntity(entity);
           }
+          const body = resolutionBodies[tile.resolution]
+          const modelId = body?.modelId;
           if (!renderedEntities[renderId] && modelId != null && (!renderTile || tiles.has(renderTile)) ) {
             renderedEntities[renderId] = 1;
             let render = toRender[modelId];
@@ -1409,8 +1619,8 @@ window.onload = async () => {
               // drop the render down a bit for each resolution to hide edges
               //matrix4Translate(0, 0, -Math.pow(resolution, 2)/30),
             );
-            const rotation = partTransforms?.[entity.body.id] || matrix4Identity();
-            render.push([position, rotation]);
+            const rotation = partTransforms?.[0] || matrix4Identity();
+            render.push([position, rotation, body.textures]);
           }
   
         }
@@ -1421,10 +1631,14 @@ window.onload = async () => {
       const renders = toRender[modelId];
       if (renders) {
         gl.bindVertexArray(vao);
-        renders.forEach(([position, rotation]) => {
+        renders.forEach(([position, rotation, textures]) => {
           gl.uniformMatrix4fv(uWorldPositionMatrix, false, position as any);
           gl.uniformMatrix4fv(uWorldRotationMatrix, false, rotation as any);
-          gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);  
+          allTextureUniforms.forEach(uniform => {
+            const textureIds = textures?.get(uniform) || fallbackTextures.get(uniform);
+            gl.uniform1iv(uniform, textureIds);
+          });
+          gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
         });  
       }
     });

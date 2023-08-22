@@ -1,10 +1,24 @@
 const NORMAL_X: ReadonlyVector3 = [1, 0, 0];
 const NORMAL_Y: ReadonlyVector3 = [0, 1, 0];
 const NORMAL_Z: ReadonlyVector3 = [0, 0, 1];
+
+
 const EPSILON = .0001;
 const DEFAULT_GRAVITY = .00001;
-const HORIZON = 99;
+
+
+const RESOLUTIONS = 8;
+const WORLD_DIMENSION = Math.pow(2, RESOLUTIONS);
+
+const DEPTH_RESOLUTIONS = 6;
+const DEPTH_DIMENSION = Math.pow(2, DEPTH_RESOLUTIONS);
+const WORLD_DEPTH_SCALE = WORLD_DIMENSION/DEPTH_DIMENSION;
+
+const HORIZON = WORLD_DIMENSION * 2;
 const SKY: Vector3 = [.7, .8, 1];
 
 const MAX_COLLISION_STEPS = 9;
 const MAX_COLLISIONS = 8;
+
+const MATERIAL_TEXTURE_DIMENSION = 4196;
+const MATERIAL_DEPTH_RANGE = .05;

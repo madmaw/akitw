@@ -2,40 +2,46 @@ type Terrain = (x: number, y: number) => number;
 
 function weightedAverageTerrainFactory(
   depths: number[][],
-  sampleRadius: number,
-  scale: number,
 ): Terrain {
-  // TODO can be a constant
-  const width = depths.length;
-  const height = depths[0].length;
   return function(wx: number, wy: number) {
-    const tx = wx * width;
-    const ty = wy * height;
+    const tx = wx * DEPTH_DIMENSION;
+    const ty = wy * DEPTH_DIMENSION;
+    const dcx = wx * 2 - 1;
+    const dcy = wy * 2 - 1;
+    //const sampleRadius = worldSampleRadius * DEPTH_DIMENSION;
+    const sampleRadius = 3;
     const sampleRadiusSquared = sampleRadius * sampleRadius;
+    const roundedSampleRadius = sampleRadius | 0;
     let totalWeight = 0;
     let totalWeightedDepth = 0;
 
-    for (let x = tx - sampleRadius | 0; x < tx + sampleRadius; x++) {
-      for (let y = ty - sampleRadius | 0; y < ty + sampleRadius; y++) {
+    //const sharpness = Math.max(0, depths[tx | 0][ty | 0]/9);
+    const sharpness = Math.pow(1 - (dcx * dcx + dcy * dcy), 4) * 3;
+
+    for (let x = tx - roundedSampleRadius | 0; x < tx + sampleRadius; x++) {
+      for (let y = ty - roundedSampleRadius | 0; y < ty + sampleRadius; y++) {
         const dx = tx - x;
         const dy = ty - y;
         const distanceSquared = dx * dx + dy * dy;
-        if (
-          x >= 0
-          && y >= 0
-          && x < width
-          && y < height
-          && sampleRadiusSquared > distanceSquared
-        ) {
-          const depth = depths[x][y];
-          const weight = Math.pow(1 - Math.sqrt(distanceSquared)/Math.sqrt(sampleRadiusSquared), 2);
+        
+        if (sampleRadiusSquared > distanceSquared) {
+          const sharpWeight = Math.pow(1 - Math.sqrt(distanceSquared)/sampleRadius, sharpness);
+          const smoothWeight = Math.cos((Math.sqrt(distanceSquared)/sampleRadius) * Math.PI/2);
+          const weight = sharpWeight * Math.min(1, sharpness) + smoothWeight * Math.max(0, 1 - sharpness);
+
+          const depth = x < 0
+            || y < 0
+            || x >= DEPTH_DIMENSION
+            || y >= DEPTH_DIMENSION
+            ? -2
+            : depths[x][y];
           totalWeightedDepth += weight * depth;
           totalWeight += weight;
         }
-      }
+    }
     }
     return totalWeight > 0
-      ? totalWeightedDepth/totalWeight * scale
+      ? totalWeightedDepth/totalWeight * WORLD_DEPTH_SCALE
       : 0;
   };
 }

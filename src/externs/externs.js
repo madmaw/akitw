@@ -1,4 +1,5 @@
 var Z;
+var fps;
 var innerWidth;
 var innerHeight;
 var onkeyup;
