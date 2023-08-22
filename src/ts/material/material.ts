@@ -1,5 +1,5 @@
 
-type Material = (ctx: CanvasRenderingContext2D, size: number) => void;
+type Material = (ctx: CanvasRenderingContext2D) => void;
 
 type ImageDataMaterial = (imageData: ImageData) => void;
 
@@ -104,22 +104,22 @@ function featureMaterial(
   quantity: number,
   distribution: Distribution,
 ): Material {
-  return function(ctx: CanvasRenderingContext2D, size: number) {
-    const imageData = ctx.getImageData(0, 0, size, size);
+  return function(ctx: CanvasRenderingContext2D) {
+    const imageData = ctx.getImageData(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
     const z = imageData.data[2];
 
     for(let i=0; i<quantity; i++) {
-      const [x, y, scale] = distribution(size);
-      const dimension = (baseDimension * scale)*size/MATERIAL_TEXTURE_DIMENSION;
+      const [x, y, scale] = distribution(MATERIAL_TEXTURE_DIMENSION);
+      const dimension = baseDimension * scale;
       const r = dimension/2;
       const feature = f(r, z);
 
       for (let dx = -1; dx < dimension + 1; dx++) {
-        const px = x + dx + size | 0;
+        const px = x + dx + MATERIAL_TEXTURE_DIMENSION | 0;
         for (let dy = -1; dy < dimension + 1; dy++) {
-          const py = y + dy + size | 0;
-          let index = ((py % size) * size
-            + (px % size)) * 4;
+          const py = y + dy + MATERIAL_TEXTURE_DIMENSION | 0;
+          let index = ((py % MATERIAL_TEXTURE_DIMENSION) * MATERIAL_TEXTURE_DIMENSION
+            + (px % MATERIAL_TEXTURE_DIMENSION)) * 4;
           const ox = dx - r + .5;
           const oy = dy - r + .5;
           const z = imageData.data[index + 2];

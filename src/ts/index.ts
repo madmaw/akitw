@@ -3,6 +3,7 @@ const U_WORLD_POSITION_MATRIX = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
 const U_PROJECTION_MATRIX = 'uProjection';
 const U_CAMERA_POSITION = 'uCameraPosition';
+const U_MATERIAL_ATLAS = 'uMaterialAtlas';
 const U_MATERIAL_TEXTURE = 'uMaterialTexture';
 const U_TIME = 'uTime';
 
@@ -79,6 +80,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
+  uniform sampler2D ${U_MATERIAL_ATLAS};
   uniform sampler2D ${U_MATERIAL_TEXTURE};
   uniform float ${U_TIME};
 
@@ -127,7 +129,7 @@ const FRAGMENT_SHADER = `#version 300 es
     float inverseBrightness = min(${V_MODEL_COLOR}.w*2.,1.);
     vec4 color = mix(
       vec4(${V_MODEL_COLOR}.xyz, 1),
-      vec4(.1, .4, .2, 1),
+      vec4(.0, .5, .2, 1),
       abs(tm.a * 2. - 1.)
     );
     float lighting = max(
@@ -137,8 +139,12 @@ const FRAGMENT_SHADER = `#version 300 es
 
     vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z, .1));
     float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z, 0., 1.), 9.);
-    vec3 sandDistance = distance * (1. - max(0., .2-${V_WORLD_POSITION}.z)/max(distance.z, .1));
-    float sandiness = 1. - pow(1. - clamp(distance.z - sandDistance.z, 0., 1.), 9.);
+    //vec3 sandDistance = distance * (1. - max(0., .2-${V_WORLD_POSITION}.z)/max(distance.z, .1));
+    //float sandiness = 1. - pow(1. - clamp(distance.z - sandDistance.z, 0., 1.), 9.);
+    float sandiness = texture(
+      ${U_MATERIAL_ATLAS},
+      ${V_WORLD_POSITION}.xy/${WORLD_DIMENSION}.
+    ).x;
 
     vec3 fc = mix(
       mix(
@@ -284,56 +290,6 @@ window.onload = async () => {
     }
   }
 
-  // material, flags = generate linear, generate mipmap
-  const materials: (Material | Falsey)[] = [
-    // empty
-    0,
-    // skybox
-    (ctx, size) => {
-      const gradient = ctx.createLinearGradient(0, 0, 0, size/2);
-      gradient.addColorStop(0, 'rgb(128,128,128,.5)');
-      gradient.addColorStop(.5, 'rgba(128,128,128)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, size, size);
-      // TODO clouds
-    },
-    featureMaterial(
-      spikeFeatureFactory(.02, .02),
-      8,
-      // spikeFeatureFactory(1, 1),
-      // 64,
-      99999,
-      randomDistributionFactory(
-        0,
-        2,
-      ),
-    ),
-  ];
-  // make some textures
-  const textureImages = materials.map(material => {
-    const materialCanvas = document.createElement('canvas');
-    //document.body.appendChild(materialCanvas);
-    const dimension = MATERIAL_TEXTURE_DIMENSION;
-    materialCanvas.width = dimension;
-    materialCanvas.height = dimension; 
-    const ctx = materialCanvas.getContext(
-      '2d',
-      FLAG_FAST_READ_CANVASES
-        ? {
-          willReadFrequently: true,
-        }
-        : undefined
-    );
-    // nx = 0, ny = 0, depth = 0, feature color = 0
-    ctx.fillStyle = 'rgba(128,128,128,.5)';
-    //ctx.fillStyle = 'red';
-    ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
-
-    material && material(ctx, MATERIAL_TEXTURE_DIMENSION);
-    return materialCanvas;  
-  });
-  
-
   const terrain = weightedAverageTerrainFactory(depths);
   
   const world: World = new Array(RESOLUTIONS).fill(0).map((_, resolution) => {
@@ -452,7 +408,7 @@ window.onload = async () => {
       const groundFaces = workingArray.map((point, i) => {
         const nextPoint = points[(i+1)%points.length];
         return toFace<PlaneMetadata>(axisPoint, point, nextPoint, {
-          color1: [.2, .3, .0, .5],
+          color1: [.1, .3, .0, .5],
           textureCoordinateTransform: matrix4Identity(),
         });
       });
@@ -530,7 +486,10 @@ window.onload = async () => {
               centerRadius: radius,
               modelId,
               renderTransform: matrix4Identity(),
-              textures: new Map([[uMaterialTexture, [resolution > 1 ? TEXTURE_GRASS_MIPMAP: TEXTURE_GRASS]]]),
+              textures: new Map([
+                [uMaterialAtlas, [TEXTURE_MAP_MIPMAP]],
+                [uMaterialTexture, [resolution > 1 ? TEXTURE_GRASS_MIPMAP: TEXTURE_GRASS]],
+              ]),
             },
           },
           position: [0, 0, 0],
@@ -613,6 +572,7 @@ window.onload = async () => {
     uWorldRotationMatrix,
     uProjectionMatrix,
     uCameraPosition,
+    uMaterialAtlas,
     uMaterialTexture,
     uTime,
   ] = [
@@ -620,6 +580,7 @@ window.onload = async () => {
     U_WORLD_ROTATION_MATRIX,
     U_PROJECTION_MATRIX,
     U_CAMERA_POSITION,
+    U_MATERIAL_ATLAS,
     U_MATERIAL_TEXTURE,
     U_TIME,
   ].map(
@@ -627,6 +588,7 @@ window.onload = async () => {
   );
 
   const fallbackTextures: Map<WebGLUniformLocation, number[]> = new Map([
+    [uMaterialAtlas, [TEXTURE_EMPTY]],
     [uMaterialTexture, [TEXTURE_EMPTY]],
   ]);
   const allTextureUniforms = [...fallbackTextures.keys()];
@@ -866,15 +828,83 @@ window.onload = async () => {
       },
     );
   });
-
+  // material, flags = generate linear, generate mipmap
+  const materials: (Material | Falsey)[] = [
+    // empty
+    0,
+    // map
+    ctx => {
+      const imageData = ctx.getImageData(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+      for (let x=0; x<MATERIAL_TEXTURE_DIMENSION; x++) {
+        for (let y=0; y<MATERIAL_TEXTURE_DIMENSION; y++) {
+          //const depth = terrain((x + .5)/MATERIAL_TEXTURE_DIMENSION, (y + .5)/MATERIAL_TEXTURE_DIMENSION);
+          const depth = terrain(x/MATERIAL_TEXTURE_DIMENSION, y/MATERIAL_TEXTURE_DIMENSION);
+          const dx = x - MATERIAL_TEXTURE_DIMENSION/2;
+          const dy = y - MATERIAL_TEXTURE_DIMENSION/2;
+          const dc = Math.sqrt(dx *dx + dy * dy);
+          const sandiness = Math.max(
+            Math.max(0, Math.min(1, .5-depth)), 
+            .3 - Math.pow(Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc), 2)/9,
+          );
+          imageData.data.set([
+            // sandiness
+             sandiness * 255 | 0,
+          ], (y * MATERIAL_TEXTURE_DIMENSION + x) * 4);
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+    },    
+    // skybox
+    ctx => {
+      const gradient = ctx.createLinearGradient(0, 0, 0, MATERIAL_TEXTURE_DIMENSION/2);
+      gradient.addColorStop(0, 'rgb(128,128,128,.5)');
+      gradient.addColorStop(.5, 'rgba(128,128,128)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+      // TODO clouds
+    },
+    // grass
+    featureMaterial(
+      spikeFeatureFactory(.02, .02),
+      8,
+      // spikeFeatureFactory(1, 1),
+      // 64,
+      99999,
+      randomDistributionFactory(
+        0,
+        2,
+      ),
+    ),
+  ];
   let textureId = gl.TEXTURE0;
-  textureImages.forEach(image => {
+
+  // make some textures
+  materials.forEach(material => {
+    const materialCanvas = document.createElement('canvas');
+    //document.body.appendChild(materialCanvas);
+    const dimension = MATERIAL_TEXTURE_DIMENSION;
+    materialCanvas.width = dimension;
+    materialCanvas.height = dimension; 
+    const ctx = materialCanvas.getContext(
+      '2d',
+      FLAG_FAST_READ_CANVASES
+        ? {
+          willReadFrequently: true,
+        }
+        : undefined
+    );
+    // nx = 0, ny = 0, depth = 0, feature color = 0
+    ctx.fillStyle = 'rgba(128,128,128,.5)';
+    //ctx.fillStyle = 'red';
+    ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+    material && material(ctx);
+
     // need mipmap and non-mipmap versions of some textures (so we do all textures)
     new Array(2).fill(0).forEach((_, i) => {
       gl.activeTexture(textureId++);
       const texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, materialCanvas);
       if (i) {
         gl.generateMipmap(gl.TEXTURE_2D);
       } else {
@@ -890,7 +920,8 @@ window.onload = async () => {
         );
       }
     });
-  });
+    
+  });  
 
 
 
@@ -1133,7 +1164,7 @@ window.onload = async () => {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
-    //gl.uniform1i(uMaterialTexture, TEXTURE_GRASS);
+    gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MIPMAP);
 
     gl.bindVertexArray(skyCylinderModel.vao);
     gl.uniformMatrix4fv(
