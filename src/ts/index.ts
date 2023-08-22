@@ -12,14 +12,14 @@ const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'aVertexModelSmoothingRotation'
 const A_MODEL_COLOR = 'aColor';
 const A_MODEL_TEXTURE_POSITION_MATRIX = 'aModelTexturePosition';
 
-const V_TEXTURE_POSITION = 'vPlanePosition';
 const V_MODEL_POSITION = 'vModelPosition';
 const V_WORLD_POSITION = 'vWorldPosition';
 const V_MODEL_ROTATION_MATRIX = 'vModelRotation';
-const V_WORLD_TO_PLANE_ROTATION_MATRIX = 'vWorldToPlaneRotation';
 const V_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
 const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = 'vInverseModelSmoothingRotation';
 const V_MODEL_COLOR = 'vColor';
+const V_MODEL_PLANE_NORMAL = 'vModelPlaneNormal';
+const V_MODEL_TEXTURE_POSITION_MATRIX = 'vModelTexturePosition'
 
 const O_COLOR = "oColor";
 
@@ -37,20 +37,20 @@ const VERTEX_SHADER = `#version 300 es
   uniform mat4 ${U_PROJECTION_MATRIX};
   
   out vec4 ${V_WORLD_POSITION};
+  out mat4 ${V_MODEL_TEXTURE_POSITION_MATRIX};
   out vec4 ${V_MODEL_POSITION};
-  out vec4 ${V_TEXTURE_POSITION};
   out mat4 ${V_MODEL_ROTATION_MATRIX};
-  out mat4 ${V_WORLD_TO_PLANE_ROTATION_MATRIX};
   out mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
   out mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   out vec3 ${V_MODEL_COLOR};
+  out vec4 ${V_MODEL_PLANE_NORMAL};
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
-    ${V_TEXTURE_POSITION} = ${A_MODEL_TEXTURE_POSITION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
+    ${V_MODEL_TEXTURE_POSITION_MATRIX} = ${A_MODEL_TEXTURE_POSITION_MATRIX};
     ${V_WORLD_POSITION} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
-    ${V_WORLD_TO_PLANE_ROTATION_MATRIX} = inverse(${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_ROTATION_MATRIX});
+    ${V_MODEL_PLANE_NORMAL} = ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
     
     ${V_MODEL_SMOOTHING_ROTATION_MATRIX} = ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
     ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} = inverse(${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX});
@@ -67,14 +67,14 @@ const MATERIAL_DEPTH_SCALE = 256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RA
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
 
-  in vec4 ${V_TEXTURE_POSITION};
+  in mat4 ${V_MODEL_TEXTURE_POSITION_MATRIX};
   in vec4 ${V_WORLD_POSITION};
   in vec4 ${V_MODEL_POSITION};
   in mat4 ${V_MODEL_ROTATION_MATRIX};
   in mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
   in mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   in vec3 ${V_MODEL_COLOR};
-  in mat4 ${V_WORLD_TO_PLANE_ROTATION_MATRIX};
+  in vec4 ${V_MODEL_PLANE_NORMAL};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
@@ -85,11 +85,11 @@ const FRAGMENT_SHADER = `#version 300 es
 
   void main(void) {
     vec3 distance = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
-    vec4 d = ${V_WORLD_TO_PLANE_ROTATION_MATRIX}
+    vec4 d = inverse(${U_WORLD_ROTATION_MATRIX})
       * ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX}
       * vec4(normalize(distance), 1);
     // NOTE: c will be positive for camera facing surfaces
-    float c = dot(vec3(0, 0, 1), d.xyz);
+    float c = dot(${V_MODEL_PLANE_NORMAL}.xyz, d.xyz);
     float depth = ${MATERIAL_DEPTH_RANGE/2};
     // material
     vec4 tm;
@@ -98,13 +98,13 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 p;
     for (int count = 0; count < ${NUM_STEPS}; count++) {
       depth -= ${STEP};
-      p = ${V_TEXTURE_POSITION} + d * depth / c;
+      p = ${V_MODEL_TEXTURE_POSITION_MATRIX} * vec4(${V_MODEL_POSITION}.xyz + d.xyz * depth / c, 1);
       vec4 tm1 = texture(
         ${U_MATERIAL_TEXTURE},
         p.xy
       );
 
-      float surfaceDepth = (tm1.z - .5) * ${MATERIAL_DEPTH_SCALE}; 
+      float surfaceDepth = (tm1.z - .5) * ${MATERIAL_DEPTH_SCALE};
       if (surfaceDepth > depth) {
         float d0 = depth + ${STEP};
         float s0 = d0 - (tm.z - .5) * ${MATERIAL_DEPTH_SCALE};
@@ -114,7 +114,7 @@ const FRAGMENT_SHADER = `#version 300 es
         if (abs(divisor) > .0) {  
           float si = s0 * ${STEP}/divisor;
           depth += ${STEP} - si;
-          p = ${V_TEXTURE_POSITION} + d * (d0 - si) / c;  
+          p = ${V_MODEL_TEXTURE_POSITION_MATRIX} * vec4(${V_MODEL_POSITION}.xyz + d.xyz * (d0 - si) / c, 1);
           count = ${NUM_STEPS};
         }
       }
@@ -123,11 +123,12 @@ const FRAGMENT_SHADER = `#version 300 es
         p.xy
       );  
     }
+
     vec2 n = tm.xy * 2. - 1.;
     vec3 m = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(n, pow(1. - length(n), 2.), 1)).xyz;
     vec4 color = mix(
       vec4(${V_MODEL_COLOR}, 1),
-      vec4(0, .6, .4, 1),
+      vec4(1, 0, 0, 1),
       abs(tm.a * 2. - 1.)
     );
     float lighting = max(
@@ -777,20 +778,12 @@ window.onload = async () => {
       }, new Set<ReadonlyVector3>());
 
       const modelPointsUnique = [...modelPointsSet];
-      // TODO: attach textures properly
-      const dx = Math.random();
-      const dy = Math.random();
 
-      const newPlanePoints = modelPointsUnique.map<ReadonlyVector4>(modelPoint => {
-        const [x, y] = vector3TransformMatrix4(fromModelCoordinates, ...modelPoint);
-        return [x, y, dx, dy];
-        //return [modelPoint[0], modelPoint[1], 0, 0];
-      });
-
-      // just use the plane coordinates
       const newModelTextureTransforms = modelPointsUnique.map<ReadonlyMatrix4>(() => {
         // TODO obtain from plane metadata (also have plane metadata)
+        //return rotateFromModelCoordinates;
         return fromModelCoordinates;
+        //return matrix4Identity();
       });
 
       const newModelRotations = new Array<ReadonlyMatrix4>(modelPointsUnique.length)
