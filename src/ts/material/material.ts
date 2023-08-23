@@ -1,5 +1,5 @@
 
-type Material = (ctx: CanvasRenderingContext2D) => void;
+type Material = (ctx: CanvasRenderingContext2D, y: number) => void;
 
 type ImageDataMaterial = (imageData: ImageData) => void;
 
@@ -104,8 +104,8 @@ function featureMaterial(
   quantity: number,
   distribution: Distribution,
 ): Material {
-  return function(ctx: CanvasRenderingContext2D) {
-    const imageData = ctx.getImageData(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+  return function(ctx: CanvasRenderingContext2D, y: number) {
+    const imageData = ctx.getImageData(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
     const z = imageData.data[2];
 
     for(let i=0; i<quantity; i++) {
@@ -131,6 +131,6 @@ function featureMaterial(
         }
       }
     }
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imageData, 0, y);
   };
 };

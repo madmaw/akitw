@@ -30,7 +30,6 @@ type BaseEntity<PartId extends number = number> = {
 
 type PlaneMetadata = {
   readonly textureCoordinateTransform?: ReadonlyMatrix4,
-  readonly color1: ReadonlyVector4,
 };
 
 type StaticEntity<PartId extends number = number> = {
@@ -59,5 +58,10 @@ type Part<PartId extends number = number> = {
   readonly centerRadius: number,
   readonly renderTransform: ReadonlyMatrix4,
   // uniform to texture id(s) for that uniform
-  textures?: Map<WebGLUniformLocation, number[]>;
+  textures?: Partial<Textures>;
+};
+
+type Textures = {
+  atlasTextureId: number,
+  materialTextureId: number,
 };
