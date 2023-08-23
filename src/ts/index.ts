@@ -1,4 +1,3 @@
-
 const U_WORLD_POSITION_MATRIX = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
 const U_PROJECTION_MATRIX = 'uProjection';
@@ -88,17 +87,29 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 d = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(distance), 1);
     // NOTE: c will be positive for camera facing surfaces
     float c = dot(${V_WORLD_PLANE_NORMAL}.xyz, d.xyz);
+    float il = max(1. - pow(length(distance)/8., 1.), 0.);
     float maxDepth = ${-MATERIAL_DEPTH_RANGE/2};
     vec4 maxPixel;
     vec4 maxColor;
+    // TODO look up material based on adjusted position
+    vec4 materialness = texture(
+      ${U_MATERIAL_ATLAS},
+      ${V_WORLD_POSITION}.xy/${WORLD_DIMENSION}.
+    );
+    vec4 baseColor = (
+      ${U_MATERIAL_COLORS}[0]*materialness.x
+        + ${U_MATERIAL_COLORS}[2]*materialness.y
+        + ${U_MATERIAL_COLORS}[4]*materialness.z
+    )/(materialness.x + materialness.y + materialness.z);
+
     for (int textureIndex=0; textureIndex<${MATERIAL_TEXTURE_COUNT}; textureIndex++) {
-      float depth = ${MATERIAL_DEPTH_RANGE/2};
+      float depth = ${MATERIAL_DEPTH_RANGE/2}*il;
       // material
       vec4 tm;
   
       // distances
       vec4 p;
-      for (int count = 0; count < ${NUM_STEPS}; count++) {
+      for (float count = 0.; count <= ${NUM_STEPS}.*il; count++) {
         depth -= ${STEP};
         p = vec4(${V_WORLD_POSITION}.xyz + d.xyz * depth / c, 1);
 
@@ -118,7 +129,7 @@ const FRAGMENT_SHADER = `#version 300 es
             float si = s0 * ${STEP}/divisor;
             depth += ${STEP} - si;
             p = vec4(${V_WORLD_POSITION}.xyz + d.xyz * (d0 - si) / c, 1);
-            count = ${NUM_STEPS};
+            count = ${NUM_STEPS}.;
           }
         }
         tm = texture(
@@ -126,11 +137,6 @@ const FRAGMENT_SHADER = `#version 300 es
           vec3((${V_WORLD_TEXTURE_POSITION_MATRIX} * p).xy, textureIndex)
         );  
       }
-      // TODO apply depth adjust to line intersection check
-      vec4 materialness = texture(
-        ${U_MATERIAL_ATLAS},
-        ${V_WORLD_POSITION}.xy/${WORLD_DIMENSION}.
-      );
       float depthAdjust = (
         textureIndex > 0
           ? textureIndex > 1
@@ -139,19 +145,22 @@ const FRAGMENT_SHADER = `#version 300 es
           : materialness.x
         ) * ${MATERIAL_DEPTH_RANGE};
 
+      // TODO properly adjust for the depth instead of just at the end
       if (depth + depthAdjust > maxDepth) {
         maxDepth = depth + depthAdjust;
         maxPixel = tm;
         maxColor = mix(
-          ${U_MATERIAL_COLORS}[textureIndex*2],
+          baseColor,
           ${U_MATERIAL_COLORS}[textureIndex*2+1],
-          abs(maxPixel.a * 2. - 1.)
+          tm.a * 2. - 1.
         );
       }
     }
     vec2 n = maxPixel.xy * 2. - 1.;
     vec3 m = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(n, pow(1. - length(n), 2.), 1)).xyz;
-    float inverseBrightness = min(maxColor.w*2.,1.);
+    vec4 color = maxColor * il + baseColor * (1. - il);
+
+    float inverseBrightness = min(color.w*2.,1.);
     float lighting = max(
       1. - inverseBrightness, 
       (dot(m, normalize(vec3(1, 2, 3)))+1.)/2.
@@ -162,7 +171,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
     vec3 fc = mix(
       mix(
-        maxColor.xyz * lighting,
+        color.xyz * lighting,
         vec3(${WATER.join()}),
         wateriness
       ),
@@ -249,7 +258,7 @@ window.onload = async () => {
       return .2;
     }
   });
-  console.log(depths);
+
   for (let i=0; i<DEPTH_RESOLUTIONS; i++) {
     const chunkDimension = Math.pow(2, DEPTH_RESOLUTIONS - i);
     const chunkCount = DEPTH_DIMENSION / chunkDimension;
@@ -283,7 +292,7 @@ window.onload = async () => {
             }, 0)/from.length;
             const dcenterSquared = (dx * dx + dy * dy)*4/(DEPTH_DIMENSION*DEPTH_DIMENSION);
             const inverseRandomness = Math.pow(i, 2+dcenterSquared * 2) * Math.pow(1 / (Math.abs(averageDepth)+1), .5);
-            const targetDepth = Math.pow(Math.max(0, 1 - dcenterSquared), 9) * 7;
+            const targetDepth = Math.pow(Math.max(0, 1 - dcenterSquared), 9) * 5;
             
             const rnd = 1 - Math.random() * Math.min(2, 1 + dcenterSquared);
             //const rnd = Math.random();
@@ -296,6 +305,36 @@ window.onload = async () => {
   }
 
   const terrain = weightedAverageTerrainFactory(depths);
+  function terrainNormal(worldPoint: ReadonlyVector3 | ReadonlyVector2) {
+    const offsets: ReadonlyVector2[] = [
+      [-1/WORLD_DIMENSION, 0],
+      [.7/WORLD_DIMENSION, -.7/WORLD_DIMENSION],
+      [.7/WORLD_DIMENSION, .7/WORLD_DIMENSION]];
+    // const offsets: ReadonlyVector2[] = [
+    //   [-1/(worldWidth * worldTerrainScale), 0],
+    //   [1/(worldWidth * worldTerrainScale), -1/(worldHeight * worldTerrainScale)],
+    //   [1/(worldWidth * worldTerrainScale), 1/(worldHeight * worldTerrainScale)],
+    // ];
+    const [p0, p1, p2] = offsets.map<Vector3>(offset => {
+      const point = vectorNScaleThenAdd(offset, worldPoint, 1/WORLD_DIMENSION);
+      
+      return [
+        ...vectorNScale(point, WORLD_DIMENSION),
+        terrain(...point),
+      ];
+    }) as [Vector3, Vector3, Vector3];
+    //const face = toFace(...points);
+    //const { rotateToModelCoordinates } = face;
+    // could also use cross product
+    //return vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
+    return vectorNNormalize(
+      vector3CrossProduct(
+        vectorNNormalize(vectorNScaleThenAdd(p1, p0, -1)),
+        vectorNNormalize(vectorNScaleThenAdd(p2, p0, -1)),
+      ),
+    );  
+  }
+
   
   const world: World = new Array(RESOLUTIONS).fill(0).map((_, resolution) => {
     const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
@@ -437,35 +476,7 @@ window.onload = async () => {
           return cachedResult;
         },
         (_, modelPoint) => {
-          // get some samples
-          const offsets: ReadonlyVector2[] = [
-            [-1/WORLD_DIMENSION, 0],
-            [.7/WORLD_DIMENSION, -.7/WORLD_DIMENSION],
-            [.7/WORLD_DIMENSION, .7/WORLD_DIMENSION]];
-          // const offsets: ReadonlyVector2[] = [
-          //   [-1/(worldWidth * worldTerrainScale), 0],
-          //   [1/(worldWidth * worldTerrainScale), -1/(worldHeight * worldTerrainScale)],
-          //   [1/(worldWidth * worldTerrainScale), 1/(worldHeight * worldTerrainScale)],
-          // ];
-          const [p0, p1, p2] = offsets.map<Vector3>(offset => {
-            const point = vectorNScaleThenAdd(offset, modelPoint, 1/WORLD_DIMENSION);
-            
-            return [
-              ...vectorNScale(point, WORLD_DIMENSION),
-              terrain(...point),
-            ];
-          }) as [Vector3, Vector3, Vector3];
-          //const face = toFace(...points);
-          //const { rotateToModelCoordinates } = face;
-          // could also use cross product
-          //return vector3TransformMatrix4(rotateToModelCoordinates, 0, 0, 1);
-          return vectorNNormalize(
-            vector3CrossProduct(
-              vectorNNormalize(vectorNScaleThenAdd(p1, p0, -1)),
-              vectorNNormalize(vectorNScaleThenAdd(p2, p0, -1)),
-            ),
-          );
-          //return vector3TransformMatrix4(_.rotateToModelCoordinates, 0, 0, 1);
+          return terrainNormal(modelPoint);
         },
       );
       const renderGroupId = nextRenderGroupId++;
@@ -492,7 +503,7 @@ window.onload = async () => {
               renderTransform: matrix4Identity(),
               textures: {
                 atlasTextureId: TEXTURE_MAP_MIPMAP,
-                materialTextureId: resolution > 1 ? TEXTURE_TERRAIN_MIPMAP: TEXTURE_TERRAIN,
+                materialTextureId: resolution > 0 ? TEXTURE_TERRAIN_MIPMAP: TEXTURE_TERRAIN,
               }
             },
           },
@@ -830,15 +841,26 @@ window.onload = async () => {
             const dy = y - MATERIAL_TEXTURE_DIMENSION/2;
             const dc = Math.sqrt(dx *dx + dy * dy);
             const sandiness = Math.max(
-              1 - Math.pow(Math.max(0, Math.min(1, depth)), 2), 
+              1 - Math.pow(Math.max(0, Math.min(1, depth*2)), 2), 
+              // road
+              1 - Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc)/2,
+            );
+            // iciness?
+            // too slow (TODO flag)
+            //const normal = terrainNormal(vectorNScale([x, y], WORLD_DIMENSION/MATERIAL_TEXTURE_DIMENSION));
+            const normal = NORMAL_Z;
+            const rockiness = Math.max(
+              1 - Math.pow(vectorNDotProduct(normal, NORMAL_Z), .5),
+              1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2),
+              // road
               1 - Math.pow(Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc), 2),
             );
-            const rockiness = 1 - Math.max(0, Math.min(1, 9 - depth));
+
             imageData.data.set([
               // sandiness
               sandiness * 255 | 0,
               // grassiness
-              127,
+              255 - Math.max(sandiness, rockiness) * 255 | 0,
               // rockiness
               rockiness * 255 | 0,
             ], (y * MATERIAL_TEXTURE_DIMENSION + x) * 4);
@@ -885,10 +907,10 @@ window.onload = async () => {
       ),
       // stone
       featureMaterial(
-        staticFeature,
-        12,
+        riverStonesFeatureFactory(.7),
+        24,
         9999,
-        randomDistributionFactory(1, 2),
+        randomDistributionFactory(2, 2),
       ),
       0,
     ],
@@ -1206,8 +1228,8 @@ window.onload = async () => {
       .2, .6, .2, .5,
       .3, .7, .5, 1,
       // stone
-      .2, .2, .2, .5,
-      .4, .4, .5, .5,
+      .4, .4, .4, .5,
+      .8, .7, .5, .5,
     ]);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

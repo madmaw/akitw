@@ -17,7 +17,7 @@ const WORLD_DEPTH_SCALE = WORLD_DIMENSION/DEPTH_DIMENSION;
 const HORIZON = WORLD_DIMENSION * 9;
 const MAX_FOG_DEPTH = HORIZON/2;
 const SKY: ReadonlyVector3 = [.7, .8, 1];
-const WATER: ReadonlyVector3 = [0, .2, .4];
+const WATER: ReadonlyVector3 = [.0, .1, .3];
 
 const MAX_COLLISION_STEPS = 9;
 const MAX_COLLISIONS = 8;
