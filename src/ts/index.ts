@@ -57,9 +57,11 @@ const VERTEX_SHADER = `#version 300 es
   }
 `;
 
-const STEP = .002;
+const STEP = .001;
 const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
-const MATERIAL_DEPTH_SCALE = (256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE)).toFixed(1);
+//const MATERIAL_DEPTH_SCALE = (256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE)).toFixed(1);
+//const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
+const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
 const MATERIAL_TEXTURE_COUNT = 3;
 
 const FRAGMENT_SHADER = `#version 300 es
@@ -87,8 +89,8 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 d = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(distance), 1);
     // NOTE: c will be positive for camera facing surfaces
     float c = dot(${V_WORLD_PLANE_NORMAL}.xyz, d.xyz);
-    float il = max(1. - pow(length(distance)/8., 1.), 0.);
-    float maxDepth = ${-MATERIAL_DEPTH_RANGE/2};
+    float il = max(1. - pow(length(distance)/4., 2.), 0.);
+    float maxDepth = ${(-MATERIAL_DEPTH_RANGE).toFixed(1)};
     vec4 maxPixel;
     vec4 maxColor;
     // TODO look up material based on adjusted position
@@ -103,10 +105,17 @@ const FRAGMENT_SHADER = `#version 300 es
     )/(materialness.x + materialness.y + materialness.z);
 
     for (int textureIndex=0; textureIndex<${MATERIAL_TEXTURE_COUNT}; textureIndex++) {
-      float depth = ${MATERIAL_DEPTH_RANGE/2}*il;
       // material
       vec4 tm;
-  
+      float depthAdjust = (
+        textureIndex > 0
+          ? textureIndex > 1
+            ? materialness.z
+            : materialness.y
+          : materialness.x
+        ) * ${MATERIAL_DEPTH_RANGE/2} - ${MATERIAL_DEPTH_RANGE/2};
+      float depth = ${MATERIAL_DEPTH_RANGE/2}*il;
+
       // distances
       vec4 p;
       for (float count = 0.; count <= ${NUM_STEPS}.*il; count++) {
@@ -137,15 +146,8 @@ const FRAGMENT_SHADER = `#version 300 es
           vec3((${V_WORLD_TEXTURE_POSITION_MATRIX} * p).xy, textureIndex)
         );  
       }
-      float depthAdjust = (
-        textureIndex > 0
-          ? textureIndex > 1
-            ? materialness.z
-            : materialness.y
-          : materialness.x
-        ) * ${MATERIAL_DEPTH_RANGE};
 
-      // TODO properly adjust for the depth instead of just at the end
+      // TODO depth adjust should be applied before here
       if (depth + depthAdjust > maxDepth) {
         maxDepth = depth + depthAdjust;
         maxPixel = tm;
@@ -156,8 +158,31 @@ const FRAGMENT_SHADER = `#version 300 es
         );
       }
     }
+    // maxPixel = texture(
+    //   ${U_MATERIAL_TEXTURE},
+    //   vec3((${V_WORLD_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, 1)
+    // );
+    // maxColor = mix(
+    //   ${U_MATERIAL_COLORS}[2],
+    //   ${U_MATERIAL_COLORS}[3],
+    //   maxPixel.a * 2. - 1.
+    // );
+
+
     vec2 n = maxPixel.xy * 2. - 1.;
-    vec3 m = normalize(${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * ${V_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(n, pow(1. - length(n), 2.), 1)).xyz;
+    vec3 m = normalize(
+      ${U_WORLD_ROTATION_MATRIX}
+        * ${V_MODEL_ROTATION_MATRIX}
+        * ${V_MODEL_SMOOTHING_ROTATION_MATRIX}
+        * vec4(
+          mix(
+            vec3(0, 0, 1),
+            vec3(n, sqrt(1. - n.x*n.x - n.y*n.y)),
+            il
+          ),
+          1
+        )
+      ).xyz;
     vec4 color = maxColor * il + baseColor * (1. - il);
 
     float inverseBrightness = min(color.w*2.,1.);
@@ -166,13 +191,13 @@ const FRAGMENT_SHADER = `#version 300 es
       (dot(m, normalize(vec3(1, 2, 3)))+1.)/2.
     ) * .5;
 
-    vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z, .1));
-    float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z, 0., 1.), 9.);
+    vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z + maxDepth, .1));
+    float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z - maxDepth, 0., 1.), 9.);
 
     vec3 fc = mix(
       mix(
         color.xyz * lighting,
-        vec3(${WATER.join()}),
+        mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., wateriness), 2.)),
         wateriness
       ),
       // fog
@@ -503,7 +528,7 @@ window.onload = async () => {
               renderTransform: matrix4Identity(),
               textures: {
                 atlasTextureId: TEXTURE_MAP_MIPMAP,
-                materialTextureId: resolution > 0 ? TEXTURE_TERRAIN_MIPMAP: TEXTURE_TERRAIN,
+                materialTextureId: resolution > 1 ? TEXTURE_TERRAIN_MIPMAP: TEXTURE_TERRAIN,
               }
             },
           },
@@ -847,13 +872,20 @@ window.onload = async () => {
             );
             // iciness?
             // too slow (TODO flag)
-            //const normal = terrainNormal(vectorNScale([x, y], WORLD_DIMENSION/MATERIAL_TEXTURE_DIMENSION));
-            const normal = NORMAL_Z;
+            const slopeRockiness = FLAG_STONEY_SLOPES
+              ? 1 - Math.pow(
+                vectorNDotProduct(
+                  terrainNormal(vectorNScale([x, y], WORLD_DIMENSION/MATERIAL_TEXTURE_DIMENSION)),
+                  NORMAL_Z,
+                ),
+                .1,
+              )
+              : 0;
             const rockiness = Math.max(
-              1 - Math.pow(vectorNDotProduct(normal, NORMAL_Z), .5),
+              slopeRockiness,
               1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2),
               // road
-              1 - Math.pow(Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc), 2),
+              1 - Math.pow(Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc)/3, 2) - sandiness,
             );
 
             imageData.data.set([
@@ -895,24 +927,22 @@ window.onload = async () => {
       ),
       // grass
       featureMaterial(
-        spikeFeatureFactory(.02, .02),
+        spikeFeatureFactory(4, 4),
         8,
-        // spikeFeatureFactory(1, 1),
-        // 64,
         99999,
         randomDistributionFactory(
-          0,
+          2,
           2,
         ),
       ),
       // stone
       featureMaterial(
-        riverStonesFeatureFactory(.7),
+        riverStonesFeatureFactory(1),
         24,
         9999,
         randomDistributionFactory(2, 2),
       ),
-      0,
+
     ],
   ];
   let textureId = gl.TEXTURE0;

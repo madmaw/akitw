@@ -18,10 +18,11 @@ const HORIZON = WORLD_DIMENSION * 9;
 const MAX_FOG_DEPTH = HORIZON/2;
 const SKY: ReadonlyVector3 = [.7, .8, 1];
 const WATER: ReadonlyVector3 = [.0, .1, .3];
+const SHORE: ReadonlyVector3 = [.1, .5, .5];
 
 const MAX_COLLISION_STEPS = 9;
 const MAX_COLLISIONS = 8;
 
 //const MATERIAL_TEXTURE_DIMENSION = 4196;
 const MATERIAL_TEXTURE_DIMENSION = 1024;
-const MATERIAL_DEPTH_RANGE = .05;
+const MATERIAL_DEPTH_RANGE = .1;
