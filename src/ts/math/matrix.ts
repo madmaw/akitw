@@ -175,7 +175,7 @@ const matrix4Scale = (x: number, y: number = x, z: number = y): ReadonlyMatrix4 
   ];
 }
 
-const matrix4Translate = (x: number, y: number, z: number): ReadonlyMatrix4 => {
+const matrix4Translate = (x: number, y: number, z: number): Matrix4 => {
   return [
     1, 0, 0, 0,
     0, 1, 0, 0,

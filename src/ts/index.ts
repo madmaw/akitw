@@ -6,11 +6,12 @@ const U_MATERIAL_ATLAS = 'uMaterialAtlas';
 const U_MATERIAL_TEXTURE = 'uMaterialTexture';
 const U_MATERIAL_COLORS = 'uMaterialColors';
 const U_TIME = 'uTime';
+const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE = 'uAtlasTextureIndex';
 
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
 const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'aVertexModelSmoothingRotation';
-const A_MODEL_TEXTURE_POSITION_MATRIX = 'aModelTexturePosition';
+const A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX = 'aModelTexturePosition';
 
 const V_MODEL_POSITION = 'vModelPosition';
 const V_WORLD_POSITION = 'vWorldPosition';
@@ -18,7 +19,7 @@ const V_MODEL_ROTATION_MATRIX = 'vModelRotation';
 const V_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
 const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = 'vInverseModelSmoothingRotation';
 const V_WORLD_PLANE_NORMAL = 'vWorldPlaneNormal';
-const V_WORLD_TEXTURE_POSITION_MATRIX = 'vWorldTexturePosition'
+const V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX = 'vWorldTexturePosition'
 
 const O_COLOR = "oColor";
 
@@ -28,14 +29,14 @@ const VERTEX_SHADER = `#version 300 es
   in vec4 ${A_VERTEX_MODEL_POSITION};
   in mat4 ${A_VERTEX_MODEL_ROTATION_MATRIX};
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
-  in mat4 ${A_MODEL_TEXTURE_POSITION_MATRIX};
+  in mat4 ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX};
 
   uniform mat4 ${U_WORLD_POSITION_MATRIX};
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform mat4 ${U_PROJECTION_MATRIX};
   
   out vec4 ${V_WORLD_POSITION};
-  out mat4 ${V_WORLD_TEXTURE_POSITION_MATRIX};
+  out mat4 ${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX};
   out vec4 ${V_MODEL_POSITION};
   out mat4 ${V_MODEL_ROTATION_MATRIX};
   out mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
@@ -44,8 +45,7 @@ const VERTEX_SHADER = `#version 300 es
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
-    //${V_WORLD_TEXTURE_POSITION_MATRIX} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_MODEL_TEXTURE_POSITION_MATRIX};
-    ${V_WORLD_TEXTURE_POSITION_MATRIX} = ${A_MODEL_TEXTURE_POSITION_MATRIX} * inverse(${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX});
+    ${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} = ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX} * inverse(${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX});
     ${V_WORLD_POSITION} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
     ${V_WORLD_PLANE_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
@@ -67,7 +67,7 @@ const MATERIAL_TEXTURE_COUNT = 3;
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
 
-  in mat4 ${V_WORLD_TEXTURE_POSITION_MATRIX};
+  in mat4 ${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX};
   in vec4 ${V_WORLD_POSITION};
   in vec4 ${V_MODEL_POSITION};
   in mat4 ${V_MODEL_ROTATION_MATRIX};
@@ -77,10 +77,11 @@ const FRAGMENT_SHADER = `#version 300 es
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
-  uniform sampler2D ${U_MATERIAL_ATLAS};
+  uniform lowp sampler2DArray ${U_MATERIAL_ATLAS};
   uniform lowp sampler2DArray ${U_MATERIAL_TEXTURE};
   uniform vec4 ${U_MATERIAL_COLORS}[${MATERIAL_TEXTURE_COUNT * 2}];
   uniform float ${U_TIME};
+  uniform vec2 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE};
 
   out vec4 ${O_COLOR};
 
@@ -94,10 +95,15 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 maxPixel;
     vec4 maxColor;
     // TODO look up material based on adjusted position
+    // TODO probably needs to be another matrix to do this
     vec4 materialness = texture(
       ${U_MATERIAL_ATLAS},
-      ${V_WORLD_POSITION}.xy/${WORLD_DIMENSION}.
+      vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE}.x)
     );
+    if (materialness.w < .5) {
+      discard;
+      return;
+    }
     vec4 baseColor = (
       ${U_MATERIAL_COLORS}[0]*materialness.x
         + ${U_MATERIAL_COLORS}[2]*materialness.y
@@ -124,7 +130,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
         vec4 tm1 = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_TEXTURE_POSITION_MATRIX} * p).xy, textureIndex)
+          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE}.y, textureIndex)
         );
   
         float surfaceDepth = (tm1.z - .5) * ${MATERIAL_DEPTH_SCALE};
@@ -143,7 +149,7 @@ const FRAGMENT_SHADER = `#version 300 es
         }
         tm = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_TEXTURE_POSITION_MATRIX} * p).xy, textureIndex)
+          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE}.y, textureIndex)
         );  
       }
 
@@ -160,7 +166,7 @@ const FRAGMENT_SHADER = `#version 300 es
     }
     // maxPixel = texture(
     //   ${U_MATERIAL_TEXTURE},
-    //   vec3((${V_WORLD_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, 1)
+    //   vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, 1)
     // );
     // maxColor = mix(
     //   ${U_MATERIAL_COLORS}[2],
@@ -240,29 +246,6 @@ window.onload = async () => {
     toPlane(0, -1, 0, .9, defaultPlaneMetadata),
   ];
 
-  const skyCylinderRadius = HORIZON*.6;
-  const skyCylinder: ConvexShape<PlaneMetadata> = new Array(12).fill(0).map((_, i, arr) => {
-    const a = Math.PI * 2 * i / arr.length;
-    const sin = Math.sin(a);
-    const cos = Math.cos(a);
-    const unrotate = matrix4Multiply(
-      // y <-> z (only need z -> y but not sure which dir does that)
-      // TODO just rotate around X instead
-      matrix4Rotate(-Math.PI/2, 1, 0, 0),
-      matrix4Scale(.5/skyCylinderRadius),
-      matrix4Rotate(-a, 0, 0, 1),
-    );
-    return toPlane<PlaneMetadata>(cos, sin, 0, skyCylinderRadius, {
-      textureCoordinateTransform: unrotate,
-    });
-  }).concat([
-    toPlane<PlaneMetadata>(0, 0, 1, skyCylinderRadius, {
-      textureCoordinateTransform: matrix4Scale(.5/skyCylinderRadius),
-    }),
-    toPlane<PlaneMetadata>(0, 0, -1, skyCylinderRadius, {
-      textureCoordinateTransform: undefined,
-    }),
-  ]);
 
   // const shapes: readonly Shape[] = ([
   //   [shape5, [shape6]],
@@ -468,7 +451,6 @@ window.onload = async () => {
         workingArray = points;
       } else {
         const index = resolution ? 1 : (tx+ty)%points.length;
-        //const index = 1;
         const cut = points.splice(0, index+1);
         points.push(...cut.slice(0, index));  
         axisPoint = cut[index]
@@ -477,7 +459,7 @@ window.onload = async () => {
       const groundFaces = workingArray.map((point, i) => {
         const nextPoint = points[(i+1)%points.length];
         return toFace<PlaneMetadata>(axisPoint, point, nextPoint, {
-          textureCoordinateTransform: matrix4Identity(),
+          textureCoordinateTransform: matrix4Scale(1/WORLD_DIMENSION),
         });
       });
       const {
@@ -522,14 +504,11 @@ window.onload = async () => {
             [resolution]: {
               // terrain is always at position 0, so offset == center
               id: 0,
-              centerOffset: center,
+              centerOffset: [0, 0, 0],
               centerRadius: radius,
               modelId,
               renderTransform: matrix4Identity(),
-              textures: {
-                atlasTextureId: TEXTURE_MAP_MIPMAP,
-                materialTextureId: resolution > 1 ? TEXTURE_TERRAIN_MIPMAP: TEXTURE_TERRAIN,
-              }
+              variant: VARIANT_TERRAIN,
             },
           },
           position: [0, 0, 0],
@@ -596,12 +575,12 @@ window.onload = async () => {
     aModelPosition,
     aModelRotationMatrix,
     aModelSmoothingRotationMatrix,
-    aModelTexturePositionMatrix,
+    aAtlasTexturePositionMatrix,
   ] = [
     A_VERTEX_MODEL_POSITION,
     A_VERTEX_MODEL_ROTATION_MATRIX,
     A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX,
-    A_MODEL_TEXTURE_POSITION_MATRIX,
+    A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX,
   ].map(
     attribute => gl.getAttribLocation(program, attribute)
   );
@@ -614,6 +593,7 @@ window.onload = async () => {
     uMaterialTexture,
     uMaterialColors,
     uTime,
+    uAtlasTextureIndexAndMaterialTextureScale,
   ] = [
     U_WORLD_POSITION_MATRIX,
     U_WORLD_ROTATION_MATRIX,
@@ -623,6 +603,7 @@ window.onload = async () => {
     U_MATERIAL_TEXTURE,
     U_MATERIAL_COLORS,
     U_TIME,
+    U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
@@ -745,7 +726,7 @@ window.onload = async () => {
         return transform;
         //return matrix4Identity();
       });
-  
+
       const newIndices = polygons.reduce<number[]>((indices, polygon, i) => {
         const polygonIndices = polygon.map(point => {
           const worldPoint = toModelPoint(point, toModelCoordinates);
@@ -776,7 +757,7 @@ window.onload = async () => {
       [aModelPosition, modelPoints],
       [aModelRotationMatrix, modelRotations],
       [aModelSmoothingRotationMatrix, smoothingTransforms],
-      [aModelTexturePositionMatrix, modelTextureTransforms],
+      [aAtlasTexturePositionMatrix, modelTextureTransforms],
     ] as const).forEach(([attribute, vectors]) => {
       var buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -817,17 +798,62 @@ window.onload = async () => {
     return model;
   }
 
+  const [billboardSmallModel, billboardMediumModel, billboardLargeModel, billboardHugeModel] = [.2, 1, 2, 4].map(dimension => {
+    const rotateToModelCoordinates = matrix4Identity();
+    const points: ReadonlyVector3[] = [
+      [0, -dimension/2, 0],
+      [0, dimension/2, 0],
+      [0, dimension/2, dimension],
+      [0, -dimension/2, dimension],
+    ];
+    const polygons: ReadonlyVector3[][] = [
+      points
+    ];
+    const face: Face<PlaneMetadata> = {
+      rotateToModelCoordinates,
+      toModelCoordinates: rotateToModelCoordinates,
+      polygons,
+      t: {
+        textureCoordinateTransform: matrix4Multiply(
+          matrix4Rotate(-Math.PI/2, 0, 0, 1),
+          matrix4Translate(0, .5, 0),
+          matrix4Scale(1/dimension),
+          // matrix4Rotate(Math.PI/2, 0, 0, 1),
+          //matrix4Rotate(-Math.PI/2, 0, 0, 1),
+          matrix4Rotate(Math.PI/2, 0, 1, 0),
+        ),
+      }
+    };
+    const planeToModelCoordinates = new Map(
+      points.map(point => [point, vector3TransformMatrix4(rotateToModelCoordinates, ...point)]),
+    );
+    const model = appendModel(
+      [face], 
+      (point) => {
+        return planeToModelCoordinates.get(point);
+      },
+      () => {
+        // there's only one face
+        return NORMAL_X;
+      },
+    );
+    model.billboard = 1;
+    return model;
+  });
+
   const [
     skyCylinderModel,
+    treeDeciduousModel,
     cubeModel,
     cubeSmallModel,
     cubeBigModel,
   ] = ([
-    [[skyCylinder, []]],
+    skyCylinder,
+    treeDeciduous,
     [[cube, []]],
     [[cubeSmall, []]],
     [[cubeBig, []]],
-  ] as Shape<PlaneMetadata>[][]).map((shapes, i) => {
+  ] as Shape<PlaneMetadata>[][]).map((shapes) => {
     let modelShapeFaces = decompose(shapes);
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
@@ -846,19 +872,25 @@ window.onload = async () => {
       }, 
       face => {
         // TODO smooth some models/planes
+        // I have no idea what I meant here ^
         return vector3TransformMatrix4(face.rotateToModelCoordinates, 0, 0, 1);
       },
     );
   });
   // material, 2d/1d texture, features 
   const materials: Material[][][] = [
-    // empty (2d)
-    [[]],
-    // map (2d)
+    // empty atlus (2d)
+    [[
+      ctx => {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+      }
+    ]],
+    // world atlus (2d)
     [
       [
-        (ctx, y) => {
-          const imageData = ctx.getImageData(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+        ctx => {
+          const imageData = ctx.getImageData(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
           for (let x=0; x<MATERIAL_TEXTURE_DIMENSION; x++) {
             for (let y=0; y<MATERIAL_TEXTURE_DIMENSION; y++) {
               //const depth = terrain((x + .5)/MATERIAL_TEXTURE_DIMENSION, (y + .5)/MATERIAL_TEXTURE_DIMENSION);
@@ -904,34 +936,54 @@ window.onload = async () => {
                 grassiness * 255 | 0,
                 // rockiness
                 stoniness * 255 | 0,
+                // transparency
+                255,
               ], (y * MATERIAL_TEXTURE_DIMENSION + x) * 4);
             }
           }
-          ctx.putImageData(imageData, 0, y);
+          ctx.putImageData(imageData, 0, 0);
         },
       ],
-    ],    
-    // empty (2d array)
-    [[],[],[]],
+    ],
+    // emoji atlas (2d array)
+    [...'🌳🌲🌴🍖'].map(s => {
+      return [
+        (ctx, y) => {
+          ctx.font = `${MATERIAL_TEXTURE_DIMENSION*.8 | 0}px serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(s, MATERIAL_TEXTURE_DIMENSION/2, y + MATERIAL_TEXTURE_DIMENSION);
+        },
+      ];
+    }),    
+    // default (2d array)
+    [
+      [flatMaterial],
+      // TODO can we remove these two empty arrays (will it roll around?)
+      [flatMaterial],
+      [flatMaterial],
+    ],
     // skybox (2d array)
     [
       [
         (ctx, y) => {
           const gradient = ctx.createLinearGradient(0, y, 0, y + MATERIAL_TEXTURE_DIMENSION/2);
-          gradient.addColorStop(0, 'rgb(128,128,128,.5)');
-          gradient.addColorStop(.5, 'rgba(128,128,128)');
+          gradient.addColorStop(0, 'rgba(128,128,128,.5)');
+          gradient.addColorStop(.5, 'rgb(128,128,128)');
           ctx.fillStyle = gradient;
           ctx.fillRect(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
           // TODO clouds
         },
       ],
-      [],
-      [],
+      // TODO can we remove these two empty arrays (will it roll around?)
+      [flatMaterial],
+      [flatMaterial],
     ],
     // terrain (2d array)
     [
       // sand
       [
+        flatMaterial,
         featureMaterial(
           staticFeature,
           4,
@@ -947,6 +999,7 @@ window.onload = async () => {
       ],
       // grass
       [
+        flatMaterial,
         featureMaterial(
           spikeFeatureFactory(4, 4),
           8,
@@ -959,6 +1012,7 @@ window.onload = async () => {
       ],
       // stone
       [
+        flatMaterial,
         featureMaterial(
           staticFeature,
           8,
@@ -977,12 +1031,12 @@ window.onload = async () => {
   let textureId = gl.TEXTURE0;
 
   // make some textures
-  materials.forEach(terrain => {
+  materials.forEach(frames => {
     const materialCanvas = document.createElement('canvas');
     //document.body.appendChild(materialCanvas);
     const dimension = MATERIAL_TEXTURE_DIMENSION;
     materialCanvas.width = dimension;
-    materialCanvas.height = dimension * terrain.length; 
+    materialCanvas.height = dimension * frames.length; 
     const ctx = materialCanvas.getContext(
       '2d',
       FLAG_FAST_READ_CANVASES
@@ -991,55 +1045,41 @@ window.onload = async () => {
         }
         : undefined
     );
-    // nx = 0, ny = 0, depth = 0, feature color = 0
-    ctx.fillStyle = 'rgba(128,128,128,.5)';
-    //ctx.fillStyle = 'red';
-    ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION * terrain.length);
-    terrain.forEach((terrainFeatures, i) => {
-      terrainFeatures.forEach(material => {
+    frames.forEach((frame, i) => {
+      frame.forEach(material => {
         material(ctx, i * MATERIAL_TEXTURE_DIMENSION);
       });
     });
 
     // need mipmap and non-mipmap versions of some textures (so we do all textures)
-    const textureType = terrain.length > 1 ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D;
     new Array(2).fill(0).forEach((_, i) => {
       gl.activeTexture(textureId++);
       const texture = gl.createTexture();
-      gl.bindTexture(textureType, texture);
-      if (terrain.length > 1) {
-        gl.texImage3D(
-          gl.TEXTURE_2D_ARRAY,
-          0,
-          gl.RGBA,
-          MATERIAL_TEXTURE_DIMENSION,
-          MATERIAL_TEXTURE_DIMENSION, 
-          terrain.length,
-          0,
-          gl.RGBA,
-          gl.UNSIGNED_BYTE,
-          materialCanvas,
-        );
-      } else {
-        gl.texImage2D(
-          textureType,
-          0,
-          gl.RGBA,
-          gl.RGBA,
-          gl.UNSIGNED_BYTE,
-          materialCanvas,
-        );
-      }
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+      gl.texImage3D(
+        gl.TEXTURE_2D_ARRAY,
+        0,
+        gl.RGBA,
+        MATERIAL_TEXTURE_DIMENSION,
+        MATERIAL_TEXTURE_DIMENSION, 
+        frames.length,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        materialCanvas,
+      );
       if (i) {
-        gl.generateMipmap(textureType);
+        gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
       } else {
+        // faster, but looks shit
         // gl.texParameteri(
-        //   gl.TEXTURE_2D,
-        //   gl.TEXTURE_MAG_FILTER,
+        //   gl.TEXTURE_2D_ARRAY,
+        //   gl.TEXTURE_MIN_FILTER,
         //   gl.NEAREST,
         // );
+        // less static on textures, but slower
         gl.texParameteri(
-          textureType,
+          gl.TEXTURE_2D_ARRAY,
           gl.TEXTURE_MIN_FILTER,
           gl.LINEAR,
         );
@@ -1048,10 +1088,7 @@ window.onload = async () => {
     
   });  
 
-
-
   // add in the cube
-
   new Array(2).fill(0).forEach((_, i) => {
     const {
       id,
@@ -1077,6 +1114,7 @@ window.onload = async () => {
         centerRadius: radius,
         renderTransform: matrix4Identity(),
         modelId: id,
+        variant: VARIANT_NULL,
       };
       const entity: StaticEntity = {
         resolutionBodies: {
@@ -1096,6 +1134,49 @@ window.onload = async () => {
     });
   });
 
+  // add in some trees
+  new Array(99).fill(0).forEach(() => {
+    const {
+      id,
+      center,
+      radius,
+    } = billboardHugeModel;
+
+    const scaledCoordinates: Vector2 = [Math.random(), Math.random()];
+    const z = terrain(...scaledCoordinates);
+    if (z > 1 && terrainNormal(scaledCoordinates)[2] > .9) {
+      const renderGroupId = nextRenderGroupId++;
+      const position: Vector3 = [...vectorNScale(scaledCoordinates, WORLD_DIMENSION), z + 1];
+  
+      const body: Part = {
+        id: 0,
+        centerOffset: center,
+        centerRadius: radius,
+        renderTransform: matrix4Identity(),
+        modelId: id,
+        variant: VARIANT_SYMBOLS,
+        atlasIndex: Math.random() * 3 | 0,
+      };
+      const entity: DynamicEntity = {
+        resolutionBodies: {
+          [0]: body,
+          [1]: body,
+          [2]: body,
+          [3]: body,
+          [4]: body,
+        },
+        position,
+        id: nextEntityId++,
+        bounds: rect3FromRadius(radius),
+        renderGroupId,
+        gravity: 0,
+        collisionRadius: radius,
+        velocity: [0, 0, 0],
+      };
+      addEntity(entity);
+    }
+  });
+
 
   const { 
     id,
@@ -1112,6 +1193,7 @@ window.onload = async () => {
         renderTransform: matrix4Identity(),
         centerOffset: center,
         centerRadius: radius,
+        variant: VARIANT_NULL,
       },
     },
     bounds,
@@ -1200,6 +1282,7 @@ window.onload = async () => {
           centerOffset: center,
           centerRadius: radius,
           renderTransform: matrix4Identity(),
+          variant: VARIANT_NULL,
         },
       },
       bounds,
@@ -1289,17 +1372,12 @@ window.onload = async () => {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
-    gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MIPMAP);
+    gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MAP_MIPMAP);
     gl.uniform4fv(uMaterialColors, [
       // sky
       ...SKY, 0,
       1, 0, 0, 0,
-      ...SKY, 0,
-      1, 0, 0, 0,
-      ...SKY, 0,
-      1, 0, 0, 0,
     ]);
-
 
     gl.bindVertexArray(skyCylinderModel.vao);
     gl.uniformMatrix4fv(
@@ -1317,25 +1395,12 @@ window.onload = async () => {
     // end sky cylinder
     //
 
-    // TODO set this on a per-model basis
-    gl.uniform4fv(uMaterialColors, [
-      // sand
-      .8, .7, .5, 1,
-      .8, .8, .7, 1,
-      // grass
-      .3, .7, .2, 1,
-      .2, .6, .4, .2,
-      // stone
-      .1, .1, .1, 1,
-      .2, .1, .1, 1,
-    ]);
-
-
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
     const handledEntities: Record<EntityId, Truthy> = {};
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
-    const toRender: Record<ModelId, [ReadonlyMatrix4, ReadonlyMatrix4, Partial<Textures>][]> = {};
+    // variantId -> modelId -> position, rotation, resolution, atlasIndex
+    const toRender: Partial<Record<VariantId, Record<ModelId, [ReadonlyVector3, ReadonlyMatrix4, number, number][]>>> = {};
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/WORLD_DIMENSION).slice(0, 2) as any;
@@ -1736,40 +1801,66 @@ window.onload = async () => {
           const modelId = body?.modelId;
           if (!renderedEntities[renderId] && modelId != null && (!renderTile || tiles.has(renderTile)) ) {
             renderedEntities[renderId] = 1;
-            let render = toRender[modelId];
-            if (render == null) {
-              render = [];
-              toRender[modelId] = render;
+            const { 
+              variant,
+              atlasIndex = 0,
+              centerOffset,
+            } = body;
+            let variantRenders = toRender[variant];
+            if (!variantRenders) {
+              variantRenders = {};
+              toRender[variant] = variantRenders;
             }
-            const position = matrix4Multiply(
-              // TODO maybe just pass in position as a vec3
-              matrix4Translate(...entity.position),
-              // TODO render transform
-              //renderTransform,
-              // drop the render down a bit for each resolution to hide edges
-              //matrix4Translate(0, 0, -Math.pow(resolution, 2)/30),
-            );
+            let modelRenders = variantRenders[modelId];
+            if (!modelRenders) {
+              modelRenders = [];
+              variantRenders[modelId] = modelRenders;
+            }
             const rotation = partTransforms?.[0] || matrix4Identity();
-            render.push([position, rotation, body.textures]);
+            modelRenders.push([
+              vectorNScaleThenAdd(entity.position, centerOffset, -1),
+              rotation,
+              tile.resolution,
+              atlasIndex,
+            ]);
           }
-  
         }
       }
     });
 
-    models.forEach(({ vao, indexCount }, modelId) => {
-      const renders = toRender[modelId];
-      if (renders) {
+    for (let variantId in toRender) {
+      const variantRenders = toRender[variantId as any as VariantId];
+      const {  
+        atlasTextureId,
+        materialTextureId,
+        materialTextureScale = 1,
+        materialTextureColors: colors,
+       } = VARIANTS[variantId as any as VariantId];
+
+      gl.uniform4fv(uMaterialColors, colors as any);
+      gl.uniform1i(uMaterialAtlas, atlasTextureId);
+
+      for (let modelId in variantRenders) {
+        const modelRenders = variantRenders[modelId as any as ModelId];
+        const { vao, indexCount, billboard } = models[modelId];
         gl.bindVertexArray(vao);
-        renders.forEach(([position, rotation, textures]) => {
-          gl.uniformMatrix4fv(uWorldPositionMatrix, false, position as any);
-          gl.uniformMatrix4fv(uWorldRotationMatrix, false, rotation as any);
-          gl.uniform1i(uMaterialTexture, textures?.materialTextureId ?? TEXTURE_EMPTY_ARRAY_MIPMAP);
-          gl.uniform1i(uMaterialAtlas, textures?.atlasTextureId ?? TEXTURE_EMPTY_MIPMAP);
+        modelRenders.forEach(([position, rotation, resolution, atlasIndex]) => {
+          const maybeBillboardRotation = billboard
+            ? matrix4Multiply(
+              rotation,
+              matrix4Rotate(Math.atan2(cameraPosition[1] - position[1], cameraPosition[0]- position[0]), 0, 0, 1),
+            )
+            : rotation;
+          const positionMatrix = matrix4Translate(...position);
+          gl.uniform1i(uMaterialTexture, materialTextureId + Math.min(resolution/2 | 0, 1));
+          gl.uniform2f(uAtlasTextureIndexAndMaterialTextureScale, atlasIndex, materialTextureScale);
+
+          gl.uniformMatrix4fv(uWorldPositionMatrix, false, positionMatrix);
+          gl.uniformMatrix4fv(uWorldRotationMatrix, false, maybeBillboardRotation as any);
           gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
-        });  
+        });
       }
-    });
+    }
 
     requestAnimationFrame(animate);
   }

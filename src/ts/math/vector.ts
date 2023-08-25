@@ -218,6 +218,13 @@ const rect3Intersection = (pos1: Vector3, dim1: Vector3, pos2: Vector3, dim2: Ve
   });
 }
 
+const rect3FromRadius = (radius: number): ReadonlyRect3 => {
+  return [
+    new Array(3).fill(-radius) as Vector3,
+    new Array(3).fill(radius) as Vector3,
+  ];
+}
+
 const rectNMinimalRadius = (rect: ReadonlyRect2 | ReadonlyRect3): number => {
   return rect[0].reduce((min, minValue, i) => {
     const maxValue = rect[1][i];

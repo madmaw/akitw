@@ -57,11 +57,8 @@ type Part<PartId extends number = number> = {
   readonly centerOffset: ReadonlyVector3,
   readonly centerRadius: number,
   readonly renderTransform: ReadonlyMatrix4,
-  // uniform to texture id(s) for that uniform
-  textures?: Partial<Textures>;
-};
-
-type Textures = {
-  atlasTextureId: number,
-  materialTextureId: number,
+  // reference to textures/colours/etc...
+  variant: VariantId;
+  // the index of the atlas to use
+  atlasIndex?: number,
 };

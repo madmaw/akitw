@@ -1,10 +1,11 @@
 type Model = {
-  faces: readonly Face<PlaneMetadata>[],
-  bounds: ReadonlyRect3,
-  radius: number,
-  center: ReadonlyVector3,
-  groupPointsToFaces: Map<ReadonlyVector3, Set<Face<PlaneMetadata>>>,
+  readonly faces: readonly Face<PlaneMetadata>[],
+  readonly bounds: ReadonlyRect3,
+  readonly radius: number,
+  readonly center: ReadonlyVector3,
+  readonly groupPointsToFaces: Map<ReadonlyVector3, Set<Face<PlaneMetadata>>>,
   //groupPointCache: ReadonlyVector3[],
-  indexCount: number,
-  vao: WebGLVertexArrayObject,
+  readonly indexCount: number,
+  readonly vao: WebGLVertexArrayObject,
+  billboard?: Booleanish,
 };
