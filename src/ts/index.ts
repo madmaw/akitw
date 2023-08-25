@@ -99,10 +99,10 @@ const FRAGMENT_SHADER = `#version 300 es
       ${V_WORLD_POSITION}.xy/${WORLD_DIMENSION}.
     );
     vec4 baseColor = (
-      ${U_MATERIAL_COLORS}[0]*materialness.x
-        + ${U_MATERIAL_COLORS}[2]*materialness.y
-        + ${U_MATERIAL_COLORS}[4]*materialness.z
-    )/(materialness.x + materialness.y + materialness.z);
+      ${U_MATERIAL_COLORS}[0]*sqrt(materialness.x)
+        + ${U_MATERIAL_COLORS}[2]*sqrt(materialness.y)
+        + ${U_MATERIAL_COLORS}[4]*sqrt(materialness.z)
+    )/(sqrt(materialness.x) + sqrt(materialness.y) + sqrt(materialness.z));
 
     for (int textureIndex=0; textureIndex<${MATERIAL_TEXTURE_COUNT}; textureIndex++) {
       // material
@@ -188,8 +188,8 @@ const FRAGMENT_SHADER = `#version 300 es
     float inverseBrightness = min(color.w*2.,1.);
     float lighting = max(
       1. - inverseBrightness, 
-      (dot(m, normalize(vec3(1, 2, 3)))+1.)/2.
-    ) * .5;
+      dot(m, normalize(vec3(1, 2, 3)))
+    );
 
     vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z + maxDepth, .1));
     float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z - maxDepth, 0., 1.), 9.);
@@ -850,110 +850,139 @@ window.onload = async () => {
       },
     );
   });
-  // material, flags = generate linear, generate mipmap
-  const materials: (Material | Falsey)[][] = [
+  // material, 2d/1d texture, features 
+  const materials: Material[][][] = [
     // empty (2d)
-    [0],
+    [[]],
     // map (2d)
     [
-      (ctx, y) => {
-        const imageData = ctx.getImageData(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
-        for (let x=0; x<MATERIAL_TEXTURE_DIMENSION; x++) {
-          for (let y=0; y<MATERIAL_TEXTURE_DIMENSION; y++) {
-            //const depth = terrain((x + .5)/MATERIAL_TEXTURE_DIMENSION, (y + .5)/MATERIAL_TEXTURE_DIMENSION);
-            const depth = terrain(x/MATERIAL_TEXTURE_DIMENSION, y/MATERIAL_TEXTURE_DIMENSION);
-            const dx = x - MATERIAL_TEXTURE_DIMENSION/2;
-            const dy = y - MATERIAL_TEXTURE_DIMENSION/2;
-            const dc = Math.sqrt(dx *dx + dy * dy);
-            const sandiness = Math.max(
-              1 - Math.pow(Math.max(0, Math.min(1, depth*2)), 2), 
-              // road
-              1 - Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc)/2,
-            );
-            // iciness?
-            // too slow (TODO flag)
-            const slopeRockiness = FLAG_STONEY_SLOPES
-              ? 1 - Math.pow(
-                vectorNDotProduct(
+      [
+        (ctx, y) => {
+          const imageData = ctx.getImageData(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+          for (let x=0; x<MATERIAL_TEXTURE_DIMENSION; x++) {
+            for (let y=0; y<MATERIAL_TEXTURE_DIMENSION; y++) {
+              //const depth = terrain((x + .5)/MATERIAL_TEXTURE_DIMENSION, (y + .5)/MATERIAL_TEXTURE_DIMENSION);
+              const depth = terrain(x/MATERIAL_TEXTURE_DIMENSION, y/MATERIAL_TEXTURE_DIMENSION);
+              const dx = x - MATERIAL_TEXTURE_DIMENSION/2;
+              const dy = y - MATERIAL_TEXTURE_DIMENSION/2;
+              const dc = Math.sqrt(dx *dx + dy * dy);
+              const slopeNormal = FLAG_STONEY_SLOPES || true
+                ? vectorNDotProduct(
                   terrainNormal(vectorNScale([x, y], WORLD_DIMENSION/MATERIAL_TEXTURE_DIMENSION)),
                   NORMAL_Z,
-                ),
-                .1,
-              )
-              : 0;
-            const rockiness = Math.max(
-              slopeRockiness,
-              1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2),
-              // road
-              1 - Math.pow(Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc)/3, 2) - sandiness,
-            );
+                )
+                : 1;
 
-            imageData.data.set([
-              // sandiness
-              sandiness * 255 | 0,
-              // grassiness
-              255 - Math.max(sandiness, rockiness) * 255 | 0,
-              // rockiness
-              rockiness * 255 | 0,
-            ], (y * MATERIAL_TEXTURE_DIMENSION + x) * 4);
+              const sandiness = Math.max(
+                //1 - Math.pow(Math.max(0, Math.min(1, depth*2)), 2), 
+                // road
+                1 - Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc)/2,
+                // distribute randomly based on elevation (shore line)
+                Math.pow(Math.random(), Math.max(0, depth - .2) * 50),
+                // distribute randomly based on elevation (mountain tops)
+                Math.pow(slopeNormal, 9) - Math.pow(Math.random(), Math.max(0, depth - 9)/2),
+              );
+              const stoniness = Math.max(
+                (1 - Math.pow(slopeNormal, 2)) * Math.pow(Math.random(), .1),
+                // as it gets higher, more rocky
+                1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2),
+                // some random rocks
+                //Math.pow(Math.random(), 99),
+              );
+
+              const grassiness = Math.max(
+                1 - Math.max(sandiness, stoniness),
+                // slope normal should never be 0
+                Math.pow(Math.random(), 99/slopeNormal),
+                //Math.pow(slopeNormal * Math.random(), 9),
+              )
+
+              imageData.data.set([
+                // sandiness
+                sandiness * 255 | 0,
+                // grassiness
+                grassiness * 255 | 0,
+                // rockiness
+                stoniness * 255 | 0,
+              ], (y * MATERIAL_TEXTURE_DIMENSION + x) * 4);
+            }
           }
-        }
-        ctx.putImageData(imageData, 0, y);
-      },
+          ctx.putImageData(imageData, 0, y);
+        },
+      ],
     ],    
     // empty (2d array)
-    [0,0,0],
+    [[],[],[]],
     // skybox (2d array)
     [
-      (ctx, y) => {
-        const gradient = ctx.createLinearGradient(0, y, 0, y + MATERIAL_TEXTURE_DIMENSION/2);
-        gradient.addColorStop(0, 'rgb(128,128,128,.5)');
-        gradient.addColorStop(.5, 'rgba(128,128,128)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
-        // TODO clouds
-      },
-      0,
-      0,
+      [
+        (ctx, y) => {
+          const gradient = ctx.createLinearGradient(0, y, 0, y + MATERIAL_TEXTURE_DIMENSION/2);
+          gradient.addColorStop(0, 'rgb(128,128,128,.5)');
+          gradient.addColorStop(.5, 'rgba(128,128,128)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+          // TODO clouds
+        },
+      ],
+      [],
+      [],
     ],
     // terrain (2d array)
     [
       // sand
-      featureMaterial(
-        staticFeature,
-        4,
-        99999,
-        randomDistributionFactory(0, 1),
-      ),
+      [
+        featureMaterial(
+          staticFeature,
+          4,
+          99999,
+          randomDistributionFactory(0, 1),
+        ),  
+        featureMaterial(
+          riverStonesFeatureFactory(.6),
+          16,
+          9999,
+          randomDistributionFactory(2, 2),
+        ),  
+      ],
       // grass
-      featureMaterial(
-        spikeFeatureFactory(4, 4),
-        8,
-        99999,
-        randomDistributionFactory(
-          2,
-          2,
-        ),
-      ),
+      [
+        featureMaterial(
+          spikeFeatureFactory(4, 4),
+          8,
+          99999,
+          randomDistributionFactory(
+            2,
+            2,
+          ),
+        ),  
+      ],
       // stone
-      featureMaterial(
-        riverStonesFeatureFactory(1),
-        24,
-        9999,
-        randomDistributionFactory(2, 2),
-      ),
-
+      [
+        featureMaterial(
+          staticFeature,
+          8,
+          9999,
+          randomDistributionFactory(3, 2),
+        ),  
+        featureMaterial(
+          riverStonesFeatureFactory(1),
+          12,
+          9999,
+          randomDistributionFactory(4, 2),
+        ),  
+      ],
     ],
   ];
   let textureId = gl.TEXTURE0;
 
   // make some textures
-  materials.forEach(materials => {
+  materials.forEach(terrain => {
     const materialCanvas = document.createElement('canvas');
     //document.body.appendChild(materialCanvas);
     const dimension = MATERIAL_TEXTURE_DIMENSION;
     materialCanvas.width = dimension;
-    materialCanvas.height = dimension * materials.length; 
+    materialCanvas.height = dimension * terrain.length; 
     const ctx = materialCanvas.getContext(
       '2d',
       FLAG_FAST_READ_CANVASES
@@ -965,25 +994,27 @@ window.onload = async () => {
     // nx = 0, ny = 0, depth = 0, feature color = 0
     ctx.fillStyle = 'rgba(128,128,128,.5)';
     //ctx.fillStyle = 'red';
-    ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION * materials.length);
-    materials.forEach((material, i) => {
-      material && material(ctx, i * MATERIAL_TEXTURE_DIMENSION);
-    })
+    ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION * terrain.length);
+    terrain.forEach((terrainFeatures, i) => {
+      terrainFeatures.forEach(material => {
+        material(ctx, i * MATERIAL_TEXTURE_DIMENSION);
+      });
+    });
 
     // need mipmap and non-mipmap versions of some textures (so we do all textures)
-    const textureType = materials.length > 1 ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D;
+    const textureType = terrain.length > 1 ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D;
     new Array(2).fill(0).forEach((_, i) => {
       gl.activeTexture(textureId++);
       const texture = gl.createTexture();
       gl.bindTexture(textureType, texture);
-      if (materials.length > 1) {
+      if (terrain.length > 1) {
         gl.texImage3D(
           gl.TEXTURE_2D_ARRAY,
           0,
           gl.RGBA,
           MATERIAL_TEXTURE_DIMENSION,
           MATERIAL_TEXTURE_DIMENSION, 
-          materials.length,
+          terrain.length,
           0,
           gl.RGBA,
           gl.UNSIGNED_BYTE,
@@ -1256,10 +1287,10 @@ window.onload = async () => {
       .8, .8, .7, .5,
       // grass
       .2, .6, .2, .5,
-      .3, .7, .5, 1,
+      .3, .7, .5, .5,
       // stone
-      .4, .4, .4, .5,
-      .8, .7, .5, .5,
+      .1, .1, .1, .5,
+      .2, .1, .1, .5,
     ]);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
