@@ -185,10 +185,10 @@ const FRAGMENT_SHADER = `#version 300 es
       ).xyz;
     vec4 color = maxColor * il + baseColor * (1. - il);
 
-    float inverseBrightness = min(color.w*2.,1.);
+    
     float lighting = max(
-      1. - inverseBrightness, 
-      dot(m, normalize(vec3(1, 2, 3)))
+      0., 
+      1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * color.w
     );
 
     vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z + maxDepth, .1));
@@ -202,7 +202,7 @@ const FRAGMENT_SHADER = `#version 300 es
       ),
       // fog
       vec3(${SKY.join()}),
-      pow(min(1., length(waterDistance)/${MAX_FOG_DEPTH}.), 1.) * max(wateriness, inverseBrightness)
+      pow(min(1., length(waterDistance)/${MAX_FOG_DEPTH}.), 1.) * wateriness
     );
     ${O_COLOR} = vec4(sqrt(fc), 1);
   }
@@ -1281,17 +1281,6 @@ window.onload = async () => {
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, cameraPosition);
     gl.uniform1f(uTime, now);
-    gl.uniform4fv(uMaterialColors, [
-      // sand
-      .8, .7, .5, .5,
-      .8, .8, .7, .5,
-      // grass
-      .2, .6, .2, .5,
-      .3, .7, .5, .5,
-      // stone
-      .1, .1, .1, .5,
-      .2, .1, .1, .5,
-    ]);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     //
@@ -1301,6 +1290,16 @@ window.onload = async () => {
     gl.disable(gl.CULL_FACE);
     gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
     gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MIPMAP);
+    gl.uniform4fv(uMaterialColors, [
+      // sky
+      ...SKY, 0,
+      1, 0, 0, 0,
+      ...SKY, 0,
+      1, 0, 0, 0,
+      ...SKY, 0,
+      1, 0, 0, 0,
+    ]);
+
 
     gl.bindVertexArray(skyCylinderModel.vao);
     gl.uniformMatrix4fv(
@@ -1317,6 +1316,20 @@ window.onload = async () => {
     //
     // end sky cylinder
     //
+
+    // TODO set this on a per-model basis
+    gl.uniform4fv(uMaterialColors, [
+      // sand
+      .8, .7, .5, 1,
+      .8, .8, .7, 1,
+      // grass
+      .3, .7, .2, 1,
+      .2, .6, .4, .2,
+      // stone
+      .1, .1, .1, 1,
+      .2, .1, .1, 1,
+    ]);
+
 
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
