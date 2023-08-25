@@ -99,10 +99,10 @@ const FRAGMENT_SHADER = `#version 300 es
       ${V_WORLD_POSITION}.xy/${WORLD_DIMENSION}.
     );
     vec4 baseColor = (
-      ${U_MATERIAL_COLORS}[0]*sqrt(materialness.x)
-        + ${U_MATERIAL_COLORS}[2]*sqrt(materialness.y)
-        + ${U_MATERIAL_COLORS}[4]*sqrt(materialness.z)
-    )/(sqrt(materialness.x) + sqrt(materialness.y) + sqrt(materialness.z));
+      ${U_MATERIAL_COLORS}[0]*materialness.x
+        + ${U_MATERIAL_COLORS}[2]*materialness.y
+        + ${U_MATERIAL_COLORS}[4]*materialness.z
+    )/(materialness.x + materialness.y + materialness.z);
 
     for (int textureIndex=0; textureIndex<${MATERIAL_TEXTURE_COUNT}; textureIndex++) {
       // material
@@ -866,7 +866,7 @@ window.onload = async () => {
               const dx = x - MATERIAL_TEXTURE_DIMENSION/2;
               const dy = y - MATERIAL_TEXTURE_DIMENSION/2;
               const dc = Math.sqrt(dx *dx + dy * dy);
-              const slopeNormal = FLAG_STONEY_SLOPES || true
+              const slopeNormal = FLAG_STONEY_SLOPES
                 ? vectorNDotProduct(
                   terrainNormal(vectorNScale([x, y], WORLD_DIMENSION/MATERIAL_TEXTURE_DIMENSION)),
                   NORMAL_Z,
