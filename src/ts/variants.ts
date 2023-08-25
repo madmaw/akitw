@@ -11,8 +11,9 @@ const VARIANT_SYMBOLS = 2;
 type Variant = {
   atlasTextureId: AtlusTextureId,
   materialTextureId: MaterialTextureId,
-  materialTextureScale?: number,
   materialTextureColors: readonly number[],
+  materialTextureScale?: number,
+  materialDepth?: number,
 }
 
 const TERRAIN_COLORS: readonly number[] = [
@@ -48,6 +49,7 @@ const VARIANTS: Record<VariantId, Variant> = {
     materialTextureId: TEXTURE_TERRAIN,
     materialTextureScale: WORLD_DIMENSION,
     materialTextureColors: TERRAIN_COLORS,
+    materialDepth: MATERIAL_TERRAIN_DEPTH_RANGE,
   },
   [VARIANT_SYMBOLS]: {
     atlasTextureId: TEXTURE_SYMBOL_MAP_MIPMAP,

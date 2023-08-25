@@ -6,7 +6,7 @@ const U_MATERIAL_ATLAS = 'uMaterialAtlas';
 const U_MATERIAL_TEXTURE = 'uMaterialTexture';
 const U_MATERIAL_COLORS = 'uMaterialColors';
 const U_TIME = 'uTime';
-const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE = 'uAtlasTextureIndex';
+const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = 'uAtlasTextureIndex';
 
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
@@ -58,11 +58,11 @@ const VERTEX_SHADER = `#version 300 es
 `;
 
 const STEP = .001;
-const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
+//const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
 //const MATERIAL_DEPTH_SCALE = (256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE)).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
-const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
-const MATERIAL_TEXTURE_COUNT = 3;
+//const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
+const MAX_MATERIAL_TEXTURE_COUNT = 3;
 
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
@@ -79,9 +79,9 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec3 ${U_CAMERA_POSITION};
   uniform lowp sampler2DArray ${U_MATERIAL_ATLAS};
   uniform lowp sampler2DArray ${U_MATERIAL_TEXTURE};
-  uniform vec4 ${U_MATERIAL_COLORS}[${MATERIAL_TEXTURE_COUNT * 2}];
+  uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
   uniform float ${U_TIME};
-  uniform vec2 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE};
+  uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
 
   out vec4 ${O_COLOR};
 
@@ -91,14 +91,14 @@ const FRAGMENT_SHADER = `#version 300 es
     // NOTE: c will be positive for camera facing surfaces
     float c = dot(${V_WORLD_PLANE_NORMAL}.xyz, d.xyz);
     float il = max(1. - pow(length(distance)/4., 2.), 0.);
-    float maxDepth = ${(-MATERIAL_DEPTH_RANGE).toFixed(1)};
+    float maxDepth = -1.;
     vec4 maxPixel;
     vec4 maxColor;
     // TODO look up material based on adjusted position
     // TODO probably needs to be another matrix to do this
     vec4 materialness = texture(
       ${U_MATERIAL_ATLAS},
-      vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE}.x)
+      vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.x)
     );
     if (materialness.w < .5) {
       discard;
@@ -110,33 +110,38 @@ const FRAGMENT_SHADER = `#version 300 es
         + ${U_MATERIAL_COLORS}[4]*materialness.z
     )/(materialness.x + materialness.y + materialness.z);
 
-    for (int textureIndex=0; textureIndex<${MATERIAL_TEXTURE_COUNT}; textureIndex++) {
+    for (
+      int textureIndex=0;
+      textureIndex < ${MAX_MATERIAL_TEXTURE_COUNT};
+      textureIndex++
+    ) {
       // material
       vec4 tm;
-      float depthAdjust = (
+      float depthAdjust = ((
         textureIndex > 0
           ? textureIndex > 1
             ? materialness.z
             : materialness.y
           : materialness.x
-        ) * ${MATERIAL_DEPTH_RANGE/2} - ${MATERIAL_DEPTH_RANGE/2};
-      float depth = ${MATERIAL_DEPTH_RANGE/2}*il;
+        ) - 1.) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
+      float depth = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z*il/2.;
 
       // distances
       vec4 p;
-      for (float count = 0.; count <= ${NUM_STEPS}.*il; count++) {
+      float maxCount = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z * il/${STEP};
+      for (float count = 0.; count <= maxCount; count++) {
         depth -= ${STEP};
         p = vec4(${V_WORLD_POSITION}.xyz + d.xyz * depth / c, 1);
 
         vec4 tm1 = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE}.y, textureIndex)
+          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
         );
   
-        float surfaceDepth = (tm1.z - .5) * ${MATERIAL_DEPTH_SCALE};
+        float surfaceDepth = (tm1.z - .5) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
         if (surfaceDepth > depth) {
           float d0 = depth + ${STEP};
-          float s0 = d0 - (tm.z - .5) * ${MATERIAL_DEPTH_SCALE};
+          float s0 = d0 - (tm.z - .5) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
           float s1 = d0 - surfaceDepth;
           float divisor = ${STEP} - s1 + s0;
           // make sure it's not almost parallel, if it is, defer until next iteration
@@ -144,12 +149,12 @@ const FRAGMENT_SHADER = `#version 300 es
             float si = s0 * ${STEP}/divisor;
             depth += ${STEP} - si;
             p = vec4(${V_WORLD_POSITION}.xyz + d.xyz * (d0 - si) / c, 1);
-            count = ${NUM_STEPS}.;
+            count = maxCount;
           }
         }
         tm = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE}.y, textureIndex)
+          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
         );  
       }
 
@@ -593,7 +598,7 @@ window.onload = async () => {
     uMaterialTexture,
     uMaterialColors,
     uTime,
-    uAtlasTextureIndexAndMaterialTextureScale,
+    uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
   ] = [
     U_WORLD_POSITION_MATRIX,
     U_WORLD_ROTATION_MATRIX,
@@ -603,7 +608,7 @@ window.onload = async () => {
     U_MATERIAL_TEXTURE,
     U_MATERIAL_COLORS,
     U_TIME,
-    U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE,
+    U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
@@ -946,7 +951,7 @@ window.onload = async () => {
       ],
     ],
     // emoji atlas (2d array)
-    [...'🌳🌲🌴🍖'].map(s => {
+    [...'🌳🌲🌴🌼🌻🍖☀️'].map(s => {
       return [
         (ctx, y) => {
           ctx.font = `${MATERIAL_TEXTURE_DIMENSION*.8 | 0}px serif`;
@@ -1135,7 +1140,7 @@ window.onload = async () => {
   });
 
   // add in some trees
-  new Array(99).fill(0).forEach(() => {
+  new Array(0).fill(0).forEach(() => {
     const {
       id,
       center,
@@ -1373,6 +1378,7 @@ window.onload = async () => {
     gl.disable(gl.CULL_FACE);
     gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
     gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MAP_MIPMAP);
+    gl.uniform3f(uAtlasTextureIndexAndMaterialTextureScaleAndDepth, 0, 1, 0);
     gl.uniform4fv(uMaterialColors, [
       // sky
       ...SKY, 0,
@@ -1834,10 +1840,11 @@ window.onload = async () => {
         atlasTextureId,
         materialTextureId,
         materialTextureScale = 1,
-        materialTextureColors: colors,
+        materialDepth = 0,
+        materialTextureColors,
        } = VARIANTS[variantId as any as VariantId];
 
-      gl.uniform4fv(uMaterialColors, colors as any);
+      gl.uniform4fv(uMaterialColors, materialTextureColors as any);
       gl.uniform1i(uMaterialAtlas, atlasTextureId);
 
       for (let modelId in variantRenders) {
@@ -1852,8 +1859,14 @@ window.onload = async () => {
             )
             : rotation;
           const positionMatrix = matrix4Translate(...position);
-          gl.uniform1i(uMaterialTexture, materialTextureId + Math.min(resolution/2 | 0, 1));
-          gl.uniform2f(uAtlasTextureIndexAndMaterialTextureScale, atlasIndex, materialTextureScale);
+          gl.uniform1i(uMaterialTexture, materialTextureId + (resolution < 2 && materialDepth ? 0 : 1) );
+          // TODO can we move (some of) this out of the loop?
+          gl.uniform3f(
+            uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
+            atlasIndex,
+            materialTextureScale,
+            materialDepth,
+          );
 
           gl.uniformMatrix4fv(uWorldPositionMatrix, false, positionMatrix);
           gl.uniformMatrix4fv(uWorldRotationMatrix, false, maybeBillboardRotation as any);

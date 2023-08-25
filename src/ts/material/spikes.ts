@@ -13,7 +13,7 @@ function spikeFeatureFactory(
       const dxysq = dx * dx + dy * dy;
       if (dxysq < r * r) {
         const depth = (1 - Math.sqrt(dxysq)/r) * d;
-        const depthValue = z + depth / (MATERIAL_DEPTH_RANGE * 2);
+        const depthValue = z + depth / (MATERIAL_TERRAIN_DEPTH_RANGE * 2);
         if (depthValue >= existingDepth) {
           const az = Math.atan2(dy, dx);
           const [nx, ny] = vectorNNormalize(

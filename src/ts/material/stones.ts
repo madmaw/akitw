@@ -9,7 +9,7 @@ function riverStonesFeatureFactory(
       if (dzsq > 0) {
         const dz = Math.sqrt(dzsq);
         const depth = Math.min(stoneDepth, dz);
-        const depthValue = z + depth / (MATERIAL_DEPTH_RANGE * 2);
+        const depthValue = z + depth / (MATERIAL_TERRAIN_DEPTH_RANGE * 2);
         if (depthValue > existingDepth) {
           const [nx, ny] = dz < stoneDepth ? vectorNNormalize([dx, dy, dz]) : [0, 0];
           return [

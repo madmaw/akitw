@@ -1,12 +1,10 @@
 body {
   padding: 0;
   margin: 0;
-  background: #000;
 }
 
 #fps, #Z {
   position: absolute;
   width: 100%;
   height: 100%;
-  color: white;
 }
