@@ -9,3 +9,4 @@ const FLAG_SHRINK_FACES = false;
 const FLAG_DEBUG_PHYSICS = true;
 const FLAG_FAST_READ_CANVASES = true;
 const FLAG_STONEY_SLOPES = false;
+const FLAG_SAFE_STRING_TO_INT = false;

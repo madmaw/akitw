@@ -118,6 +118,7 @@ module.exports = function (grunt) {
               { from: "gl.BACK", to: "0x0405" },
               { from: "gl.COLOR_BUFFER_BIT", to: "0x4000" },
               { from: "gl.DEPTH_BUFFER_BIT", to: "0x100" },
+              { from: "gl.TEXTURE_2D_ARRAY", to: "0x8C1A" },
               { from: "gl.TEXTURE_2D", to: "0x0DE1" },
               { from: "gl.RGBA", to: "0x1908" },
               { from: "gl.UNSIGNED_SHORT", to: "0x1403" },

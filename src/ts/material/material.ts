@@ -85,7 +85,7 @@ function evenDistributionFactory(d: number): Distribution {
   return function (size: number) {
     const ox = x;
     const oy = y;
-    x += d * size/MATERIAL_TEXTURE_DIMENSION;
+    x += d * size/MATERIAL_TERRAIN_TEXTURE_DIMENSION;
     if (x > size - d) {
       x = 0;
       y += d;
@@ -105,21 +105,21 @@ function featureMaterial(
   distribution: Distribution,
 ): Material {
   return function(ctx: CanvasRenderingContext2D, y: number) {
-    const imageData = ctx.getImageData(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+    const imageData = ctx.getImageData(0, y, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
     const z = imageData.data[2];
 
     for(let i=0; i<quantity; i++) {
-      const [x, y, scale] = distribution(MATERIAL_TEXTURE_DIMENSION);
+      const [x, y, scale] = distribution(MATERIAL_TERRAIN_TEXTURE_DIMENSION);
       const dimension = baseDimension * scale;
       const r = dimension/2;
       const feature = f(r, z);
 
       for (let dx = -1; dx < dimension + 1; dx++) {
-        const px = x + dx + MATERIAL_TEXTURE_DIMENSION | 0;
+        const px = x + dx + MATERIAL_TERRAIN_TEXTURE_DIMENSION | 0;
         for (let dy = -1; dy < dimension + 1; dy++) {
-          const py = y + dy + MATERIAL_TEXTURE_DIMENSION | 0;
-          let index = ((py % MATERIAL_TEXTURE_DIMENSION) * MATERIAL_TEXTURE_DIMENSION
-            + (px % MATERIAL_TEXTURE_DIMENSION)) * 4;
+          const py = y + dy + MATERIAL_TERRAIN_TEXTURE_DIMENSION | 0;
+          let index = ((py % MATERIAL_TERRAIN_TEXTURE_DIMENSION) * MATERIAL_TERRAIN_TEXTURE_DIMENSION
+            + (px % MATERIAL_TERRAIN_TEXTURE_DIMENSION)) * 4;
           const ox = dx - r + .5;
           const oy = dy - r + .5;
           const z = imageData.data[index + 2];

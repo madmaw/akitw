@@ -318,7 +318,7 @@ window.onload = async () => {
   }
 
   const terrain = weightedAverageTerrainFactory(depths);
-  function terrainNormal(worldPoint: ReadonlyVector3 | ReadonlyVector2) {
+  function terrainNormal(scaledWorldPoint: ReadonlyVector3 | ReadonlyVector2) {
     const offsets: ReadonlyVector2[] = [
       [-1/WORLD_DIMENSION, 0],
       [.7/WORLD_DIMENSION, -.7/WORLD_DIMENSION],
@@ -329,7 +329,7 @@ window.onload = async () => {
     //   [1/(worldWidth * worldTerrainScale), 1/(worldHeight * worldTerrainScale)],
     // ];
     const [p0, p1, p2] = offsets.map<Vector3>(offset => {
-      const point = vectorNScaleThenAdd(offset, worldPoint, 1/WORLD_DIMENSION);
+      const point = vectorNScaleThenAdd(offset, scaledWorldPoint);
       
       return [
         ...vectorNScale(point, WORLD_DIMENSION),
@@ -376,7 +376,9 @@ window.onload = async () => {
   ) {
     for (let resolutionString in resolutionBodies) {
       // in JS strings can be numbers
-      const resolution: number = parseInt(resolutionString) as any;
+      const resolution: number = FLAG_SAFE_STRING_TO_INT
+        ? parseInt(resolutionString)
+        : resolutionString as any;
       const divisor = Math.pow(2, resolution);
       const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
       const [px, py] = position;
@@ -488,7 +490,7 @@ window.onload = async () => {
           return cachedResult;
         },
         (_, modelPoint) => {
-          return terrainNormal(modelPoint);
+          return terrainNormal(vectorNScale(modelPoint, 1/WORLD_DIMENSION));
         },
       );
       const renderGroupId = nextRenderGroupId++;
@@ -658,7 +660,7 @@ window.onload = async () => {
       (acc, point) => {
         return Math.max(
           acc,
-          vectorNLength(vectorNScaleThenAdd(point, center)),
+          vectorNLength(vectorNScaleThenAdd(point, center, -1)),
         );
       },
       0,
@@ -803,13 +805,27 @@ window.onload = async () => {
     return model;
   }
 
-  const [billboardSmallModel, billboardMediumModel, billboardLargeModel, billboardHugeModel] = [.2, 1, 2, 4].map(dimension => {
-    const rotateToModelCoordinates = matrix4Identity();
+  const [
+    billboardSmallModel,
+    billboardMediumModel,
+    billboardLargeModel,
+    billboardHugeModel,
+  ] = [
+    .2,
+    1,
+    2,
+    4,
+  ].map(dimension => {
+    const rotateToModelCoordinates = matrix4Rotate(-Math.PI/2, 0, 1, 0);
     const points: ReadonlyVector3[] = [
+      // [0, -dimension/2, 0],
+      // [0, dimension/2, 0],
+      // [0, dimension/2, dimension],
+      // [0, -dimension/2, dimension],
       [0, -dimension/2, 0],
       [0, dimension/2, 0],
-      [0, dimension/2, dimension],
-      [0, -dimension/2, dimension],
+      [dimension, dimension/2, 0],
+      [dimension, -dimension/2, 0],
     ];
     const polygons: ReadonlyVector3[][] = [
       points
@@ -820,11 +836,9 @@ window.onload = async () => {
       polygons,
       t: {
         textureCoordinateTransform: matrix4Multiply(
+          matrix4Translate(.5, 0, 0),
           matrix4Rotate(-Math.PI/2, 0, 0, 1),
-          matrix4Translate(0, .5, 0),
           matrix4Scale(1/dimension),
-          // matrix4Rotate(Math.PI/2, 0, 0, 1),
-          //matrix4Rotate(-Math.PI/2, 0, 0, 1),
           matrix4Rotate(Math.PI/2, 0, 1, 0),
         ),
       }
@@ -883,29 +897,33 @@ window.onload = async () => {
     );
   });
   // material, 2d/1d texture, features 
-  const materials: Material[][][] = [
+  const materials: [number, ...Material[][]][] = [
     // empty atlus (2d)
-    [[
-      ctx => {
-        ctx.fillStyle = 'red';
-        ctx.fillRect(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
-      }
-    ]],
-    // world atlus (2d)
     [
+      MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [
         ctx => {
-          const imageData = ctx.getImageData(0, 0, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
-          for (let x=0; x<MATERIAL_TEXTURE_DIMENSION; x++) {
-            for (let y=0; y<MATERIAL_TEXTURE_DIMENSION; y++) {
+          ctx.fillStyle = 'red';
+          ctx.fillRect(0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+        }
+      ],
+    ],
+    // world atlus (2d)
+    [
+      MATERIAL_TERRAIN_TEXTURE_DIMENSION,
+      [
+        ctx => {
+          const imageData = ctx.getImageData(0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+          for (let x=0; x<MATERIAL_TERRAIN_TEXTURE_DIMENSION; x++) {
+            for (let y=0; y<MATERIAL_TERRAIN_TEXTURE_DIMENSION; y++) {
               //const depth = terrain((x + .5)/MATERIAL_TEXTURE_DIMENSION, (y + .5)/MATERIAL_TEXTURE_DIMENSION);
-              const depth = terrain(x/MATERIAL_TEXTURE_DIMENSION, y/MATERIAL_TEXTURE_DIMENSION);
-              const dx = x - MATERIAL_TEXTURE_DIMENSION/2;
-              const dy = y - MATERIAL_TEXTURE_DIMENSION/2;
+              const depth = terrain(x/MATERIAL_TERRAIN_TEXTURE_DIMENSION, y/MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+              const dx = x - MATERIAL_TERRAIN_TEXTURE_DIMENSION/2;
+              const dy = y - MATERIAL_TERRAIN_TEXTURE_DIMENSION/2;
               const dc = Math.sqrt(dx *dx + dy * dy);
               const slopeNormal = FLAG_STONEY_SLOPES
                 ? vectorNDotProduct(
-                  terrainNormal(vectorNScale([x, y], WORLD_DIMENSION/MATERIAL_TEXTURE_DIMENSION)),
+                  terrainNormal(vectorNScale([x, y], 1/MATERIAL_TERRAIN_TEXTURE_DIMENSION)),
                   NORMAL_Z,
                 )
                 : 1;
@@ -913,7 +931,7 @@ window.onload = async () => {
               const sandiness = Math.max(
                 //1 - Math.pow(Math.max(0, Math.min(1, depth*2)), 2), 
                 // road
-                1 - Math.abs(MATERIAL_TEXTURE_DIMENSION*.4 - dc)/2,
+                1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2,
                 // distribute randomly based on elevation (shore line)
                 Math.pow(Math.random(), Math.max(0, depth - .2) * 50),
                 // distribute randomly based on elevation (mountain tops)
@@ -943,7 +961,7 @@ window.onload = async () => {
                 stoniness * 255 | 0,
                 // transparency
                 255,
-              ], (y * MATERIAL_TEXTURE_DIMENSION + x) * 4);
+              ], (y * MATERIAL_TERRAIN_TEXTURE_DIMENSION + x) * 4);
             }
           }
           ctx.putImageData(imageData, 0, 0);
@@ -951,18 +969,22 @@ window.onload = async () => {
       ],
     ],
     // emoji atlas (2d array)
-    [...'🌳🌲🌴🌼🌻🍖☀️'].map(s => {
-      return [
-        (ctx, y) => {
-          ctx.font = `${MATERIAL_TEXTURE_DIMENSION*.8 | 0}px serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(s, MATERIAL_TEXTURE_DIMENSION/2, y + MATERIAL_TEXTURE_DIMENSION);
-        },
-      ];
-    }),    
+    [
+      MATERIAL_SYMBOL_TEXTURE_DIMENSION,
+      ...[...'🌴🌳🌲🌼🌻🍖☀️'].map(s => {
+        return [
+          (ctx, y) => {
+            ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(s, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
+          },
+        ];
+      }),
+    ],    
     // default (2d array)
     [
+      MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [flatMaterial],
       // TODO can we remove these two empty arrays (will it roll around?)
       [flatMaterial],
@@ -970,13 +992,14 @@ window.onload = async () => {
     ],
     // skybox (2d array)
     [
+      MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [
         (ctx, y) => {
-          const gradient = ctx.createLinearGradient(0, y, 0, y + MATERIAL_TEXTURE_DIMENSION/2);
+          const gradient = ctx.createLinearGradient(0, y, 0, y + MATERIAL_TERRAIN_TEXTURE_DIMENSION/2);
           gradient.addColorStop(0, 'rgba(128,128,128,.5)');
           gradient.addColorStop(.5, 'rgb(128,128,128)');
           ctx.fillStyle = gradient;
-          ctx.fillRect(0, y, MATERIAL_TEXTURE_DIMENSION, MATERIAL_TEXTURE_DIMENSION);
+          ctx.fillRect(0, y, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
           // TODO clouds
         },
       ],
@@ -986,6 +1009,7 @@ window.onload = async () => {
     ],
     // terrain (2d array)
     [
+      MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       // sand
       [
         flatMaterial,
@@ -1036,10 +1060,9 @@ window.onload = async () => {
   let textureId = gl.TEXTURE0;
 
   // make some textures
-  materials.forEach(frames => {
+  materials.forEach(([dimension, ...frames]) => {
     const materialCanvas = document.createElement('canvas');
     //document.body.appendChild(materialCanvas);
-    const dimension = MATERIAL_TEXTURE_DIMENSION;
     materialCanvas.width = dimension;
     materialCanvas.height = dimension * frames.length; 
     const ctx = materialCanvas.getContext(
@@ -1052,7 +1075,7 @@ window.onload = async () => {
     );
     frames.forEach((frame, i) => {
       frame.forEach(material => {
-        material(ctx, i * MATERIAL_TEXTURE_DIMENSION);
+        material(ctx, i * dimension);
       });
     });
 
@@ -1065,8 +1088,8 @@ window.onload = async () => {
         gl.TEXTURE_2D_ARRAY,
         0,
         gl.RGBA,
-        MATERIAL_TEXTURE_DIMENSION,
-        MATERIAL_TEXTURE_DIMENSION, 
+        dimension,
+        dimension, 
         frames.length,
         0,
         gl.RGBA,
@@ -1090,7 +1113,6 @@ window.onload = async () => {
         );
       }
     });
-    
   });  
 
   // add in the cube
@@ -1140,18 +1162,41 @@ window.onload = async () => {
   });
 
   // add in some trees
-  new Array(0).fill(0).forEach(() => {
-    const {
-      id,
-      center,
-      radius,
-    } = billboardHugeModel;
+  const treeBillboards = [billboardMediumModel, billboardLargeModel, billboardHugeModel];
+  const treeDistribution = clusteredDistributionFactory(
+    1/WORLD_DIMENSION,
+    5/WORLD_DIMENSION,
+    2,
+    2,
+    .1,
+    3,
+  );
+  new Array(999).fill(0).forEach(() => {
 
-    const scaledCoordinates: Vector2 = [Math.random(), Math.random()];
+    const [x, y, scale] = treeDistribution(1);
+
+    const scaledCoordinates: Vector2 = [x, y];
     const z = terrain(...scaledCoordinates);
-    if (z > 1 && terrainNormal(scaledCoordinates)[2] > .9) {
+    const terrainNormalZ = terrainNormal(scaledCoordinates)[2];
+    if (z > .5 && terrainNormalZ > .9) {
+      const atlasIndex = (z + 7 + Math.random())/9 | 0;
+      
+      // TODO could probably just scale the one billboard
+      const billboardIndex = Math.min(
+        Math.pow((terrainNormalZ - .9) * 9, 2) * scale * treeBillboards.length | 0,
+        treeBillboards.length - 1,
+      );
+      const {
+        id,
+        center,
+        radius,
+      } = treeBillboards[billboardIndex];
+  
       const renderGroupId = nextRenderGroupId++;
-      const position: Vector3 = [...vectorNScale(scaledCoordinates, WORLD_DIMENSION), z + 1];
+      const position: Vector3 = vectorNScaleThenAdd(
+        center,
+        [...vectorNScale(scaledCoordinates, WORLD_DIMENSION), z - radius/7],
+      ) as Vector3;
   
       const body: Part = {
         id: 0,
@@ -1160,15 +1205,16 @@ window.onload = async () => {
         renderTransform: matrix4Identity(),
         modelId: id,
         variant: VARIANT_SYMBOLS,
-        atlasIndex: Math.random() * 3 | 0,
+        atlasIndex,
       };
       const entity: DynamicEntity = {
         resolutionBodies: {
           [0]: body,
           [1]: body,
           [2]: body,
-          [3]: body,
-          [4]: body,
+          [billboardIndex+1]: body,
+          [billboardIndex+2]: body,
+          [billboardIndex+3]: body,
         },
         position,
         id: nextEntityId++,
@@ -1218,6 +1264,7 @@ window.onload = async () => {
     renderGroupId: nextRenderGroupId++,
     velocity: [0, 0, 0],
     gravity: DEFAULT_GRAVITY,
+    inverseMass: 1,
   };
   addEntity(player);
 
@@ -1296,8 +1343,9 @@ window.onload = async () => {
       position: player.position,
       velocity,
       renderGroupId: nextRenderGroupId++,
-      restitution: 1,
-      //gravity: DEFAULT_GRAVITY,
+      restitution: .1,
+      inverseMass: 9,
+      gravity: DEFAULT_GRAVITY,
     };
 
     addEntity(ball);
@@ -1455,7 +1503,7 @@ window.onload = async () => {
             face,
           } = entity;
 
-          if (!face) {
+          if (!face && (entity as DynamicEntity).inverseMass) {
   
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
             entity.logs = entity.logs?.slice(-30) || [];

@@ -39,7 +39,6 @@ type StaticEntity<PartId extends number = number> = {
   // TODO toWorldCoordinates, rotateToWorldCoordinates
   // only render if is in this tile
   readonly renderTile?: Tile,
-
 } & BaseEntity<PartId>;
 
 type DynamicEntity<PartId extends number = number> = {
@@ -49,6 +48,7 @@ type DynamicEntity<PartId extends number = number> = {
   readonly restitution?: number,
   readonly gravity?: number,
   readonly renderTile?: undefined,
+  readonly inverseMass?: number,
 } & BaseEntity<PartId>;
 
 type Part<PartId extends number = number> = {
