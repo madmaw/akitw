@@ -1,7 +1,7 @@
 type Model = {
   readonly faces: readonly Face<PlaneMetadata>[],
   readonly bounds: ReadonlyRect3,
-  readonly radius: number,
+  readonly minimalInternalRadius: number,
   readonly center: ReadonlyVector3,
   readonly groupPointsToFaces: Map<ReadonlyVector3, Set<Face<PlaneMetadata>>>,
   //groupPointCache: ReadonlyVector3[],

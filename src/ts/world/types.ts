@@ -1,3 +1,17 @@
+const ENTITY_TYPE_DRAGON = 1;
+const ENTITY_TYPE_SCENERY = 2;
+const ENTITY_TYPE_FIREBALL = 3;
+const ENTITY_TYPE_PARTICLE = 4;
+const ENTITY_TYPE_TERRAIN = 5;
+
+type EntityType =
+  | typeof ENTITY_TYPE_DRAGON
+  | typeof ENTITY_TYPE_SCENERY
+  | typeof ENTITY_TYPE_FIREBALL
+  | typeof ENTITY_TYPE_PARTICLE
+  | typeof ENTITY_TYPE_TERRAIN
+  ;
+
 type World = Grid[];
 
 type GridId = 1;
@@ -16,18 +30,29 @@ type Entity = StaticEntity | DynamicEntity;
 type ModelId = number;
 
 type BaseEntity<PartId extends number = number> = {
+  readonly entityType: EntityType,
   readonly renderGroupId: RenderGroupId,
+  // TODO make optional so, if it's 0 we can just use the position directly
+  readonly centerOffset: ReadonlyVector3,
+  readonly collisionRadiusFromCenter: number,
   readonly id: EntityId,
   readonly partTransforms?: Record<PartId, ReadonlyMatrix4>,
   // all the resolutions that this entity renders in
-  // to the bodies that we will render those in 
-  readonly resolutionBodies: Record<number, Part<PartId>>;
+  readonly resolutions: number[];
+
   position: Vector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
   logs?: any[][];
   // the radius of the fire associated with this entity
   readonly fire?: number,
+
+  readonly modelId?: ModelId,
+  // reference to textures/colours/etc...
+  modelVariant?: VariantId;
+  // the index of the atlas to use
+  modelAtlasIndex?: number,
+  readonly modelTransform?: ReadonlyMatrix4,
 };
 
 type PlaneMetadata = {
@@ -43,25 +68,12 @@ type StaticEntity<PartId extends number = number> = {
   readonly renderTile?: Tile,
 } & BaseEntity<PartId>;
 
-type DynamicEntity<PartId extends number = number> = {
+type DynamicEntity = {
   readonly face?: undefined,
-  readonly collisionRadius: number,
   velocity: Vector3,
   readonly restitution?: number,
   readonly gravity?: number,
   readonly renderTile?: undefined,
   readonly inverseMass?: number,
-} & BaseEntity<PartId>;
-
-type Part<PartId extends number = number> = {
-  readonly id: PartId,
-  readonly modelId?: ModelId,
-  readonly centerOffset: ReadonlyVector3,
-  readonly centerRadius: number,
-  readonly renderTransform: ReadonlyMatrix4,
-  // reference to textures/colours/etc...
-  variant: VariantId;
-  // the index of the atlas to use
-  atlasIndex?: number,
-};
+} & BaseEntity;
 
