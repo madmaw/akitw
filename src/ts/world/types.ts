@@ -26,6 +26,8 @@ type BaseEntity<PartId extends number = number> = {
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
   logs?: any[][];
+  // the radius of the fire associated with this entity
+  readonly fire?: number,
 };
 
 type PlaneMetadata = {
@@ -62,3 +64,4 @@ type Part<PartId extends number = number> = {
   // the index of the atlas to use
   atlasIndex?: number,
 };
+

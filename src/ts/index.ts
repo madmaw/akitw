@@ -7,6 +7,8 @@ const U_MATERIAL_TEXTURE = 'uMaterialTexture';
 const U_MATERIAL_COLORS = 'uMaterialColors';
 const U_TIME = 'uTime';
 const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = 'uAtlasTextureIndex';
+const U_LASERS = 'uLasers';
+const U_FIREBALLS = 'uFireballs';
 
 const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
@@ -63,6 +65,8 @@ const STEP = .001;
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
 const MAX_MATERIAL_TEXTURE_COUNT = 3;
+const MAX_LASERS = 1;
+const MAX_FIREBALLS = 9;
 
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
@@ -82,7 +86,9 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
   uniform float ${U_TIME};
   uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
-
+  uniform mat4 ${U_LASERS}[${MAX_LASERS}];
+  uniform mat4 ${U_FIREBALLS}[${MAX_FIREBALLS}];
+  
   out vec4 ${O_COLOR};
 
   void main(void) {
@@ -196,9 +202,28 @@ const FRAGMENT_SHADER = `#version 300 es
       ).xyz;
     vec4 color = maxColor * il + baseColor * (1. - il);
 
+    float fireiness = 0.;
+    for (int i=0; i<${MAX_FIREBALLS}; i++) {
+      vec4 firePosition = ${U_FIREBALLS}[i] * ${V_WORLD_POSITION};
+      float fireDistance = length(firePosition.xy/firePosition.w);
+      
+      fireiness = max(
+        pow(
+          max(
+            0.,
+            (1.-fireDistance)
+          ) * max(
+            0.,
+            firePosition.z/firePosition.w + 1. - pow(fireDistance, 2.)
+          ),
+          3.
+        ),
+        fireiness
+      );
+    }
     
     float lighting = max(
-      0., 
+      .3, 
       1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * color.w
     );
 
@@ -214,6 +239,15 @@ const FRAGMENT_SHADER = `#version 300 es
       // fog
       vec3(${SKY.join()}),
       pow(min(1., length(waterDistance)/${MAX_FOG_DEPTH}.), 1.) * wateriness
+    );
+    fc = mix(
+      fc,
+      mix(
+        vec3(1,0,0),
+        vec3(1,1,0),
+        fireiness
+      ),
+      fireiness
     );
     ${O_COLOR} = vec4(sqrt(fc), 1);
   }
@@ -536,6 +570,21 @@ window.onload = async () => {
   const gl = Z.getContext('webgl2');
 
   let projectionMatrix: ReadonlyMatrix4;
+  const fireProjectionMatrix = matrix4Multiply(
+    matrix4Perspective(
+      Math.PI/4,
+      1,
+      MIN_FOCAL_LENGTH,
+      HORIZON,
+    ),
+    matrix4Rotate(
+      -Math.PI/2,
+      1,
+      0,
+      0,
+    ),
+
+  );
   
   let previousPosition: ReadonlyVector2 | undefined;
   let cameraZoom = 0;
@@ -548,7 +597,7 @@ window.onload = async () => {
       matrix4Perspective(
         Math.PI/4,
         Z.clientWidth/Z.clientHeight,
-        .1,
+        MIN_FOCAL_LENGTH,
         HORIZON,
       ),
       matrix4Rotate(
@@ -599,8 +648,10 @@ window.onload = async () => {
     uMaterialAtlas,
     uMaterialTexture,
     uMaterialColors,
-    uTime,
     uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
+    uTime,
+    uLasers,
+    uFireballs,
   ] = [
     U_WORLD_POSITION_MATRIX,
     U_WORLD_ROTATION_MATRIX,
@@ -609,8 +660,10 @@ window.onload = async () => {
     U_MATERIAL_ATLAS,
     U_MATERIAL_TEXTURE,
     U_MATERIAL_COLORS,
-    U_TIME,
     U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH,
+    U_TIME,
+    U_LASERS,
+    U_FIREBALLS,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
@@ -1240,7 +1293,7 @@ window.onload = async () => {
     resolutionBodies: {
       [0]: {
         id: 0,
-        modelId: id,
+        //modelId: id,
         renderTransform: matrix4Identity(),
         centerOffset: center,
         centerRadius: radius,
@@ -1313,29 +1366,34 @@ window.onload = async () => {
       bounds,
       center,
       radius,
-    } = cubeSmallModel;
+    } = cubeModel;
 
-    const velocity: Vector3 = vector3TransformMatrix4(
-      matrix4Multiply(
-        //player.partTransforms[MODEL_KNIGHT_HEAD],
-        player.partTransforms[MODEL_KNIGHT_BODY],
+    const velocity: Vector3 = vectorNScaleThenAdd(
+      player.velocity,
+      vector3TransformMatrix4(
+        matrix4Multiply(
+          player.partTransforms[MODEL_KNIGHT_BODY],
+          matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
+        ),
+        0,
+        .01,
+        0,
       ),
-      0,
-      .01,
-      0,
     );
+    const body: Part<number> = {
+      id: 0,
+      //modelId: id,
+      centerOffset: center,
+      centerRadius: radius,
+      renderTransform: matrix4Identity(),
+      variant: VARIANT_NULL,
+    };
 
-    // fire a ball 
+    //fire a ball 
     const ball: DynamicEntity = {
       resolutionBodies: {
-        [0]: {
-          id: 0,
-          modelId: id,
-          centerOffset: center,
-          centerRadius: radius,
-          renderTransform: matrix4Identity(),
-          variant: VARIANT_NULL,
-        },
+        [0]: body,
+        [1]: body,
       },
       bounds,
       id: nextEntityId++,
@@ -1343,12 +1401,142 @@ window.onload = async () => {
       position: player.position,
       velocity,
       renderGroupId: nextRenderGroupId++,
-      restitution: .1,
+      restitution: 1,
       inverseMass: 9,
-      gravity: DEFAULT_GRAVITY,
+      //gravity: DEFAULT_GRAVITY,
+      fire: radius,
     };
 
     addEntity(ball);
+
+    // const cameraRelativeTargetPosition = vector3TransformMatrix4(
+    //   matrix4Invert(cameraPositionAndRotationMatrix),
+    //   ...targetPosition,
+    // );
+
+    // const screenPosition = vector3TransformMatrix4(
+    //   cameraPositionAndProjectionMatrix,
+    //   ...targetPosition,
+    // );
+
+    // const unscreenPosition = vector3TransformMatrix4(
+    //   matrix4Invert(projectionMatrix),
+    //   ...screenPosition,
+    // )
+
+    // const screenClickWorldPosition = vector3TransformMatrix4(
+    //   matrix4Invert(cameraPositionAndProjectionMatrix),
+    //   ...screenClickPosition,
+    // );
+
+    //previousLaserSources[0] = screenCoordinateDistanceMatrix;
+
+    // console.log(
+      // 'targetPosition', targetPosition,
+      // 'targetScreenCoordinateDistance', targetScreenCoordinateDistance,
+      // 'offsetTargetScreenCoordinateDistance', offsetTargetScreenCoordinateDistance,
+      // 'cameraRelativeTargetPosition', cameraRelativeTargetPosition, 
+      // 'screenPosition', screenPosition,
+      // 'unscreenPosition', unscreenPosition,
+      // 'screenClickWorldPosition', screenClickWorldPosition,
+    // );
+
+    // const toCameraSpace = matrix4Invert(matrix4Multiply(
+    //   matrix4Translate(...cameraPosition),
+    //   player.partTransforms[MODEL_KNIGHT_BODY],
+    //   matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
+    //   matrix4Translate(0, cameraZoom, 0),
+    // ));
+
+    // const sourceCameraPosition = vector3TransformMatrix4(
+    //   toCameraSpace,
+    //   ...sourcePosition,
+    // );
+    // const targetCameraPosition = vector3TransformMatrix4(
+    //   toCameraSpace,
+    //   ...targetPosition,
+    // );
+    // const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, sourceCameraPosition, -1);
+
+    // //console.log(sourceCameraPosition, targetCameraPosition);
+
+    // const cosa = vectorNDotProduct(deltaCameraPosition, NORMAL_X);
+    // const a = Math.acos(cosa);
+    // const axis = a > EPSILON
+    //     ? vectorNNormalize(vector3CrossProduct(deltaCameraPosition, NORMAL_X))
+    //     : NORMAL_Y;
+    
+    // const transform = matrix4Multiply(
+    //   matrix4Scale(1/length, 9, 1),
+    //   matrix4Rotate(a, ...axis),
+    //   toCameraSpace,
+    // );
+
+    // const sourceCameraPosition2 = vector3TransformMatrix4(
+    //   transform,
+    //   ...sourcePosition,
+    // );
+    // const targetCameraPosition2 = vector3TransformMatrix4(
+    //   transform,
+    //   ...targetPosition,
+    // );
+    // console.log(sourceCameraPosition2, targetCameraPosition2);
+
+    // previousLasers[0] = transform;
+    
+    // const cameraPositionAndRotationMatrix = matrix4Multiply(
+    //   matrix4Translate(...cameraPosition),
+    //   player.partTransforms[MODEL_KNIGHT_BODY],
+    //   matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
+    //   matrix4Translate(0, cameraZoom, 0),
+    // );
+    // const cameraPositionAndProjectionMatrix = matrix4Multiply(
+    //   fireProjectionMatrix,
+    //   matrix4Invert(cameraPositionAndRotationMatrix),
+    // );
+
+    // const sourceScreenPosition = vector3TransformMatrix4(
+    //   cameraPositionAndProjectionMatrix,
+    //   ...sourcePosition,
+    // );
+    // const targetScreenPosition = vector3TransformMatrix4(
+    //   cameraPositionAndProjectionMatrix,
+    //   ...targetPosition,
+    // );
+    
+    // // rotate the matrix so it is horizontal
+    // const deltaScreenPosition = vectorNScaleThenAdd(targetScreenPosition, sourceScreenPosition, -1);
+    // const angle = Math.atan2(deltaScreenPosition[1], deltaScreenPosition[0]);
+    // const x = vectorNLength(deltaScreenPosition.slice(0, 2));
+
+    // const screenCoordinateDistanceMatrix = matrix4Multiply(
+    //   matrix4Scale(1/x, 9, 1),
+    //   matrix4Rotate(-angle, 0, 0, 1),
+    //   matrix4Translate(...vectorNScale(sourceScreenPosition, -1)),
+    //   cameraPositionAndProjectionMatrix,
+    // );
+
+    // const rotatedTargetScreenPosition = vector3TransformMatrix4(
+    //   screenCoordinateDistanceMatrix,
+    //   ...targetPosition,
+    // );
+    // const rotatedSourceScreenPosition = vector3TransformMatrix4(
+    //   screenCoordinateDistanceMatrix,
+    //   ...sourcePosition,
+    // );
+
+    // console.log(
+    //   'source', sourcePosition,
+    //   'target', targetPosition, 
+    //   'source screen', sourceScreenPosition,
+    //   'target screen', targetScreenPosition,
+    //   'delta screen', deltaScreenPosition,
+    //   'screen angle', angle,
+    //   'rotatedSourceScreenPosition', rotatedSourceScreenPosition,
+    //   'rotatedTargetScreenPosition', rotatedTargetScreenPosition,
+    // );
+    // previousLasers[0] = screenCoordinateDistanceMatrix;
+    // previousLaserSources[0] = sourcePosition;
   };
   window.onwheel = (e: WheelEvent) => {
     const v = e.deltaY/999;
@@ -1377,6 +1565,7 @@ window.onload = async () => {
     const delta = now - then;
     then = now;
     const cappedDelta = 16;
+
     //const cappedDelta = Math.min(delta, 40);
     if (FLAG_SHOW_FPS) {
       lastFrameTimes.push(delta);
@@ -1402,59 +1591,13 @@ window.onload = async () => {
     player.velocity[1] = targetLateralVelocity[1];     
     player.velocity[2] = inputs[INPUT_JUMP] ? .001 : player.velocity[2];
 
-    const cameraPositionMatrix = matrix4Translate(...player.position);
-    const cameraPositionAndRotationMatrix = matrix4Multiply(
-      cameraPositionMatrix,
-      player.partTransforms[MODEL_KNIGHT_BODY],
-      matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
-      matrix4Translate(0, cameraZoom, 0),
-    );
-    const cameraPositionAndProjectionMatrix = matrix4Multiply(
-      projectionMatrix,
-      matrix4Invert(cameraPositionAndRotationMatrix),
-    );
-    const cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
-    gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
-    gl.uniform3fv(uCameraPosition, cameraPosition);
-    gl.uniform1f(uTime, now);
-
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    //
-    // draw the sky cylinder
-    //
-    gl.disable(gl.DEPTH_TEST);
-    gl.disable(gl.CULL_FACE);
-    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
-    gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MAP_MIPMAP);
-    gl.uniform3f(uAtlasTextureIndexAndMaterialTextureScaleAndDepth, 0, 1, 0);
-    gl.uniform4fv(uMaterialColors, [
-      // sky
-      ...SKY, 0,
-      1, 0, 0, 0,
-    ]);
-
-    gl.bindVertexArray(skyCylinderModel.vao);
-    gl.uniformMatrix4fv(
-      uWorldPositionMatrix,
-      false,
-      matrix4Translate(...(player.position.slice(0, 2) as Vector2), 0) as any,
-    );
-    //gl.uniformMatrix4fv(uWorldPositionMatrix, false, matrix4Translate(WORLD_DIMENSION/2, 0, 0) as any);
-    gl.uniformMatrix4fv(uWorldRotationMatrix, false, matrix4Identity() as any);
-    gl.drawElements(gl.TRIANGLES, skyCylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
-
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.CULL_FACE);
-    //
-    // end sky cylinder
-    //
-
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
     const handledEntities: Record<EntityId, Truthy> = {};
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
     // variantId -> modelId -> position, rotation, resolution, atlasIndex
     const toRender: Partial<Record<VariantId, Record<ModelId, [ReadonlyVector3, ReadonlyMatrix4, number, number][]>>> = {};
+    const fireballs: ReadonlyVector4[] = [];
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/WORLD_DIMENSION).slice(0, 2) as any;
@@ -1853,34 +1996,121 @@ window.onload = async () => {
           }
           const body = resolutionBodies[tile.resolution]
           const modelId = body?.modelId;
-          if (!renderedEntities[renderId] && modelId != null && (!renderTile || tiles.has(renderTile)) ) {
+          if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
             renderedEntities[renderId] = 1;
-            const { 
-              variant,
-              atlasIndex = 0,
-              centerOffset,
-            } = body;
-            let variantRenders = toRender[variant];
-            if (!variantRenders) {
-              variantRenders = {};
-              toRender[variant] = variantRenders;
+            // TODO maybe we could make model id always non zero?
+            if (modelId != null) {
+              const { 
+                variant,
+                atlasIndex = 0,
+                centerOffset,
+              } = body;
+              let variantRenders = toRender[variant];
+              if (!variantRenders) {
+                variantRenders = {};
+                toRender[variant] = variantRenders;
+              }
+              let modelRenders = variantRenders[modelId];
+              if (!modelRenders) {
+                modelRenders = [];
+                variantRenders[modelId] = modelRenders;
+              }
+              const rotation = partTransforms?.[0] || matrix4Identity();
+              modelRenders.push([
+                vectorNScaleThenAdd(entity.position, centerOffset, -1),
+                rotation,
+                tile.resolution,
+                atlasIndex,
+              ]);  
             }
-            let modelRenders = variantRenders[modelId];
-            if (!modelRenders) {
-              modelRenders = [];
-              variantRenders[modelId] = modelRenders;
+            if (entity.fire) {
+              fireballs.push([...entity.position, entity.fire]);
             }
-            const rotation = partTransforms?.[0] || matrix4Identity();
-            modelRenders.push([
-              vectorNScaleThenAdd(entity.position, centerOffset, -1),
-              rotation,
-              tile.resolution,
-              atlasIndex,
-            ]);
           }
         }
       }
     });
+
+    //
+    // render
+    //
+
+    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius]);
+    const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
+    const cameraPositionAndRotationMatrix = matrix4Multiply(
+      cameraPositionMatrix,
+      player.partTransforms[MODEL_KNIGHT_BODY],
+      matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
+      matrix4Translate(0, cameraZoom, 0),
+    );
+    const cameraPositionAndProjectionMatrix = matrix4Multiply(
+      projectionMatrix,
+      matrix4Invert(cameraPositionAndRotationMatrix),
+    );
+    const firePositionAndProjectionMatrix = matrix4Multiply(
+      fireProjectionMatrix,
+      matrix4Invert(cameraPositionAndRotationMatrix),
+    );
+
+    const cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
+    gl.uniform3fv(uCameraPosition, cameraPosition);
+    gl.uniform1f(uTime, now);
+    const fireballMatrices = fireballs.slice(0, MAX_FIREBALLS).map(fireball => {
+      const fireballPosition = fireball.slice(0, 3) as Vector3;
+      const fireballRadius = fireball[3];
+      const distance = vectorNLength(vectorNScaleThenAdd(fireballPosition, cameraPosition, -1));
+
+      const fireballScreenPosition = vector3TransformMatrix4(
+        firePositionAndProjectionMatrix,
+        ...fireballPosition,
+      )
+  
+      return matrix4Multiply(
+        matrix4Scale(distance/fireballRadius),
+        matrix4Translate(...vectorNScale(fireballScreenPosition, -1)),
+        firePositionAndProjectionMatrix,
+      );
+    });
+    gl.uniformMatrix4fv(
+      uFireballs,
+      false,
+      [
+        ...fireballMatrices.flat(1),
+        ...new Array(16 * (MAX_FIREBALLS - fireballMatrices.length)).fill(0),
+      ],
+    );
+
+    //
+    // draw the sky cylinder
+    //
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.CULL_FACE);
+    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
+    gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MAP_MIPMAP);
+    gl.uniform3f(uAtlasTextureIndexAndMaterialTextureScaleAndDepth, 0, 1, 0);
+    gl.uniform4fv(uMaterialColors, [
+      // sky
+      ...SKY, 0,
+      1, 0, 0, 0,
+    ]);
+
+    gl.bindVertexArray(skyCylinderModel.vao);
+    gl.uniformMatrix4fv(
+      uWorldPositionMatrix,
+      false,
+      matrix4Translate(...(player.position.slice(0, 2) as Vector2), 0) as any,
+    );
+    //gl.uniformMatrix4fv(uWorldPositionMatrix, false, matrix4Translate(WORLD_DIMENSION/2, 0, 0) as any);
+    gl.uniformMatrix4fv(uWorldRotationMatrix, false, matrix4Identity() as any);
+    gl.drawElements(gl.TRIANGLES, skyCylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    //
+    // end sky cylinder
+    //
 
     for (let variantId in toRender) {
       const variantRenders = toRender[variantId as any as VariantId];

@@ -32,16 +32,17 @@ const vector2Rotate = (a: number, p: ReadonlyVector2, c: readonly number[] = [0,
   ];
 }
 
-const vector3TransformMatrix4 = (m: ReadonlyMatrix4 | Falsey, x: number, y: number, z: number): Vector3 => 
-    m && vector4TransformMatrix4(m, x, y, z).slice(0, 3) as Vector3 || [x, y, z];
+const vector3TransformMatrix4 = (m: ReadonlyMatrix4, x: number, y: number, z: number): Vector3 => {
+  const v = vector4TransformMatrix4(m, x, y, z, 1);
+  return vectorNScale(v.slice(0, 3), 1/v[3]) as Vector3;
+}
 
-const vector4TransformMatrix4 = (m: ReadonlyMatrix4, x: number, y: number, z: number): Vector4 => {
-  let w = (m[3] * x + m[7] * y + m[11] * z + m[15]) || 1.;
+const vector4TransformMatrix4 = (m: ReadonlyMatrix4, x: number, y: number, z: number, w: number): Vector4 => {
   return [
-      (m[0] * x + m[4] * y + m[8] * z + m[12]) / w,
-      (m[1] * x + m[5] * y + m[9] * z + m[13]) / w,
-      (m[2] * x + m[6] * y + m[10] * z + m[14]) / w,
-      w,
+      m[0] * x + m[4] * y + m[8] * z + m[12] * w,
+      m[1] * x + m[5] * y + m[9] * z + m[13] * w,
+      m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+      m[3] * x + m[7] * y + m[11] * z + m[15] * w,
   ];
 }
 
