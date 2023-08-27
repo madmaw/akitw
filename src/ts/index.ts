@@ -502,7 +502,7 @@ window.onload = async () => {
       const {
         faces,
         bounds,
-        minimalInternalRadius,
+        maximalExternalRadius,
         center,
         id: modelId,
       } = appendModel(
@@ -543,7 +543,7 @@ window.onload = async () => {
           worldToPlaneCoordinates,
           rotateToPlaneCoordinates,
           bounds: expandedBounds,
-          collisionRadiusFromCenter: minimalInternalRadius,
+          collisionRadiusFromCenter: maximalExternalRadius,
           centerOffset: center,
           face,
           id,
@@ -551,6 +551,7 @@ window.onload = async () => {
           renderTile: tile,
           modelId,
           modelVariant: VARIANT_TERRAIN,
+          collisionGroup: COLLISION_GROUP_TERRAIN,
         };
         addEntity(entity);
       });
@@ -701,6 +702,9 @@ window.onload = async () => {
     const [min, max] = bounds;
     const center = vectorNScale(vectorNScaleThenAdd(min, max), .5);
     const minimalInternalRadius = Math.max(...vectorNScaleThenAdd(max, center, -1));
+    const maximalExternalRadius = Math.max(...allPoints.map(
+      p => vectorNLength(vectorNScaleThenAdd(p, center, -1)))
+    );
 
     const [
       modelPoints,
@@ -832,6 +836,7 @@ window.onload = async () => {
       faces,
       center,
       minimalInternalRadius,
+      maximalExternalRadius,
       groupPointsToFaces,
       indexCount: indices.length,
       vao,
@@ -1004,7 +1009,7 @@ window.onload = async () => {
     // emoji atlas (2d array)
     [
       MATERIAL_SYMBOL_TEXTURE_DIMENSION,
-      ...[...'🌴🌳🌲🌼🌻🍖☀️'].map(s => {
+      ...[...'🌴🌳🌲🌵🌿🌼🌻🍖☀️'].map(s => {
         return [
           (ctx, y) => {
             ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
@@ -1155,7 +1160,7 @@ window.onload = async () => {
       faces,
       bounds,
       center,
-      minimalInternalRadius,
+      maximalExternalRadius,
     } = cubeBigModel;
     const renderGroupId = nextRenderGroupId++;
     const cx = WORLD_DIMENSION/2 + i * 2;
@@ -1169,18 +1174,19 @@ window.onload = async () => {
       );
       const rotateToPlaneCoordinates = matrix4Invert(face.rotateToModelCoordinates);
       const entity: StaticEntity = {
-        entityType: ENTITY_TYPE_SCENERY,
+        entityType: ENTITY_TYPE_TERRAIN,
         resolutions: [0, 1, 2],
         face,
         position,
         id: nextEntityId++,
         bounds,
         renderGroupId,
-        collisionRadiusFromCenter: minimalInternalRadius,
+        collisionRadiusFromCenter: maximalExternalRadius,
         centerOffset: center,
         modelId: id,
         rotateToPlaneCoordinates,
         worldToPlaneCoordinates,
+        collisionGroup: COLLISION_GROUP_TERRAIN,
       };
       addEntity(entity);
     });
@@ -1215,6 +1221,7 @@ window.onload = async () => {
         id,
         center,
         minimalInternalRadius,
+        bounds,
       } = treeBillboards[billboardIndex];
   
       const renderGroupId = nextRenderGroupId++;
@@ -1228,7 +1235,7 @@ window.onload = async () => {
         resolutions: [...new Set([0, 1, 2, billboardIndex+1, billboardIndex+2, billboardIndex+3])],
         position,
         id: nextEntityId++,
-        bounds: rect3FromRadius(minimalInternalRadius),
+        bounds,
         renderGroupId,
         gravity: 0,
         collisionRadiusFromCenter: minimalInternalRadius,
@@ -1237,6 +1244,8 @@ window.onload = async () => {
         modelVariant: VARIANT_SYMBOLS,
         modelAtlasIndex: atlasIndex,
         velocity: [0, 0, 0],
+        collisionGroup: COLLISION_GROUP_TERRAIN,
+        health: (billboardIndex+1) * 9,
       };
       addEntity(entity);
     }
@@ -1267,14 +1276,12 @@ window.onload = async () => {
     renderGroupId: nextRenderGroupId++,
     velocity: [0, 0, 0],
     gravity: DEFAULT_GRAVITY,
+    collisionGroup: COLLISION_GROUP_PLAYER,
+    collisionMask: COLLISION_GROUP_TERRAIN | COLLISION_GROUP_ENEMY | COLLISION_GROUP_ITEMS,
     inverseMass: 1,
   };
   addEntity(player);
 
-  //const modelFaces: Face[][] = groundFaces.flat(2).map(faces => [faces]);
-
-  let playerHeadXRotation = 0;
-  
   window.onmousedown = (e: MouseEvent) => previousPosition = [e.clientX, e.clientY];
   window.onmouseup = () => previousPosition = null;
   window.onmousemove = (e: MouseEvent) => {
@@ -1315,13 +1322,15 @@ window.onload = async () => {
       ),
     );
 
-    //fire a ball 
+    // fire a ball 
     const ball: DynamicEntity = {
       entityType: ENTITY_TYPE_FIREBALL,
       resolutions: [0, 1],
       bounds,
       id: nextEntityId++,
       collisionRadiusFromCenter: minimalInternalRadius,
+      collisionGroup: COLLISION_GROUP_PLAYER,
+      collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_TERRAIN,
       centerOffset: center,
       position: player.position,
       velocity,
@@ -1334,6 +1343,7 @@ window.onload = async () => {
 
     addEntity(ball);
 
+    // lasers
     // const cameraRelativeTargetPosition = vector3TransformMatrix4(
     //   matrix4Invert(cameraPositionAndRotationMatrix),
     //   ...targetPosition,
@@ -1573,7 +1583,7 @@ window.onload = async () => {
 
           if (entity.dead) {
             removeEntity(entity);
-          } else if (!face && (entity as DynamicEntity).inverseMass) {
+          } if (!face && entity.inverseMass) {
   
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
             entity.logs = entity.logs?.slice(-30) || [];
@@ -1590,10 +1600,11 @@ window.onload = async () => {
                 centerOffset,
                 collisionRadiusFromCenter,
                 restitution = 0,
+                collisionMask,
               } = entity as DynamicEntity;
-              const offsetPosition = vectorNScaleThenAdd(position, centerOffset);
-
               const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
+              const offsetTargetPosition = vectorNScaleThenAdd(targetPosition, centerOffset);
+
               const targetUnionBounds: ReadonlyRect3 = [
                 velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime) as Vector3,
                 velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime) as Vector3,
@@ -1610,10 +1621,10 @@ window.onload = async () => {
               // update dynamic entity
               iterateEntityBounds(targetEntity, tile => {
                 for (let checkEntityId in tile.entities) {
-                  if (!checkedEntities[checkEntityId]) {
+                  let check = tile.entities[checkEntityId];
+                  if (!checkedEntities[checkEntityId] && (check.collisionGroup & collisionMask)) {
                     checkedEntities[checkEntityId] = 1;
                     let collisionTime: number | undefined;
-                    let check = tile.entities[checkEntityId];
                     if (check.face) {
                       let planeCollisionNormal: ReadonlyVector3 | Falsey;
                       const {
@@ -1811,42 +1822,77 @@ window.onload = async () => {
                         minCollisionEntity = check;
                       }
                     } else {
+
+                      // update any dynamic-dynamic collision behaviours
+
                       const entityDelta = vectorNScaleThenAdd(
-                        offsetPosition,
+                        offsetTargetPosition,
                         vectorNScaleThenAdd(check.position, check.centerOffset),
                         -1
                       );
                       const entityDistance = vectorNLength(entityDelta);
                       const entityOverlap = collisionRadiusFromCenter + check.collisionRadiusFromCenter - entityDistance;
+                      const inverseMass = entity.inverseMass || 0;
+                      const checkInverseMass = check.inverseMass || 0;
+                      // push both away
+
                       if (entityOverlap > 0) {
                         switch (entity.entityType) {
                           case ENTITY_TYPE_DRAGON:
-                            switch (check.entityType) {
-                              case ENTITY_TYPE_SCENERY:
-                                // push both away
-                                const inverseMass = entity.inverseMass || 0;
-                                const checkInverseMass = check.inverseMass || 0;
-                                if (inverseMass || checkInverseMass) {
-                                  const divisor = 999*(inverseMass + checkInverseMass);
-                                  entity.velocity = entity.velocity && vectorNScaleThenAdd(
-                                    entity.velocity,
-                                    entityDelta,
-                                    -entityOverlap*inverseMass/divisor
-                                  );
-                                  check.velocity = check.velocity && vectorNScaleThenAdd(
-                                    check.velocity,
-                                    entityDelta,
-                                    entityOverlap*checkInverseMass/divisor,
-                                  )
-                                }
-                                break;
-                            }
+                            if (inverseMass || checkInverseMass) {
+                              const divisor = 999*(inverseMass + checkInverseMass);
+                              entity.velocity = entity.velocity && vectorNScaleThenAdd(
+                                entity.velocity,
+                                entityDelta,
+                                -entityOverlap*inverseMass/divisor
+                              );
+                              check.velocity = check.velocity && vectorNScaleThenAdd(
+                                check.velocity,
+                                entityDelta,
+                                entityOverlap*checkInverseMass/divisor,
+                              )
+                            }      
                             break;
                           case ENTITY_TYPE_FIREBALL:
-                            entity.dead = 1;
                             switch (check.entityType) {
                               case ENTITY_TYPE_SCENERY:
-                                check.dead = 1;
+                                if (entityOverlap > entity.collisionRadiusFromCenter * 2) {
+                                  entity.dead = 1;
+                                  addEntity({
+                                    bounds,
+                                    centerOffset,
+                                    collisionGroup: COLLISION_GROUP_PLAYER,
+                                    collisionRadiusFromCenter,
+                                    entityType: ENTITY_TYPE_EXPLOSION,
+                                    id: nextEntityId++,
+                                    position: entity.position,
+                                    renderGroupId: nextRenderGroupId++,
+                                    resolutions: [0, 1],
+                                    velocity: [0, 0, 0],
+                                    animations: [createAttributeAnimation(
+                                      300,
+                                      'fire',
+                                      EASING_BACK_IN,
+                                      p => 1 - p,
+                                      e => e.dead = 1,
+                                    )],
+                                    fire: entity.fire,
+                                  });
+                                  if (check.health) {
+                                    check.health--;
+                                    check.animations = [...(check.animations || []), createAttributeAnimation(
+                                      99 + 99 * Math.random(),
+                                      'animationTransform',
+                                      EASING_BOUNCE,
+                                      createEntityMatrixUpdate(p => matrix4Multiply(
+                                        matrix4Translate(0, 0, -check.collisionRadiusFromCenter),
+                                        //matrix4Rotate(-Math.PI*p/4, 0, 1, 0),
+                                        matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random())),
+                                        matrix4Translate(0, 0, check.collisionRadiusFromCenter),
+                                      )),
+                                    )];
+                                  }
+                                }
                                 break;
                             }
                             break;
@@ -1965,6 +2011,18 @@ window.onload = async () => {
               addEntity(entity);
             }
           }
+          // update any passive behaviours
+
+          // NOTE that if health is undefined, this check fails
+          if (entity.health <= 0) {
+            entity.dead = 1;
+          }
+
+          // update any animations
+          entity.animationTransform = matrix4Identity();
+          entity.animations = entity.animations?.filter(a => !a(entity, delta));
+
+          // render
           if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
             renderedEntities[renderId] = 1;
             // TODO maybe we could make model id always non zero?
@@ -1987,10 +2045,11 @@ window.onload = async () => {
               }
               const rotation = zRotation || xRotation
                 ? matrix4Multiply(
+                  entity.animationTransform,
                   matrix4Rotate(xRotation || 0, 1, 0, 0),
                   matrix4Rotate(zRotation || 0, 0, 0, 1),
                 )
-                : matrix4Identity();
+                : entity.animationTransform || matrix4Identity();
               modelRenders.push([
                 entity.position,
                 // TODO allow undefined/Falesy
@@ -2044,6 +2103,7 @@ window.onload = async () => {
       )
   
       return matrix4Multiply(
+        // TODO the z scaling here is not right
         matrix4Scale(distance/fireballRadius),
         matrix4Translate(...vectorNScale(fireballScreenPosition, -1)),
         firePositionAndProjectionMatrix,
@@ -2108,8 +2168,8 @@ window.onload = async () => {
         modelRenders.forEach(([position, rotation, resolution, atlasIndex]) => {
           const maybeBillboardRotation = billboard
             ? matrix4Multiply(
-              rotation,
               matrix4Rotate(Math.atan2(cameraPosition[1] - position[1], cameraPosition[0] - position[0]), 0, 0, 1),
+              rotation,
             )
             : rotation;
           const positionMatrix = matrix4Translate(...position);
