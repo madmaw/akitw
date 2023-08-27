@@ -279,12 +279,12 @@ window.onload = async () => {
   ];
 
   const cubeBig: ConvexShape<PlaneMetadata> = [
-    toPlane(0, 0, 1, .9, defaultPlaneMetadata),
-    toPlane(0, 0, -1, .9, defaultPlaneMetadata),
-    toPlane(1, 0, 0, .9, defaultPlaneMetadata),
-    toPlane(-1, 0, 0, .9, defaultPlaneMetadata),
-    toPlane(0, 1, 0, .9, defaultPlaneMetadata),
-    toPlane(0, -1, 0, .9, defaultPlaneMetadata),
+    toPlane(0, 0, 1, .4, defaultPlaneMetadata),
+    toPlane(0, 0, -1, .4, defaultPlaneMetadata),
+    toPlane(1, 0, 0, .4, defaultPlaneMetadata),
+    toPlane(-1, 0, 0, .4, defaultPlaneMetadata),
+    toPlane(0, 1, 0, .4, defaultPlaneMetadata),
+    toPlane(0, -1, 0, .4, defaultPlaneMetadata),
   ];
 
 
@@ -1246,16 +1246,14 @@ window.onload = async () => {
     bounds,
     center,
     minimalInternalRadius
-  } = cubeModel;
+  } = cubeBigModel;
   // add in a "player"
   const player: DynamicEntity = {
     entityType: ENTITY_TYPE_DRAGON,
     resolutions: [0],
     bounds,
-    partTransforms: {
-      [MODEL_KNIGHT_BODY]: matrix4Identity(),
-      [MODEL_KNIGHT_HEAD]: matrix4Identity(),
-    },
+    xRotation: 0,
+    zRotation: 0,
     // collision radius must fit within the bounds, so the model render radius will almost certainly
     // be larger than that
     collisionRadiusFromCenter: minimalInternalRadius,
@@ -1285,28 +1283,13 @@ window.onload = async () => {
       const delta = vectorNScaleThenAdd(currentPosition, previousPosition, -1);
       const rotation = vectorNLength(delta)/399;
       if (rotation > EPSILON) {
-        const playerBodyRotationMatrix = player.partTransforms[MODEL_KNIGHT_BODY];
-        player.partTransforms[MODEL_KNIGHT_BODY] = matrix4Multiply(
-          playerBodyRotationMatrix,
-          matrix4Rotate(
-            -delta[0]/399,
-            0,
-            0,
-            1,
-          ),
-        );
-        playerHeadXRotation = Math.max(
+        player.zRotation -= delta[0]/399;
+        player.xRotation = Math.max(
           -Math.PI/6,
           Math.min(
             Math.PI/2,
-            playerHeadXRotation + delta[1]/199,   
+            player.xRotation + delta[1]/199,
           ),
-        ) 
-        player.partTransforms[MODEL_KNIGHT_HEAD] = matrix4Rotate(
-          playerHeadXRotation,
-          1,
-          0,
-          0
         );
       }
       previousPosition = currentPosition;
@@ -1320,26 +1303,17 @@ window.onload = async () => {
       minimalInternalRadius,
     } = cubeModel;
 
+    const playerTransform = matrix4Multiply(
+      matrix4Rotate(player.zRotation, 0, 0, 1),
+      matrix4Rotate(-player.xRotation, 1, 0, 0),
+    );
     const velocity: Vector3 = vectorNScaleThenAdd(
       player.velocity,
       vector3TransformMatrix4(
-        matrix4Multiply(
-          player.partTransforms[MODEL_KNIGHT_BODY],
-          matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
-        ),
-        0,
-        .01,
-        0,
+        playerTransform,
+        0, .01, 0,
       ),
     );
-
-    const ballPosition = vector3TransformMatrix4(
-      matrix4Multiply(
-        matrix4Translate(0, 0, 0),
-        matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
-      ),
-      ...player.position,
-    )
 
     //fire a ball 
     const ball: DynamicEntity = {
@@ -1533,8 +1507,9 @@ window.onload = async () => {
       const multiplier = inputs[keyCode] || 0;
       return vectorNScaleThenAdd(velocity, vector, .001 * multiplier);
     }, [0, 0]);
+    const playerZRotation = matrix4Rotate(player.zRotation, 0, 0, 1);
     const targetLateralVelocity = vector3TransformMatrix4(
-      player.partTransforms[MODEL_KNIGHT_BODY],
+      playerZRotation,
       ...vectorNScale(targetUnrotatedLateralVelocity, (inputs[INPUT_RUN] || 0)*5 + 1),
       0,
     );
@@ -1592,12 +1567,13 @@ window.onload = async () => {
             bounds,
             renderGroupId: renderId,
             renderTile,
-            partTransforms,
             face,
             modelId,
           } = entity;
 
-          if (!face && (entity as DynamicEntity).inverseMass) {
+          if (entity.dead) {
+            removeEntity(entity);
+          } else if (!face && (entity as DynamicEntity).inverseMass) {
   
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
             entity.logs = entity.logs?.slice(-30) || [];
@@ -1841,12 +1817,36 @@ window.onload = async () => {
                         -1
                       );
                       const entityDistance = vectorNLength(entityDelta);
-                      if (entityDistance < collisionRadiusFromCenter + check.collisionRadiusFromCenter) {
+                      const entityOverlap = collisionRadiusFromCenter + check.collisionRadiusFromCenter - entityDistance;
+                      if (entityOverlap > 0) {
                         switch (entity.entityType) {
-                          case ENTITY_TYPE_FIREBALL:
+                          case ENTITY_TYPE_DRAGON:
                             switch (check.entityType) {
                               case ENTITY_TYPE_SCENERY:
-                                console.log('pop');
+                                // push both away
+                                const inverseMass = entity.inverseMass || 0;
+                                const checkInverseMass = check.inverseMass || 0;
+                                if (inverseMass || checkInverseMass) {
+                                  const divisor = 999*(inverseMass + checkInverseMass);
+                                  entity.velocity = entity.velocity && vectorNScaleThenAdd(
+                                    entity.velocity,
+                                    entityDelta,
+                                    -entityOverlap*inverseMass/divisor
+                                  );
+                                  check.velocity = check.velocity && vectorNScaleThenAdd(
+                                    check.velocity,
+                                    entityDelta,
+                                    entityOverlap*checkInverseMass/divisor,
+                                  )
+                                }
+                                break;
+                            }
+                            break;
+                          case ENTITY_TYPE_FIREBALL:
+                            entity.dead = 1;
+                            switch (check.entityType) {
+                              case ENTITY_TYPE_SCENERY:
+                                check.dead = 1;
                                 break;
                             }
                             break;
@@ -1961,7 +1961,9 @@ window.onload = async () => {
                 entity.logs = [];
               }  
             }
-            addEntity(entity);
+            if (!entity.dead) {
+              addEntity(entity);
+            }
           }
           if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
             renderedEntities[renderId] = 1;
@@ -1970,6 +1972,8 @@ window.onload = async () => {
               const { 
                 modelVariant = VARIANT_NULL,
                 modelAtlasIndex = 0,
+                xRotation,
+                zRotation,
               } = entity;
               let variantRenders = toRender[modelVariant];
               if (!variantRenders) {
@@ -1981,9 +1985,15 @@ window.onload = async () => {
                 modelRenders = [];
                 variantRenders[modelId] = modelRenders;
               }
-              const rotation = partTransforms?.[0] || matrix4Identity();
+              const rotation = zRotation || xRotation
+                ? matrix4Multiply(
+                  matrix4Rotate(xRotation || 0, 1, 0, 0),
+                  matrix4Rotate(zRotation || 0, 0, 0, 1),
+                )
+                : matrix4Identity();
               modelRenders.push([
                 entity.position,
+                // TODO allow undefined/Falesy
                 rotation,
                 tile.resolution,
                 modelAtlasIndex,
@@ -2005,8 +2015,8 @@ window.onload = async () => {
     const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
     const cameraPositionAndRotationMatrix = matrix4Multiply(
       cameraPositionMatrix,
-      player.partTransforms[MODEL_KNIGHT_BODY],
-      matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
+      playerZRotation,
+      matrix4Rotate(-player.xRotation, 1, 0, 0),
       matrix4Translate(0, cameraZoom, 0),
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
