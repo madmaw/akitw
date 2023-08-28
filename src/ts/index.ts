@@ -852,7 +852,7 @@ window.onload = async () => {
     billboardLargeModel,
     billboardHugeModel,
   ] = [
-    .2,
+    .5,
     1,
     2,
     4,
@@ -1006,20 +1006,39 @@ window.onload = async () => {
         },
       ],
     ],
-    // emoji atlas (2d array)
-    [
-      MATERIAL_SYMBOL_TEXTURE_DIMENSION,
-      ...[...'🌴🌳🌲🌵🌿🌼🌻🍖☀️'].map(s => {
-        return [
-          (ctx, y) => {
-            ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(s, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
-          },
-        ];
-      }),
-    ],    
+    ...[
+      // emoji atlas (2d array)
+      '🌴🌳🌲🌵🌿🌼🌻🍖🔥☀️🍖',
+      // bright emoji atlas (2d array)
+      '🔥',
+    ].map<[number, ...Material[][]]>(s => {
+      return [
+        MATERIAL_SYMBOL_TEXTURE_DIMENSION,
+        ...[...s].map<Material[]>(c => {
+          return [
+            (ctx, y) => {
+              ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.fillText(c, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
+            },
+          ];   
+        }),
+      ]
+    }),
+    // [
+    //   MATERIAL_SYMBOL_TEXTURE_DIMENSION,
+    //   ...[...''].map(s => {
+    //     return [
+    //       (ctx, y) => {
+    //         ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
+    //         ctx.textAlign = 'center';
+    //         ctx.textBaseline = 'bottom';
+    //         ctx.fillText(s, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
+    //       },
+    //     ];
+    //   }),
+    // ],
     // default (2d array)
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
@@ -1202,7 +1221,7 @@ window.onload = async () => {
     .1,
     3,
   );
-  new Array(999).fill(0).forEach(() => {
+  new Array(WORLD_DIMENSION*4).fill(0).forEach(() => {
 
     const [x, y, scale] = treeDistribution(1);
 
@@ -1335,10 +1354,10 @@ window.onload = async () => {
       position: player.position,
       velocity,
       renderGroupId: nextRenderGroupId++,
-      restitution: 1,
       inverseMass: 9,
+      transient: 1,
       //gravity: DEFAULT_GRAVITY,
-      fire: minimalInternalRadius,
+      fire: minimalInternalRadius * 2,
     };
 
     addEntity(ball);
@@ -1581,9 +1600,7 @@ window.onload = async () => {
             modelId,
           } = entity;
 
-          if (entity.dead) {
-            removeEntity(entity);
-          } if (!face && entity.inverseMass) {
+          if (!face && entity.inverseMass) {
   
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
             entity.logs = entity.logs?.slice(-30) || [];
@@ -1593,7 +1610,11 @@ window.onload = async () => {
             // TODO enforce max speed
             let remainingCollisionTime = cappedDelta;
             let collisionCount = 0;
-            while (remainingCollisionTime > EPSILON && collisionCount < MAX_COLLISIONS) {
+            while (
+              remainingCollisionTime > EPSILON
+              && collisionCount < MAX_COLLISIONS
+              && !entity.dead
+            ) {
               const {
                 position,
                 velocity,
@@ -1832,71 +1853,9 @@ window.onload = async () => {
                       );
                       const entityDistance = vectorNLength(entityDelta);
                       const entityOverlap = collisionRadiusFromCenter + check.collisionRadiusFromCenter - entityDistance;
-                      const inverseMass = entity.inverseMass || 0;
-                      const checkInverseMass = check.inverseMass || 0;
                       // push both away
-
                       if (entityOverlap > 0) {
-                        switch (entity.entityType) {
-                          case ENTITY_TYPE_DRAGON:
-                            if (inverseMass || checkInverseMass) {
-                              const divisor = 999*(inverseMass + checkInverseMass);
-                              entity.velocity = entity.velocity && vectorNScaleThenAdd(
-                                entity.velocity,
-                                entityDelta,
-                                -entityOverlap*inverseMass/divisor
-                              );
-                              check.velocity = check.velocity && vectorNScaleThenAdd(
-                                check.velocity,
-                                entityDelta,
-                                entityOverlap*checkInverseMass/divisor,
-                              )
-                            }      
-                            break;
-                          case ENTITY_TYPE_FIREBALL:
-                            switch (check.entityType) {
-                              case ENTITY_TYPE_SCENERY:
-                                if (entityOverlap > entity.collisionRadiusFromCenter * 2) {
-                                  entity.dead = 1;
-                                  addEntity({
-                                    bounds,
-                                    centerOffset,
-                                    collisionGroup: COLLISION_GROUP_PLAYER,
-                                    collisionRadiusFromCenter,
-                                    entityType: ENTITY_TYPE_EXPLOSION,
-                                    id: nextEntityId++,
-                                    position: entity.position,
-                                    renderGroupId: nextRenderGroupId++,
-                                    resolutions: [0, 1],
-                                    velocity: [0, 0, 0],
-                                    animations: [createAttributeAnimation(
-                                      300,
-                                      'fire',
-                                      EASING_BACK_IN,
-                                      p => 1 - p,
-                                      e => e.dead = 1,
-                                    )],
-                                    fire: entity.fire,
-                                  });
-                                  if (check.health) {
-                                    check.health--;
-                                    check.animations = [...(check.animations || []), createAttributeAnimation(
-                                      99 + 99 * Math.random(),
-                                      'animationTransform',
-                                      EASING_BOUNCE,
-                                      createEntityMatrixUpdate(p => matrix4Multiply(
-                                        matrix4Translate(0, 0, -check.collisionRadiusFromCenter),
-                                        //matrix4Rotate(-Math.PI*p/4, 0, 1, 0),
-                                        matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random())),
-                                        matrix4Translate(0, 0, check.collisionRadiusFromCenter),
-                                      )),
-                                    )];
-                                  }
-                                }
-                                break;
-                            }
-                            break;
-                        }  
+                        handleCollision(entity, addEntity, check);
                       }
                     }
                   }
@@ -1988,8 +1947,9 @@ window.onload = async () => {
                     vectorNLength((entity as DynamicEntity).velocity),
                     [...(entity as DynamicEntity).velocity],
                   ]);
-
                 }
+
+                handleCollision(entity, addEntity, minCollisionEntity);
                 
                 remainingCollisionTime -= boundedCollisionTime;
               } else {
@@ -2012,19 +1972,75 @@ window.onload = async () => {
             }
           }
           // update any passive behaviours
+          switch (entity.entityType) {
+            case ENTITY_TYPE_FIREBALL:
+              if (entity.position[2] < 0) {
+                handleCollision(entity, addEntity);
+              }
+              break;
+          }
 
           // NOTE that if health is undefined, this check fails
+          if (entity.onFire > 0) {
+            entity.onFire--;
+            if (entity.health) {
+              entity.health--;
+            }
+            const {
+              bounds,
+              center,
+              minimalInternalRadius,
+              id: modelId,
+            } = billboardSmallModel;
+            addEntity({
+              modelId,
+              modelVariant: VARIANT_SYMBOLS_BRIGHT,
+              modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
+              //modelAtlasIndex: 7,
+              bounds,
+              centerOffset: center,
+              collisionGroup: COLLISION_GROUP_NONE,
+              collisionRadiusFromCenter: minimalInternalRadius,
+              entityType: ENTITY_TYPE_PARTICLE,
+              id: nextEntityId++,
+              position: vectorNScaleThenAdd(
+                vectorNScaleThenAdd(entity.position, entity.centerOffset),
+                new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
+                entity.collisionRadiusFromCenter,
+              ),
+              velocity: [0, 0, 0],
+              renderGroupId: nextRenderGroupId++,
+              resolutions: [0, 1],
+              transient: 1,
+              animations: [createAttributeAnimation(
+                300 + Math.random() * 300,
+                'animationTransform',
+                EASING_EASE_IN,
+                createEntityMatrixUpdate(p => matrix4Scale(1 - p)),
+                e => e.dead = 1,
+              )],
+            });
+          }
           if (entity.health <= 0) {
             entity.dead = 1;
+          }
+          if (entity.transient) {
+            let found: Booleanish;
+            iterateEntityBounds(entity, tile => {
+              found ||= tiles.has(tile);
+            });
+            entity.dead ||= !found;
           }
 
           // update any animations
           entity.animationTransform = matrix4Identity();
           entity.animations = entity.animations?.filter(a => !a(entity, delta));
 
+          if (entity.dead) {
+            removeEntity(entity);
+          } else if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
           // render
-          if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
-            renderedEntities[renderId] = 1;
+          renderedEntities[renderId] = 1;
             // TODO maybe we could make model id always non zero?
             if (modelId != null) {
               const { 

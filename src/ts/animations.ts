@@ -2,6 +2,7 @@ type Easing = (t: number) => number;
 
 const EASING_BOUNCE: Easing = t => Math.sin(Math.pow(t, 2) * Math.PI*2) * (1 - Math.pow(t, 2));
 const EASING_BACK_IN: Easing = t => t * t * (9 * t - 8);
+const EASING_EASE_IN: Easing = t => t * t;
 
 function createAttributeAnimation<E, K extends keyof E, V extends E[K]>(
   duration: number,

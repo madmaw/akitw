@@ -3,15 +3,13 @@ const ENTITY_TYPE_SCENERY = 2;
 const ENTITY_TYPE_FIREBALL = 3;
 const ENTITY_TYPE_PARTICLE = 4;
 const ENTITY_TYPE_TERRAIN = 5;
-const ENTITY_TYPE_FIRE = 6;
-const ENTITY_TYPE_EXPLOSION = 7;
+const ENTITY_TYPE_EXPLOSION = 6;
 
 type EntityTypeDragon = typeof ENTITY_TYPE_DRAGON;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
 type EntityTypeFireball = typeof ENTITY_TYPE_FIREBALL;
 type EntityTypeParticle = typeof ENTITY_TYPE_PARTICLE;
 type EntityTypeTerrain = typeof ENTITY_TYPE_TERRAIN;
-type EntityTypeFire = typeof ENTITY_TYPE_FIRE;
 type EntityTypeExplosion = typeof ENTITY_TYPE_EXPLOSION;
 
 type EntityType =
@@ -19,16 +17,18 @@ type EntityType =
   | EntityTypeScenery
   | EntityTypeFireball
   | EntityTypeParticle
-  | EntityTypeFire
   | EntityTypeExplosion
   ;
 
+// nothing collides with this
+const COLLISION_GROUP_NONE = 0;
 const COLLISION_GROUP_PLAYER = 1;
 const COLLISION_GROUP_ENEMY = 2;
 const COLLISION_GROUP_ITEMS = 4;
 const COLLISION_GROUP_TERRAIN = 8;
 
 type CollisionGroup =
+  | typeof COLLISION_GROUP_NONE
   | typeof COLLISION_GROUP_PLAYER
   | typeof COLLISION_GROUP_ENEMY
   | typeof COLLISION_GROUP_ITEMS
@@ -69,7 +69,9 @@ type BaseEntity = {
   readonly bounds: ReadonlyRect3,
   logs?: any[][];
   // the radius of the fire associated with this entity
-  readonly fire?: number,
+  fire?: number,
+  // by how much this entity is on fire (0/undefined = not on fire)
+  onFire?: number,
 
   readonly modelId?: ModelId,
   // reference to textures/colours/etc...
@@ -83,6 +85,8 @@ type BaseEntity = {
   // what we will hit
   collisionMask?: number,
   health?: number,
+  // indicates that the entity dies when it goes out of view
+  transient?: Booleanish,
   animationTransform?: ReadonlyMatrix4,
   animations?: EntityAnimation[],
 };
@@ -108,7 +112,6 @@ type StaticEntity = {
 type DynamicEntity = {
   readonly entityType:
     | EntityTypeDragon
-    | EntityTypeFire
     | EntityTypeFireball
     | EntityTypeParticle
     | EntityTypeScenery
