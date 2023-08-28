@@ -17,7 +17,8 @@ const WORLD_DEPTH_SCALE = WORLD_DIMENSION/DEPTH_DIMENSION;
 const MIN_FOCAL_LENGTH = .1;
 const HORIZON = WORLD_DIMENSION * 9;
 const MAX_FOG_DEPTH = HORIZON/2;
-const SKY: ReadonlyVector3 = [.7, .8, 1];
+const SKY_LOW: ReadonlyVector3 = [.5, .8, 1];
+const SKY_HIGH: ReadonlyVector3 = [0, .6, .9];
 const WATER: ReadonlyVector3 = [.0, .1, .3];
 const SHORE: ReadonlyVector3 = [.1, .5, .5];
 

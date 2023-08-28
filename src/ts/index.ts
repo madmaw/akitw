@@ -171,7 +171,7 @@ const FRAGMENT_SHADER = `#version 300 es
         maxColor = mix(
           baseColor,
           ${U_MATERIAL_COLORS}[textureIndex*2+1],
-          tm.a * 2. - 1.
+          tm.w * 2. - 1.
         );
       }
     }
@@ -248,7 +248,7 @@ const FRAGMENT_SHADER = `#version 300 es
         fireiness
       ),
       // fog
-      vec3(${SKY.join()}),
+      vec3(${SKY_LOW.join()}),
       pow(min(1., length(waterDistance)/${MAX_FOG_DEPTH}.), 1.) * wateriness
     );
     ${O_COLOR} = vec4(sqrt(fc), 1);
@@ -602,7 +602,7 @@ window.onload = async () => {
   };
   window.onresize = onResize;
   onResize();
-  gl.clearColor(...SKY, 1);
+  gl.clearColor(...SKY_LOW, 1);
 
   const vertexShader = loadShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
   const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -936,7 +936,7 @@ window.onload = async () => {
   });
   // material, 2d/1d texture, features 
   const materials: [number, ...Material[][]][] = [
-    // empty atlus (2d)
+    // TEXTURE_EMPTY_MAP
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [
@@ -946,7 +946,7 @@ window.onload = async () => {
         }
       ],
     ],
-    // world atlus (2d)
+    // TEXTURE_WORLD_MAP
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [
@@ -1007,9 +1007,9 @@ window.onload = async () => {
       ],
     ],
     ...[
-      // emoji atlas (2d array)
-      '🌴🌳🌲🌵🌿🌼🌻🍖🔥☀️🍖',
-      // bright emoji atlas (2d array)
+      // TEXTURE_SYMBOL_MAP
+      '🌴🌳🌲🌵🌿🌼🌻🍖',
+      // TEXTURE_SYMBOL_BRIGHT_MAP
       '🔥',
     ].map<[number, ...Material[][]]>(s => {
       return [
@@ -1026,20 +1026,7 @@ window.onload = async () => {
         }),
       ]
     }),
-    // [
-    //   MATERIAL_SYMBOL_TEXTURE_DIMENSION,
-    //   ...[...''].map(s => {
-    //     return [
-    //       (ctx, y) => {
-    //         ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
-    //         ctx.textAlign = 'center';
-    //         ctx.textBaseline = 'bottom';
-    //         ctx.fillText(s, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
-    //       },
-    //     ];
-    //   }),
-    // ],
-    // default (2d array)
+    // TEXTURE_EMPTY_MATERIAL
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [flatMaterial],
@@ -1047,24 +1034,49 @@ window.onload = async () => {
       [flatMaterial],
       [flatMaterial],
     ],
-    // skybox (2d array)
+    // TEXTURE_SKYBOX
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       [
-        (ctx, y) => {
-          const gradient = ctx.createLinearGradient(0, y, 0, y + MATERIAL_TERRAIN_TEXTURE_DIMENSION/2);
-          gradient.addColorStop(0, 'rgba(128,128,128,.5)');
-          gradient.addColorStop(.5, 'rgb(128,128,128)');
+        ctx => {
+          // const gradient = ctx.createLinearGradient(0, 0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+          // gradient.addColorStop(0, 'rgb(128,128,128)');
+          // gradient.addColorStop(1, 'rgba(128,128,128,0)');
+          // ctx.fillStyle = gradient;
+          // ctx.fillRect(0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+          const gradient = ctx.createLinearGradient(0, 0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+          gradient.addColorStop(.9, '#0F0');
+          gradient.addColorStop(1, 'red');
           ctx.fillStyle = gradient;
-          ctx.fillRect(0, y, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
-          // TODO clouds
+          ctx.fillRect(0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+
+          if (FLAG_CLOUDS) {
+            const distribution = clusteredDistributionFactory(9, 9, 1, 2, .8, 5);
+            ctx.fillStyle = '#00F';
+            for (let i=0; i<999; i++) {
+              const [x, y, scale] = distribution(MATERIAL_TERRAIN_TEXTURE_DIMENSION)
+              const r = 9 * scale;
+              if (x < MATERIAL_TERRAIN_TEXTURE_DIMENSION - r) {
+                ctx.beginPath();
+                ctx.arc(
+                  x,
+                  MATERIAL_TERRAIN_TEXTURE_DIMENSION,
+                  r,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.fill();
+    
+              }
+            }
+          }
         },
       ],
       // TODO can we remove these two empty arrays (will it roll around?)
-      [flatMaterial],
-      [flatMaterial],
+      // [flatMaterial],
+      // [flatMaterial],
     ],
-    // terrain (2d array)
+    // TEXTURE_TERRAIN_MATERIAL
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
       // sand
@@ -1119,7 +1131,7 @@ window.onload = async () => {
   // make some textures
   materials.forEach(([dimension, ...frames]) => {
     const materialCanvas = document.createElement('canvas');
-    //document.body.appendChild(materialCanvas);
+    document.body.appendChild(materialCanvas);
     materialCanvas.width = dimension;
     materialCanvas.height = dimension * frames.length; 
     const ctx = materialCanvas.getContext(
@@ -1930,6 +1942,7 @@ window.onload = async () => {
                       const entityOverlap = collisionRadiusFromCenter + check.collisionRadiusFromCenter - entityDistance;
                       // push both away
                       if (entityOverlap > 0) {
+                        // TODO move collision handling out of here as it will alter the velocity
                         handleCollision(entity, addEntity, check);
                       }
                     }
@@ -2217,13 +2230,24 @@ window.onload = async () => {
     //
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
-    gl.uniform1i(uMaterialTexture, TEXTURE_SKYBOX);
-    gl.uniform1i(uMaterialAtlas, TEXTURE_EMPTY_MAP_MIPMAP);
+    gl.uniform1i(uMaterialTexture, TEXTURE_EMPTY_MATERIAL_MIPMAP);
+    gl.uniform1i(uMaterialAtlas, TEXTURE_SKYBOX_ATLAS_MIPMAP);
+    //gl.uniform1i(uMaterialAtlas, TEXTURE_WORLD_MAP_MIPMAP);
     gl.uniform3f(uAtlasTextureIndexAndMaterialTextureScaleAndDepth, 0, 1, 0);
     gl.uniform4fv(uMaterialColors, [
       // sky
-      ...SKY, 0,
-      1, 0, 0, 0,
+      ...SKY_LOW, 0,
+      ...SKY_LOW, 0,
+      ...SKY_HIGH, 0,
+      ...SKY_HIGH, 0,
+      1, 1, 1, 0,
+      1, 1, 1, 0,
+      // 1, 0, 0, 0,
+      // 1, 0, 0, 0,
+      // 0, 1, 0, 0,
+      // 0, 1, 0, 0,
+      // 0, 0, 1, 0,
+      // 0, 0, 1, 0,
     ]);
 
     gl.bindVertexArray(skyCylinderModel.vao);

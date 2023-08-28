@@ -64,7 +64,7 @@ function handleCollision(
       if (check && check.health) {
         check.health--;
         check.animations = [...(check.animations || []), createAttributeAnimation(
-          99 + 99 * Math.random(),
+          200 + 99 * Math.random(),
           'animationTransform',
           EASING_BOUNCE,
           createEntityMatrixUpdate(p => matrix4Multiply(

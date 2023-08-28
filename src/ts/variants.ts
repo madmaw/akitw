@@ -34,8 +34,8 @@ const TERRAIN_COLORS: readonly number[] = [
 
 const VARIANTS: Record<VariantId, Variant> = {
   [VARIANT_NULL]: {
-    atlasTextureId: TEXTURE_EMPTY_MAP_MIPMAP,
-    materialTextureId: TEXTURE_EMPTY_ARRAY,
+    atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
+    materialTextureId: TEXTURE_EMPTY_MATERIAL,
     materialTextureColors: [
       // red
       1, 0, 0, 1,
@@ -49,15 +49,15 @@ const VARIANTS: Record<VariantId, Variant> = {
     ],
   },
   [VARIANT_TERRAIN]: {
-    atlasTextureId: TEXTURE_WORLD_MAP_MIPMAP,
-    materialTextureId: TEXTURE_TERRAIN,
+    atlasTextureId: TEXTURE_WORLD_ATLAS_MIPMAP,
+    materialTextureId: TEXTURE_TERRAIN_MATERIAL,
     materialTextureScale: WORLD_DIMENSION,
     materialTextureColors: TERRAIN_COLORS,
     materialDepth: MATERIAL_TERRAIN_DEPTH_RANGE,
   },
   [VARIANT_SYMBOLS]: {
-    atlasTextureId: TEXTURE_SYMBOL_MAP_MIPMAP,
-    materialTextureId: TEXTURE_EMPTY_ARRAY,
+    atlasTextureId: TEXTURE_SYMBOL_ATLAS_MIPMAP,
+    materialTextureId: TEXTURE_EMPTY_MATERIAL,
     materialTextureColors: [
       // red
       1, 0, 0, .7,
@@ -71,8 +71,8 @@ const VARIANTS: Record<VariantId, Variant> = {
     ],
   },
   [VARIANT_SYMBOLS_BRIGHT]: {
-    atlasTextureId: TEXTURE_SYMBOL_BRIGHT_MAP_MIPMAP,
-    materialTextureId: TEXTURE_EMPTY_ARRAY,
+    atlasTextureId: TEXTURE_SYMBOL_BRIGHT_ATLAS_MIPMAP,
+    materialTextureId: TEXTURE_EMPTY_MATERIAL,
     materialTextureColors: [
       // red
       1, 0, 0, 0,
