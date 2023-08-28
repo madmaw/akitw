@@ -1271,13 +1271,15 @@ window.onload = async () => {
   });
 
   const { 
+    id,
     bounds,
     center,
-    minimalInternalRadius
+    minimalInternalRadius,
   } = cubeBigModel;
   // add in a "player"
-  const player: DynamicEntity = {
-    entityType: ENTITY_TYPE_DRAGON,
+  const player: ActiveEntity = {
+    modelId: id,
+    entityType: ENTITY_TYPE_ACTIVE,
     resolutions: [0],
     bounds,
     xRotation: 0,
@@ -1294,6 +1296,7 @@ window.onload = async () => {
     ],
     renderGroupId: nextRenderGroupId++,
     velocity: [0, 0, 0],
+    maximumLateralVelocity: .01,
     gravity: DEFAULT_GRAVITY,
     collisionGroup: COLLISION_GROUP_PLAYER,
     collisionMask: COLLISION_GROUP_TERRAIN | COLLISION_GROUP_ENEMY | COLLISION_GROUP_ITEMS,
@@ -1495,7 +1498,7 @@ window.onload = async () => {
   window.onwheel = (e: WheelEvent) => {
     const v = e.deltaY/999;
     // TODO 
-    if (Math.abs(cameraZoom) < 1) {
+    if (Math.abs(cameraZoom) < 1 || true) {
       cameraZoom -= v;
     } else {
       if (v < 0 && cameraZoom > 0 || v > 0 && cameraZoom < 0) {
@@ -1505,22 +1508,23 @@ window.onload = async () => {
       }  
     }
   };
-  const inputs: Partial<Record<KeyCode, number>>= {};
   window.onkeydown = (e: KeyboardEvent) => {
-    inputs[e.keyCode] = 1;
+    setKeyState(e.keyCode as KeyCode, 1);
   };
   window.onkeyup = (e: KeyboardEvent) => {
-    inputs[e.keyCode] = 0;
+    setKeyState(e.keyCode as KeyCode, 0);
   };
 
   const lastFrameTimes: number[] = [];
   let then = 0;
+  let time = 99;
   function animate(now: number) {
     const delta = now - then;
     then = now;
-    const cappedDelta = 16;
-
-    //const cappedDelta = Math.min(delta, 40);
+    //const cappedDelta = 16;
+    const cappedDelta = Math.min(delta, 40);
+    time += cappedDelta;
+    
     if (FLAG_SHOW_FPS) {
       lastFrameTimes.push(delta);
       const recentFrameTimes = lastFrameTimes.slice(-30);
@@ -1532,19 +1536,7 @@ window.onload = async () => {
       }  
     }
 
-    const targetUnrotatedLateralVelocity = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [keyCode, vector]) => {
-      const multiplier = inputs[keyCode] || 0;
-      return vectorNScaleThenAdd(velocity, vector, .001 * multiplier);
-    }, [0, 0]);
     const playerZRotation = matrix4Rotate(player.zRotation, 0, 0, 1);
-    const targetLateralVelocity = vector3TransformMatrix4(
-      playerZRotation,
-      ...vectorNScale(targetUnrotatedLateralVelocity, (inputs[INPUT_RUN] || 0)*5 + 1),
-      0,
-    );
-    player.velocity[0] = targetLateralVelocity[0];
-    player.velocity[1] = targetLateralVelocity[1];     
-    player.velocity[2] = inputs[INPUT_JUMP] ? .001 : player.velocity[2];
 
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
@@ -1593,6 +1585,7 @@ window.onload = async () => {
         if (!handledEntities[entityId]) {
           handledEntities[entityId] = 1;
           const {
+            entityType,
             bounds,
             renderGroupId: renderId,
             renderTile,
@@ -1601,7 +1594,60 @@ window.onload = async () => {
           } = entity;
 
           if (!face && entity.inverseMass) {
-  
+
+            if (entityType == ENTITY_TYPE_ACTIVE) {
+              // do AI stuff
+              if (entity == player) {
+                const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(([input]) => someInputUnread(input) || readInput(input));
+                const targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [input, vector]) => {
+                  const multiplier = (readInput(input) * (readInput(INPUT_RUN)*2 + 1))/3;
+                  return vectorNScaleThenAdd(
+                    velocity,
+                    vector,
+                    cappedDelta * entity.maximumLateralVelocity * multiplier,
+                  );
+                }, [0, 0]);
+                const targetLateralOffset = vector3TransformMatrix4(
+                  playerZRotation,
+                  ...targetUnrotatedLateralOffset,
+                  0,
+                );
+                entity.inverseFriction = someLateralInputsWereUnreadOrNonZero ? 1 : 0;
+                entity.targetLateralPosition = vectorNScaleThenAdd(entity.position, targetLateralOffset);
+                if (entity.lastOnGroundTime + 99 > time) {
+                  if (readInput(INPUT_JUMP)) {
+                    entity.velocity = vectorNScaleThenAdd(
+                      entity.velocity,
+                      entity.lastOnGroundNormal,
+                      .003,
+                    );
+                    entity.lastOnGroundTime = 0;
+                  }
+                }
+              }
+              if (entity.lastOnGroundTime + 99 > time) {
+                const targetLateralPosition = entity.targetLateralPosition || entity.position;
+                const targetLateralDelta = vectorNScaleThenAdd(
+                  targetLateralPosition,
+                  entity.position,
+                  -1,
+                ).slice(0, 2) as Vector2;
+                const length = vectorNLength(targetLateralDelta);
+                const angle = length > EPSILON
+                  ? Math.atan2(targetLateralDelta[1], targetLateralDelta[0])
+                  : 0;
+                const velocity = Math.min(
+                  entity.maximumLateralVelocity,
+                  length/cappedDelta,
+                )
+                entity.velocity[0] = Math.cos(angle) * velocity;
+                entity.velocity[1] = Math.sin(angle) * velocity;  
+              } else {
+                // TODO flying/falling
+
+              }
+            }
+            
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
             entity.logs = entity.logs?.slice(-30) || [];
             removeEntity(entity);
@@ -1623,6 +1669,7 @@ window.onload = async () => {
                 restitution = 0,
                 collisionMask,
               } = entity as DynamicEntity;
+
               const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
               const offsetTargetPosition = vectorNScaleThenAdd(targetPosition, centerOffset);
 
@@ -1900,7 +1947,7 @@ window.onload = async () => {
                   ]);
                   // console.log('  velocity b', vectorNLength(velocity), velocity);
                 }
-                const inverseFriction = 1;
+                
 
                 entity.position = vectorNScaleThenAdd(
                   entity.position,
@@ -1908,6 +1955,7 @@ window.onload = async () => {
                   boundedCollisionTime,
                 );
 
+                const inverseFriction = (entity as DynamicEntity).inverseFriction || 0;
 
                 const cosa = vectorNDotProduct(minCollisionNormal, NORMAL_Z);
                 const a = Math.acos(cosa);
@@ -1949,6 +1997,8 @@ window.onload = async () => {
                   ]);
                 }
 
+                (entity as DynamicEntity).lastOnGroundNormal = minCollisionNormal;
+                (entity as DynamicEntity).lastOnGroundTime = time;
                 handleCollision(entity, addEntity, minCollisionEntity);
                 
                 remainingCollisionTime -= boundedCollisionTime;
@@ -2062,8 +2112,8 @@ window.onload = async () => {
               const rotation = zRotation || xRotation
                 ? matrix4Multiply(
                   entity.animationTransform,
+                  matrix4Rotate(-zRotation || 0, 0, 0, 1),
                   matrix4Rotate(xRotation || 0, 1, 0, 0),
-                  matrix4Rotate(zRotation || 0, 0, 0, 1),
                 )
                 : entity.animationTransform || matrix4Identity();
               modelRenders.push([

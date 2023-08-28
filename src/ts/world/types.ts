@@ -1,11 +1,11 @@
-const ENTITY_TYPE_DRAGON = 1;
+const ENTITY_TYPE_ACTIVE = 1;
 const ENTITY_TYPE_SCENERY = 2;
 const ENTITY_TYPE_FIREBALL = 3;
 const ENTITY_TYPE_PARTICLE = 4;
 const ENTITY_TYPE_TERRAIN = 5;
 const ENTITY_TYPE_EXPLOSION = 6;
 
-type EntityTypeDragon = typeof ENTITY_TYPE_DRAGON;
+type EntityTypeDragon = typeof ENTITY_TYPE_ACTIVE;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
 type EntityTypeFireball = typeof ENTITY_TYPE_FIREBALL;
 type EntityTypeParticle = typeof ENTITY_TYPE_PARTICLE;
@@ -48,7 +48,7 @@ type Tile = {
 
 type RenderGroupId = number;
 type EntityId = number;
-type Entity = StaticEntity | DynamicEntity;
+type Entity = StaticEntity | DynamicEntity | ActiveEntity;
 
 type ModelId = number;
 
@@ -109,19 +109,33 @@ type StaticEntity = {
   zRotation?: undefined,
 } & BaseEntity;
 
-type DynamicEntity = {
-  readonly entityType:
-    | EntityTypeDragon
-    | EntityTypeFireball
-    | EntityTypeParticle
-    | EntityTypeScenery
-    | EntityTypeExplosion,
+type BaseDynamicEntity = {
   readonly face?: undefined,
   velocity: Vector3,
   xRotation?: number,
   zRotation?: number,
   readonly restitution?: number,
+  inverseFriction?: number,
   readonly gravity?: number,
   readonly renderTile?: undefined,
   readonly inverseMass?: number,
-} & BaseEntity;
+  // the time the dynamic entity last made contact with the ground
+  lastOnGroundTime?: number,
+  // the angle at which we last made contact with the ground
+  lastOnGroundNormal?: Vector3,
+} & BaseEntity
+
+type DynamicEntity = {
+  readonly entityType:
+  | EntityTypeFireball
+  | EntityTypeParticle
+  | EntityTypeScenery
+  | EntityTypeExplosion,
+} & BaseDynamicEntity;
+
+type ActiveEntity = {
+  readonly entityType: 
+    | EntityTypeDragon,
+  targetLateralPosition?: Vector2 | Vector3;
+  maximumLateralVelocity: number,
+} & BaseDynamicEntity;

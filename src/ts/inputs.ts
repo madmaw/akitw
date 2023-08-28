@@ -74,3 +74,27 @@ const CARDINAL_INPUT_VECTORS: readonly [Input, ReadonlyVector2][] = [
   [INPUT_UP, [0, 1]],
   [INPUT_DOWN, [0, -1]],
 ];
+
+type InputValue = {
+  read?: Booleanish,
+  value: number,
+};
+const keyStates: Partial<Record<KeyCode, InputValue>> = {};
+
+function readInput(input: Input): number {
+  const value = keyStates[input] || { value: 0 };
+  keyStates[input] = value;
+  value.read = 1;
+  return value.value;
+}
+
+function setKeyState(keyCode: KeyCode, value: number) {
+  keyStates[keyCode] = {
+    value,
+  };
+}
+
+function someInputUnread(input: Input) {
+  return !keyStates[input]?.read;
+}
+
