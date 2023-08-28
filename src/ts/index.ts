@@ -769,7 +769,7 @@ window.onload = async () => {
               vector3CrossProduct(NORMAL_Z, planeNormal),
             ),
           )
-          : matrix4Identity();
+          : MATRIX4_IDENTITY;
         return transform;
         //return matrix4Identity();
       });
@@ -2111,7 +2111,7 @@ window.onload = async () => {
           }
 
           // update any animations
-          entity.animationTransform = matrix4Identity();
+          entity.animationTransform = MATRIX4_IDENTITY;
           entity.animations = entity.animations?.filter(a => !a(entity, delta));
 
           if (entity.dead) {
@@ -2143,7 +2143,7 @@ window.onload = async () => {
                   matrix4Rotate(zRotation || 0, 0, 0, 1),
                   matrix4Rotate(xRotation || 0, 1, 0, 0),
                 )
-                : entity.animationTransform || matrix4Identity();
+                : entity.animationTransform || MATRIX4_IDENTITY;
               modelRenders.push([
                 entity.position,
                 // TODO allow undefined/Falesy
@@ -2233,7 +2233,7 @@ window.onload = async () => {
       matrix4Translate(...(player.position.slice(0, 2) as Vector2), 0) as any,
     );
     //gl.uniformMatrix4fv(uWorldPositionMatrix, false, matrix4Translate(WORLD_DIMENSION/2, 0, 0) as any);
-    gl.uniformMatrix4fv(uWorldRotationMatrix, false, matrix4Identity() as any);
+    gl.uniformMatrix4fv(uWorldRotationMatrix, false, MATRIX4_IDENTITY as any);
     gl.drawElements(gl.TRIANGLES, skyCylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
 
     gl.enable(gl.DEPTH_TEST);

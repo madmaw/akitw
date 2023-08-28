@@ -19,10 +19,6 @@ const MATRIX4_IDENTITY: ReadonlyMatrix4 = [
   0, 0, 0, 1
 ];
 
-const matrix4Identity = (): ReadonlyMatrix4 => {
-  return [...MATRIX4_IDENTITY];
-}
-
 const matrix4Invert = (a: ReadonlyMatrix4): ReadonlyMatrix4 => {
 
   // TODO there's got to be a couple of loops that can achieve this effectively (and smaller)
@@ -76,7 +72,7 @@ const matrix4Multiply = (baseMatrix: ReadonlyMatrix4 | Falsey, ...matrices: read
         }
         return a;
       },
-      baseMatrix || matrix4Identity(),
+      baseMatrix || MATRIX4_IDENTITY,
   );
 }
 
