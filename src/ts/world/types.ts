@@ -138,4 +138,5 @@ type ActiveEntity = {
     | EntityTypeDragon,
   targetLateralPosition?: Vector2 | Vector3;
   maximumLateralVelocity: number,
+  maximumLateralAcceleration: number,
 } & BaseDynamicEntity;

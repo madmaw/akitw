@@ -25,12 +25,12 @@ function handleCollision(
     entity.velocity = entity.velocity && vectorNScaleThenAdd(
       entity.velocity,
       entityDelta,
-      -entityOverlap*inverseMass/divisor
+      entityOverlap*inverseMass/divisor
     );
     check.velocity = check.velocity && vectorNScaleThenAdd(
       check.velocity,
       entityDelta,
-      entityOverlap*check.inverseMass/divisor,
+      -entityOverlap*check.inverseMass/divisor,
     );
   }
 

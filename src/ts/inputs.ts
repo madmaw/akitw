@@ -68,10 +68,10 @@ type Input =
     | typeof INPUT_JUMP
     ;
 
-const CARDINAL_INPUT_VECTORS: readonly [Input, ReadonlyVector2][] = [
+const CARDINAL_INPUT_VECTORS: readonly [Input, ReadonlyVector2, number?][] = [
   [INPUT_LEFT, [-1, 0]],
   [INPUT_RIGHT, [1, 0]],
-  [INPUT_UP, [0, 1]],
+  [INPUT_UP, [0, 1], 1],
   [INPUT_DOWN, [0, -1]],
 ];
 

@@ -579,7 +579,7 @@ window.onload = async () => {
   );
   
   let previousPosition: ReadonlyVector2 | undefined;
-  let cameraZoom = 0;
+  let cameraZoom = -2;
 
   const onResize = () => {
     Z.width = Z.clientWidth;
@@ -1297,10 +1297,12 @@ window.onload = async () => {
     renderGroupId: nextRenderGroupId++,
     velocity: [0, 0, 0],
     maximumLateralVelocity: .01,
+    maximumLateralAcceleration: .00002,
     gravity: DEFAULT_GRAVITY,
     collisionGroup: COLLISION_GROUP_PLAYER,
     collisionMask: COLLISION_GROUP_TERRAIN | COLLISION_GROUP_ENEMY | COLLISION_GROUP_ITEMS,
     inverseMass: 1,
+    //inverseFriction: 1,
   };
   addEntity(player);
 
@@ -1314,10 +1316,10 @@ window.onload = async () => {
       if (rotation > EPSILON) {
         player.zRotation -= delta[0]/399;
         player.xRotation = Math.max(
-          -Math.PI/6,
+          -Math.PI/2,
           Math.min(
-            Math.PI/2,
-            player.xRotation + delta[1]/199,
+            Math.PI/6,
+            player.xRotation - delta[1]/199,
           ),
         );
       }
@@ -1334,7 +1336,7 @@ window.onload = async () => {
 
     const playerTransform = matrix4Multiply(
       matrix4Rotate(player.zRotation, 0, 0, 1),
-      matrix4Rotate(-player.xRotation, 1, 0, 0),
+      matrix4Rotate(player.xRotation + Math.PI/20, 1, 0, 0),
     );
     const velocity: Vector3 = vectorNScaleThenAdd(
       player.velocity,
@@ -1597,10 +1599,12 @@ window.onload = async () => {
 
             if (entityType == ENTITY_TYPE_ACTIVE) {
               // do AI stuff
+              const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
+              const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
               if (entity == player) {
                 const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(([input]) => someInputUnread(input) || readInput(input));
-                const targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [input, vector]) => {
-                  const multiplier = (readInput(input) * (readInput(INPUT_RUN)*2 + 1))/3;
+                const targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [input, vector, runMultiplier = 0]) => {
+                  const multiplier = (readInput(input) * (readInput(INPUT_RUN) * 2 * runMultiplier + 1))/3;
                   return vectorNScaleThenAdd(
                     velocity,
                     vector,
@@ -1612,7 +1616,10 @@ window.onload = async () => {
                   ...targetUnrotatedLateralOffset,
                   0,
                 );
-                entity.inverseFriction = someLateralInputsWereUnreadOrNonZero ? 1 : 0;
+                // set the friction so we don't slip around when not moving
+                entity.inverseFriction = someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > EPSILON
+                  ? 1
+                  : 0;
                 entity.targetLateralPosition = vectorNScaleThenAdd(entity.position, targetLateralOffset);
                 if (entity.lastOnGroundTime + 99 > time) {
                   if (readInput(INPUT_JUMP)) {
@@ -1636,12 +1643,33 @@ window.onload = async () => {
                 const angle = length > EPSILON
                   ? Math.atan2(targetLateralDelta[1], targetLateralDelta[0])
                   : 0;
-                const velocity = Math.min(
+                const totalTargetVelocity = Math.min(
                   entity.maximumLateralVelocity,
                   length/cappedDelta,
-                )
-                entity.velocity[0] = Math.cos(angle) * velocity;
-                entity.velocity[1] = Math.sin(angle) * velocity;  
+                );
+                const targetVelocity = [
+                  Math.cos(angle) * totalTargetVelocity,
+                  Math.sin(angle) * totalTargetVelocity,
+                ];
+                const deltaVelocity = vectorNScaleThenAdd(
+                  targetVelocity,
+                  entityLateralVelocity,
+                  -1,
+                );
+                const totalDeltaVelocity = vectorNLength(deltaVelocity);
+                // apply maximum acceleration to delta
+                entity.velocity = [
+                  ...vectorNScaleThenAdd(
+                    entityLateralVelocity,
+                    deltaVelocity,
+                    Math.min(
+                      1,
+                      entity.maximumLateralAcceleration * cappedDelta / totalDeltaVelocity,
+                    ),
+                  ),
+                  entity.velocity[2],
+                ];
+                
               } else {
                 // TODO flying/falling
 
@@ -2112,7 +2140,7 @@ window.onload = async () => {
               const rotation = zRotation || xRotation
                 ? matrix4Multiply(
                   entity.animationTransform,
-                  matrix4Rotate(-zRotation || 0, 0, 0, 1),
+                  matrix4Rotate(zRotation || 0, 0, 0, 1),
                   matrix4Rotate(xRotation || 0, 1, 0, 0),
                 )
                 : entity.animationTransform || matrix4Identity();
@@ -2136,12 +2164,12 @@ window.onload = async () => {
     // render
     //
 
-    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadiusFromCenter]);
+    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadiusFromCenter * 3]);
     const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
     const cameraPositionAndRotationMatrix = matrix4Multiply(
       cameraPositionMatrix,
       playerZRotation,
-      matrix4Rotate(-player.xRotation, 1, 0, 0),
+      matrix4Rotate(player.xRotation, 1, 0, 0),
       matrix4Translate(0, cameraZoom, 0),
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
