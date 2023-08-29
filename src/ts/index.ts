@@ -287,6 +287,28 @@ window.onload = async () => {
     toPlane(0, -1, 0, .4, defaultPlaneMetadata),
   ];
 
+  const dragonBody: ConvexShape<PlaneMetadata> = [
+    // upper back
+    toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
+    // side back
+    toPlane(1, -.2, 1, .25, defaultPlaneMetadata),
+    toPlane(-1, -.2, 1, .25, defaultPlaneMetadata),
+    // undercarridge
+    toPlane(0, -.3, -1, 0, defaultPlaneMetadata),
+    // chest (below)
+    toPlane(0, 0, -1, 0, defaultPlaneMetadata),
+    // check (forward)
+    toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+    // right side
+    toPlane(1, -.1, -.1, .1, defaultPlaneMetadata),
+    // left side
+    toPlane(-1, -.1, -.1, .1, defaultPlaneMetadata),
+    // front
+    toPlane(0, 1, 0, .2, defaultPlaneMetadata),
+    // rear
+    toPlane(0, -1, 0, .2, defaultPlaneMetadata),    
+  ]
+
 
   // const shapes: readonly Shape[] = ([
   //   [shape5, [shape6]],
@@ -580,6 +602,7 @@ window.onload = async () => {
   
   let previousPosition: ReadonlyVector2 | undefined;
   let cameraZoom = -2;
+  let cameraZRotation = 0;
 
   const onResize = () => {
     Z.width = Z.clientWidth;
@@ -894,22 +917,21 @@ window.onload = async () => {
         return NORMAL_X;
       },
     );
-    model.billboard = 1;
     return model;
   });
 
   const [
     skyCylinderModel,
-    treeDeciduousModel,
     cubeModel,
     cubeSmallModel,
     cubeBigModel,
+    dragonBodyModel,
   ] = ([
     skyCylinder,
-    treeDeciduous,
     [[cube, []]],
     [[cubeSmall, []]],
     [[cubeBig, []]],
+    [[dragonBody, []]],
   ] as Shape<PlaneMetadata>[][]).map((shapes) => {
     let modelShapeFaces = decompose(shapes);
     const modelPointCache: ReadonlyVector3[] = [];
@@ -935,7 +957,7 @@ window.onload = async () => {
     );
   });
   // material, 2d/1d texture, features 
-  const materials: [number, ...Material[][]][] = [
+  const proceduralMaterials: [number, ...Material[][]][] = [
     // TEXTURE_EMPTY_MAP
     [
       MATERIAL_TERRAIN_TEXTURE_DIMENSION,
@@ -1126,28 +1148,54 @@ window.onload = async () => {
       ],
     ],
   ];
-  let textureId = gl.TEXTURE0;
 
   // make some textures
-  materials.forEach(([dimension, ...frames]) => {
-    const materialCanvas = document.createElement('canvas');
-    document.body.appendChild(materialCanvas);
-    materialCanvas.width = dimension;
-    materialCanvas.height = dimension * frames.length; 
-    const ctx = materialCanvas.getContext(
-      '2d',
-      FLAG_FAST_READ_CANVASES
-        ? {
-          willReadFrequently: true,
-        }
-        : undefined
-    );
-    frames.forEach((frame, i) => {
-      frame.forEach(material => {
-        material(ctx, i * dimension);
-      });
-    });
+  
+  const materialCanvases = await Promise.all(
+    proceduralMaterials.map<Promise<[TexImageSource, number?, number?]>>(
+      ([dimension, ...frames]) => {
+        const materialCanvas = document.createElement('canvas');
+        //document.body.appendChild(materialCanvas);
+        materialCanvas.width = dimension;
+        materialCanvas.height = dimension * frames.length; 
+        const ctx = materialCanvas.getContext(
+          '2d',
+          FLAG_FAST_READ_CANVASES
+            ? {
+              willReadFrequently: true,
+            }
+            : undefined
+        );
+        frames.forEach((frame, i) => {
+          frame.forEach(material => {
+            material(ctx, i * dimension);
+          });
+        });
+        return Promise.resolve([materialCanvas, dimension, frames.length]);
+      }).concat([
+        SVG_DRAGON_BODY_ATLAS,
+      ].map(svg => {
+        const image = new Image(MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+        let blob = new Blob(
+          [
+            `<svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="-1 -1 99 99">${svg}</svg>`
+          ],
+          {type: 'image/svg+xml'},
+        );
+        let url = URL.createObjectURL(blob);
+        image.src = url;
 
+        return new Promise(resolve => {
+          image.onload = () => resolve([image]);
+        });
+      }),
+    ),
+  );
+  let textureId = gl.TEXTURE0;
+
+  materialCanvases.forEach(([materialCanvas, dimension = MATERIAL_TERRAIN_TEXTURE_DIMENSION, frames = 1]) => {
     // need mipmap and non-mipmap versions of some textures (so we do all textures)
     new Array(2).fill(0).forEach((_, i) => {
       gl.activeTexture(textureId++);
@@ -1159,7 +1207,7 @@ window.onload = async () => {
         gl.RGBA,
         dimension,
         dimension, 
-        frames.length,
+        frames,
         0,
         gl.RGBA,
         gl.UNSIGNED_BYTE,
@@ -1287,7 +1335,7 @@ window.onload = async () => {
     bounds,
     center,
     minimalInternalRadius,
-  } = cubeBigModel;
+  } = dragonBodyModel;
   // add in a "player"
   const player: ActiveEntity = {
     modelId: id,
@@ -1314,6 +1362,7 @@ window.onload = async () => {
     collisionGroup: COLLISION_GROUP_PLAYER,
     collisionMask: COLLISION_GROUP_TERRAIN | COLLISION_GROUP_ENEMY | COLLISION_GROUP_ITEMS,
     inverseMass: 1,
+    modelVariant: VARIANT_DRAGON_BODY,
     //inverseFriction: 1,
   };
   addEntity(player);
@@ -1326,7 +1375,7 @@ window.onload = async () => {
       const delta = vectorNScaleThenAdd(currentPosition, previousPosition, -1);
       const rotation = vectorNLength(delta)/399;
       if (rotation > EPSILON) {
-        player.zRotation -= delta[0]/399;
+        cameraZRotation -= delta[0]/399;
         player.xRotation = Math.max(
           -Math.PI/2,
           Math.min(
@@ -1347,7 +1396,7 @@ window.onload = async () => {
     } = cubeModel;
 
     const playerTransform = matrix4Multiply(
-      matrix4Rotate(player.zRotation, 0, 0, 1),
+      matrix4Rotate(cameraZRotation, 0, 0, 1),
       matrix4Rotate(player.xRotation + Math.PI/20, 1, 0, 0),
     );
     const velocity: Vector3 = vectorNScaleThenAdd(
@@ -1550,7 +1599,7 @@ window.onload = async () => {
       }  
     }
 
-    const playerZRotation = matrix4Rotate(player.zRotation, 0, 0, 1);
+    const cameraZRotationMatrix = matrix4Rotate(cameraZRotation, 0, 0, 1);
 
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
@@ -1623,8 +1672,11 @@ window.onload = async () => {
                     cappedDelta * entity.maximumLateralVelocity * multiplier,
                   );
                 }, [0, 0]);
+                if (totalEntityLateralVelocity > EPSILON) {
+                  player.zRotation = cameraZRotation;
+                }
                 const targetLateralOffset = vector3TransformMatrix4(
-                  playerZRotation,
+                  cameraZRotationMatrix,
                   ...targetUnrotatedLateralOffset,
                   0,
                 );
@@ -2069,6 +2121,14 @@ window.onload = async () => {
                 handleCollision(entity, addEntity);
               }
               break;
+            case ENTITY_TYPE_SCENERY:
+            case ENTITY_TYPE_PARTICLE:
+              // rotate to look at camera (player, close enough)
+              entity.zRotation = Math.atan2(
+                player.position[1] - entity.position[1],
+                player.position[0] - entity.position[0],
+              );
+              break;
           }
 
           // NOTE that if health is undefined, this check fails
@@ -2155,6 +2215,7 @@ window.onload = async () => {
                   entity.animationTransform,
                   matrix4Rotate(zRotation || 0, 0, 0, 1),
                   matrix4Rotate(xRotation || 0, 1, 0, 0),
+                  entity.modelTransform,
                 )
                 : entity.animationTransform || MATRIX4_IDENTITY;
               modelRenders.push([
@@ -2181,7 +2242,7 @@ window.onload = async () => {
     const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
     const cameraPositionAndRotationMatrix = matrix4Multiply(
       cameraPositionMatrix,
-      playerZRotation,
+      cameraZRotationMatrix,
       matrix4Rotate(player.xRotation, 1, 0, 0),
       matrix4Translate(0, cameraZoom, 0),
     );
@@ -2195,6 +2256,7 @@ window.onload = async () => {
     );
 
     const cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, cameraPosition);
@@ -2281,15 +2343,9 @@ window.onload = async () => {
 
       for (let modelId in variantRenders) {
         const modelRenders = variantRenders[modelId as any as ModelId];
-        const { vao, indexCount, billboard } = models[modelId];
+        const { vao, indexCount } = models[modelId];
         gl.bindVertexArray(vao);
-        modelRenders.forEach(([position, rotation, resolution, atlasIndex]) => {
-          const maybeBillboardRotation = billboard
-            ? matrix4Multiply(
-              matrix4Rotate(Math.atan2(cameraPosition[1] - position[1], cameraPosition[0] - position[0]), 0, 0, 1),
-              rotation,
-            )
-            : rotation;
+        modelRenders.forEach(([position, rotationMatrix, resolution, atlasIndex]) => {
           const positionMatrix = matrix4Translate(...position);
           gl.uniform1i(uMaterialTexture, materialTextureId + (resolution < 2 && materialDepth ? 0 : 1) );
           // TODO can we move (some of) this out of the loop?
@@ -2301,7 +2357,7 @@ window.onload = async () => {
           );
 
           gl.uniformMatrix4fv(uWorldPositionMatrix, false, positionMatrix);
-          gl.uniformMatrix4fv(uWorldRotationMatrix, false, maybeBillboardRotation as any);
+          gl.uniformMatrix4fv(uWorldRotationMatrix, false, rotationMatrix as any);
           gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
         });
       }

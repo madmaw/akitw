@@ -10,5 +10,4 @@ type Model = {
   //groupPointCache: ReadonlyVector3[],
   readonly indexCount: number,
   readonly vao: WebGLVertexArrayObject,
-  billboard?: Booleanish,
 };
