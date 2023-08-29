@@ -57,9 +57,7 @@ type EntityAnimation = (e: Entity, delta: number) => Booleanish;
 
 type BaseEntity = {
   readonly renderGroupId: RenderGroupId,
-  // TODO make optional so, if it's 0 we can just use the position directly
-  readonly centerOffset: ReadonlyVector3,
-  readonly collisionRadiusFromCenter: number,
+  readonly collisionRadius: number,
   readonly id: EntityId,
   // all the resolutions that this entity renders in
   readonly resolutions: number[];

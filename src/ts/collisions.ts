@@ -6,20 +6,19 @@ function handleCollision(
   const {
     position,
     inverseMass = 0,
-    collisionRadiusFromCenter,
-    centerOffset,
+    collisionRadius: collisionRadiusFromCenter,
     bounds,
     face,
   } = entity;
   
   if (check && !face && !check.face && (inverseMass || check.inverseMass)) {
     const entityDelta = vectorNScaleThenAdd(
-      vectorNScaleThenAdd(position, centerOffset),
-      vectorNScaleThenAdd(check.position, check.centerOffset),
+      position,
+      check.position,
       -1
     );
     const entityDistance = vectorNLength(entityDelta);
-    const entityOverlap = collisionRadiusFromCenter + check.collisionRadiusFromCenter - entityDistance;
+    const entityOverlap = collisionRadiusFromCenter + check.collisionRadius - entityDistance;
 
     const divisor = 999*(inverseMass + (check.inverseMass || 0));
     entity.velocity = entity.velocity && vectorNScaleThenAdd(
@@ -39,9 +38,8 @@ function handleCollision(
       entity.dead = 1;
       addEntity({
         bounds,
-        centerOffset,
         collisionGroup: COLLISION_GROUP_PLAYER,
-        collisionRadiusFromCenter,
+        collisionRadius: collisionRadiusFromCenter,
         entityType: ENTITY_TYPE_EXPLOSION,
         id: nextEntityId++,
         position: entity.position,
@@ -68,10 +66,10 @@ function handleCollision(
           'animationTransform',
           EASING_BOUNCE,
           createEntityMatrixUpdate(p => matrix4Multiply(
-            matrix4Translate(0, 0, -check.collisionRadiusFromCenter),
+            matrix4Translate(0, 0, -check.collisionRadius),
             //matrix4Rotate(-Math.PI*p/4, 0, 1, 0),
             matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random())),
-            matrix4Translate(0, 0, check.collisionRadiusFromCenter),
+            matrix4Translate(0, 0, check.collisionRadius),
           )),
         )];
       }

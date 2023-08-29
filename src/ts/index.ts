@@ -435,13 +435,13 @@ window.onload = async () => {
       const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
       const [px, py] = position;
       for (
-        let x = Math.max(0, (px + minx)/divisor | 0);
-        x <= Math.min(resolutionDimension - 1, (px + maxx)/divisor);
+        let x = Math.max(0, (px + minx - EPSILON)/divisor | 0);
+        x <= Math.min(resolutionDimension - 1, (px + maxx + EPSILON)/divisor);
         x++
       ) {
         for (
-          let y = Math.max(0, (py + miny)/divisor | 0);
-          y <= Math.min(resolutionDimension - 1, (py + maxy)/divisor);
+          let y = Math.max(0, (py + miny - EPSILON)/divisor | 0);
+          y <= Math.min(resolutionDimension - 1, (py + maxy + EPSILON)/divisor);
           y++
         ) {
           const tile = populate
@@ -525,7 +525,6 @@ window.onload = async () => {
         faces,
         bounds,
         maximalExternalRadius,
-        center,
         id: modelId,
       } = appendModel(
         groundFaces,
@@ -544,6 +543,7 @@ window.onload = async () => {
         (_, modelPoint) => {
           return terrainNormal(vectorNScale(modelPoint, 1/WORLD_DIMENSION));
         },
+        VECTOR3_EMPTY,
       );
       const renderGroupId = nextRenderGroupId++;
       faces.forEach(face => {
@@ -553,10 +553,6 @@ window.onload = async () => {
         // for terrain tiles, at least for x/y axis
         const worldToPlaneCoordinates = matrix4Invert(face.toModelCoordinates);
         const rotateToPlaneCoordinates = matrix4Invert(face.rotateToModelCoordinates);
-        const expandedBounds: ReadonlyRect3 = [
-          vectorNScaleThenAdd(bounds[0], new Array(3).fill(EPSILON), -1),
-          vectorNScaleThenAdd(bounds[1], new Array(3).fill(EPSILON)),
-        ];
             
         const entity: StaticEntity = {
           entityType: ENTITY_TYPE_TERRAIN,
@@ -564,9 +560,8 @@ window.onload = async () => {
           position: [0, 0, 0],
           worldToPlaneCoordinates,
           rotateToPlaneCoordinates,
-          bounds: expandedBounds,
-          collisionRadiusFromCenter: maximalExternalRadius,
-          centerOffset: center,
+          bounds,
+          collisionRadius: maximalExternalRadius,
           face,
           id,
           renderGroupId,
@@ -688,6 +683,7 @@ window.onload = async () => {
     faces: readonly Face<PlaneMetadata>[],
     toModelPoint: (v: ReadonlyVector3, transform: ReadonlyMatrix4) => ReadonlyVector3,
     toSurfaceNormal: (face: Face<PlaneMetadata>, point: ReadonlyVector3) => ReadonlyVector3,
+    explicitCenter?: ReadonlyVector3,
   ): Model & { id: number } {
     const groupPointsToFaces = new Map<ReadonlyVector3, Set<Face<PlaneMetadata>>>();
 
@@ -712,7 +708,7 @@ window.onload = async () => {
       }
     ).flat(2);
 
-    const bounds = allPoints.reduce<[ReadonlyVector3, ReadonlyVector3]>(
+    const unadjustedBounds = allPoints.reduce<[ReadonlyVector3, ReadonlyVector3]>(
       ([min, max], point) => {
         return [
           point.map((v, i) => Math.min(v, min[i])) as Vector3,
@@ -722,9 +718,14 @@ window.onload = async () => {
       [allPoints[0], allPoints[0]],
     );
 
-    const [min, max] = bounds;
-    const center = vectorNScale(vectorNScaleThenAdd(min, max), .5);
-    const minimalInternalRadius = Math.max(...vectorNScaleThenAdd(max, center, -1));
+    const [unadjustedMin, unadjustedMax] = unadjustedBounds;
+    const center = explicitCenter || vectorNScale(vectorNScaleThenAdd(unadjustedMin, unadjustedMax), .5);
+    const bounds: ReadonlyRect3 = [
+      vectorNScaleThenAdd(unadjustedMin, center, -1),
+      vectorNScaleThenAdd(unadjustedMax, center, -1),
+    ];
+
+    const minimalInternalRadius = Math.max(...vectorNScaleThenAdd(unadjustedMax, unadjustedMin, -1))/2;
     const maximalExternalRadius = Math.max(...allPoints.map(
       p => vectorNLength(vectorNScaleThenAdd(p, center, -1)))
     );
@@ -1238,7 +1239,6 @@ window.onload = async () => {
       id,
       faces,
       bounds,
-      center,
       maximalExternalRadius,
     } = cubeBigModel;
     const renderGroupId = nextRenderGroupId++;
@@ -1260,8 +1260,7 @@ window.onload = async () => {
         id: nextEntityId++,
         bounds,
         renderGroupId,
-        collisionRadiusFromCenter: maximalExternalRadius,
-        centerOffset: center,
+        collisionRadius: maximalExternalRadius,
         modelId: id,
         rotateToPlaneCoordinates,
         worldToPlaneCoordinates,
@@ -1298,16 +1297,15 @@ window.onload = async () => {
       );
       const {
         id,
-        center,
         minimalInternalRadius,
         bounds,
       } = treeBillboards[billboardIndex];
   
       const renderGroupId = nextRenderGroupId++;
-      const position: Vector3 = vectorNScaleThenAdd(
-        center,
-      [...vectorNScale(scaledCoordinates, WORLD_DIMENSION), z + minimalInternalRadius*.8],
-      ) as Vector3;
+      const position: Vector3 = [
+        ...vectorNScale(scaledCoordinates, WORLD_DIMENSION),
+        z + minimalInternalRadius*.8,
+      ] as Vector3;
   
       const entity: DynamicEntity = {
         entityType: ENTITY_TYPE_SCENERY,
@@ -1317,8 +1315,7 @@ window.onload = async () => {
         bounds,
         renderGroupId,
         gravity: 0,
-        collisionRadiusFromCenter: minimalInternalRadius,
-        centerOffset: center,
+        collisionRadius: minimalInternalRadius,
         modelId: id,
         modelVariant: VARIANT_SYMBOLS,
         modelAtlasIndex: atlasIndex,
@@ -1332,27 +1329,25 @@ window.onload = async () => {
 
   const { 
     id,
-    bounds,
-    center,
     minimalInternalRadius,
+    maximalExternalRadius,
   } = dragonBodyModel;
   // add in a "player"
   const player: ActiveEntity = {
     modelId: id,
     entityType: ENTITY_TYPE_ACTIVE,
     resolutions: [0],
-    bounds,
+    bounds: rect3FromRadius(minimalInternalRadius),
     xRotation: 0,
     zRotation: 0,
     // collision radius must fit within the bounds, so the model render radius will almost certainly
     // be larger than that
-    collisionRadiusFromCenter: minimalInternalRadius,
-    centerOffset: center,
+    collisionRadius: minimalInternalRadius,
     id: nextEntityId++,
     position: [
       WORLD_DIMENSION*.5,
       WORLD_DIMENSION*.1,
-      terrain(.5, .1) + minimalInternalRadius,
+      terrain(.5, .1) + maximalExternalRadius,
     ],
     renderGroupId: nextRenderGroupId++,
     velocity: [0, 0, 0],
@@ -1390,8 +1385,6 @@ window.onload = async () => {
   window.onclick = (e: MouseEvent) => {
     const {
       id,
-      bounds,
-      center,
       minimalInternalRadius,
     } = cubeModel;
 
@@ -1411,12 +1404,11 @@ window.onload = async () => {
     const ball: DynamicEntity = {
       entityType: ENTITY_TYPE_FIREBALL,
       resolutions: [0, 1],
-      bounds,
+      bounds: rect3FromRadius(minimalInternalRadius),
       id: nextEntityId++,
-      collisionRadiusFromCenter: minimalInternalRadius,
+      collisionRadius: minimalInternalRadius,
       collisionGroup: COLLISION_GROUP_PLAYER,
       collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_TERRAIN,
-      centerOffset: center,
       position: player.position,
       velocity,
       renderGroupId: nextRenderGroupId++,
@@ -1672,7 +1664,7 @@ window.onload = async () => {
                     cappedDelta * entity.maximumLateralVelocity * multiplier,
                   );
                 }, [0, 0]);
-                if (totalEntityLateralVelocity > EPSILON) {
+                if (someLateralInputsWereUnreadOrNonZero) {
                   player.zRotation = cameraZRotation;
                 }
                 const targetLateralOffset = vector3TransformMatrix4(
@@ -1756,18 +1748,16 @@ window.onload = async () => {
               const {
                 position,
                 velocity,
-                centerOffset,
-                collisionRadiusFromCenter,
+                collisionRadius: collisionRadiusFromCenter,
                 restitution = 0,
                 collisionMask,
               } = entity as DynamicEntity;
 
               const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
-              const offsetTargetPosition = vectorNScaleThenAdd(targetPosition, centerOffset);
 
               const targetUnionBounds: ReadonlyRect3 = [
-                velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime) as Vector3,
-                velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime) as Vector3,
+                velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime - EPSILON) as Vector3,
+                velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime + EPSILON) as Vector3,
               ];
               const targetEntity = {
                 position: targetPosition,
@@ -1986,12 +1976,12 @@ window.onload = async () => {
                       // update any dynamic-dynamic collision behaviours
 
                       const entityDelta = vectorNScaleThenAdd(
-                        offsetTargetPosition,
-                        vectorNScaleThenAdd(check.position, check.centerOffset),
+                        targetPosition,
+                        check.position,
                         -1
                       );
                       const entityDistance = vectorNLength(entityDelta);
-                      const entityOverlap = collisionRadiusFromCenter + check.collisionRadiusFromCenter - entityDistance;
+                      const entityOverlap = collisionRadiusFromCenter + check.collisionRadius - entityDistance;
                       // push both away
                       if (entityOverlap > 0) {
                         // TODO move collision handling out of here as it will alter the velocity
@@ -2138,8 +2128,6 @@ window.onload = async () => {
               entity.health--;
             }
             const {
-              bounds,
-              center,
               minimalInternalRadius,
               id: modelId,
             } = billboardSmallModel;
@@ -2148,16 +2136,15 @@ window.onload = async () => {
               modelVariant: VARIANT_SYMBOLS_BRIGHT,
               modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
               //modelAtlasIndex: 7,
-              bounds,
-              centerOffset: center,
+              bounds: rect3FromRadius(minimalInternalRadius),
               collisionGroup: COLLISION_GROUP_NONE,
-              collisionRadiusFromCenter: minimalInternalRadius,
+              collisionRadius: minimalInternalRadius,
               entityType: ENTITY_TYPE_PARTICLE,
               id: nextEntityId++,
               position: vectorNScaleThenAdd(
-                vectorNScaleThenAdd(entity.position, entity.centerOffset),
+                entity.position,
                 new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
-                entity.collisionRadiusFromCenter,
+                entity.collisionRadius,
               ),
               velocity: [0, 0, 0],
               renderGroupId: nextRenderGroupId++,
@@ -2238,7 +2225,7 @@ window.onload = async () => {
     // render
     //
 
-    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadiusFromCenter * 3]);
+    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius * 3]);
     const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
     const cameraPositionAndRotationMatrix = matrix4Multiply(
       cameraPositionMatrix,
@@ -2343,10 +2330,15 @@ window.onload = async () => {
 
       for (let modelId in variantRenders) {
         const modelRenders = variantRenders[modelId as any as ModelId];
-        const { vao, indexCount } = models[modelId];
+        const {
+          vao,
+          indexCount,
+          center,
+        } = models[modelId];
         gl.bindVertexArray(vao);
         modelRenders.forEach(([position, rotationMatrix, resolution, atlasIndex]) => {
-          const positionMatrix = matrix4Translate(...position);
+          const offsetPosition = vectorNScaleThenAdd(position, center);
+          const positionMatrix = matrix4Translate(...offsetPosition);
           gl.uniform1i(uMaterialTexture, materialTextureId + (resolution < 2 && materialDepth ? 0 : 1) );
           // TODO can we move (some of) this out of the loop?
           gl.uniform3f(
