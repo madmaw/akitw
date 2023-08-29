@@ -37,3 +37,17 @@ function planeToTransforms(
   );
   return [translate, rotate];
 }
+
+function transformPlane<T>(
+  [normal, offset, t]: Plane<T>,
+  transform: ReadonlyMatrix4,
+): Plane<T> {
+  const origin = vector3TransformMatrix4(transform, 0, 0, 0);
+  const transformedNormal = vector3TransformMatrix4(transform, ...normal);
+  const transformedOffest = vector3TransformMatrix4(transform, ...offset);
+  return [
+    vectorNNormalize(vectorNScaleThenAdd(transformedNormal, origin, -1)),
+    transformedOffest,
+    t,
+  ];
+}

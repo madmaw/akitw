@@ -290,12 +290,15 @@ window.onload = async () => {
   const dragonBody: ConvexShape<PlaneMetadata> = [
     // upper back
     toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
-    // side back
+    // side back right
     toPlane(1, -.2, 1, .25, defaultPlaneMetadata),
+    // side back left
     toPlane(-1, -.2, 1, .25, defaultPlaneMetadata),
     // undercarridge
-    toPlane(0, -.3, -1, 0, defaultPlaneMetadata),
+    toPlane(-1, -.3, -1, 0, defaultPlaneMetadata),
+    toPlane(1, -.3, -1, 0, defaultPlaneMetadata),
     // chest (below)
+    toPlane(0, -.5, -1, 0, defaultPlaneMetadata),
     toPlane(0, 0, -1, 0, defaultPlaneMetadata),
     // check (forward)
     toPlane(0, 1, -1, .1, defaultPlaneMetadata),
@@ -303,12 +306,74 @@ window.onload = async () => {
     toPlane(1, -.1, -.1, .1, defaultPlaneMetadata),
     // left side
     toPlane(-1, -.1, -.1, .1, defaultPlaneMetadata),
+    // front (left)
+    toPlane(-1, 1, 1, .3, defaultPlaneMetadata),
+    toPlane(-1, 1, -1, .1, defaultPlaneMetadata),
+    // front (right)
+    toPlane(1, 1, 1, .3, defaultPlaneMetadata),
+    toPlane(1, 1, -1, .1, defaultPlaneMetadata),
     // front
-    toPlane(0, 1, 0, .2, defaultPlaneMetadata),
+    toPlane(0, 1, 0, .25, defaultPlaneMetadata),
     // rear
-    toPlane(0, -1, 0, .2, defaultPlaneMetadata),    
+    toPlane(0, -1, 0, .1, defaultPlaneMetadata),    
   ]
 
+  const dragonNeckMatrix = matrix4Multiply(
+    matrix4Translate(0, .3, .3),
+    matrix4Rotate(Math.PI/6, 1, 0, 0),
+  );
+  const dragonNeck: ConvexShape<PlaneMetadata> = transformConvexShape(
+    [
+      // top
+      toPlane(0, .2, 1, .07, defaultPlaneMetadata),
+      // top left
+      toPlane(-1, .3, 1, .07, defaultPlaneMetadata),
+      // top right
+      toPlane(1, .3, 1, .07, defaultPlaneMetadata),
+      // bottom
+      toPlane(0, .2, -1, .07, defaultPlaneMetadata),
+      // bottom left
+      toPlane(-1, .3, -1, .07, defaultPlaneMetadata),
+      // bottom right
+      toPlane(1, .3, -1, .07, defaultPlaneMetadata),      
+      // right
+      toPlane(1, .2, 0, .07, defaultPlaneMetadata),
+      // left
+      toPlane(-1, .2, 0, .07, defaultPlaneMetadata),
+      // front
+      toPlane(0, 1, 1, .1, defaultPlaneMetadata),
+      toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+      // rear
+      toPlane(0, -1, 0, .15, defaultPlaneMetadata),
+    ],
+    dragonNeckMatrix,
+  );
+
+  const dragonHead: ConvexShape<PlaneMetadata> = transformConvexShape(
+    [
+      // top
+      toPlane(0, .3, 1, .05, defaultPlaneMetadata),
+      // bottom
+      toPlane(0, .2, -1, 0, defaultPlaneMetadata),
+      // right
+      toPlane(1, .3, .3, .04, defaultPlaneMetadata),
+      // left
+      toPlane(-1, .3, .3, .04, defaultPlaneMetadata),
+      // rear top
+      toPlane(0, -.6, 1, .15, defaultPlaneMetadata),
+      // rear back
+      toPlane(0, -1, 0, .25, defaultPlaneMetadata),
+      // rear right
+      toPlane(1, -.5, .2, .15, defaultPlaneMetadata),
+      // read left
+      toPlane(-1, -.5, .2, .15, defaultPlaneMetadata),
+    ],
+    matrix4Multiply(
+      dragonNeckMatrix,
+      matrix4Translate(0, .25, -.15),
+      matrix4Rotate(-Math.PI/4, 1, 0, 0),
+    ),
+  );
 
   // const shapes: readonly Shape[] = ([
   //   [shape5, [shape6]],
@@ -932,7 +997,11 @@ window.onload = async () => {
     [[cube, []]],
     [[cubeSmall, []]],
     [[cubeBig, []]],
-    [[dragonBody, []]],
+    [
+      [dragonBody, []],
+      [dragonNeck, []],
+      [dragonHead, []]
+    ],
   ] as Shape<PlaneMetadata>[][]).map((shapes) => {
     let modelShapeFaces = decompose(shapes);
     const modelPointCache: ReadonlyVector3[] = [];
@@ -951,8 +1020,7 @@ window.onload = async () => {
         return modelPoint;
       }, 
       face => {
-        // TODO smooth some models/planes
-        // I have no idea what I meant here ^
+        // TODO put in facility to smooth some models
         return vector3TransformMatrix4(face.rotateToModelCoordinates, 0, 0, 1);
       },
     );
@@ -1409,7 +1477,7 @@ window.onload = async () => {
       collisionRadius: minimalInternalRadius,
       collisionGroup: COLLISION_GROUP_PLAYER,
       collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_TERRAIN,
-      position: player.position,
+      position: vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius+.3]),
       velocity,
       renderGroupId: nextRenderGroupId++,
       inverseMass: 9,

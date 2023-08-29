@@ -35,3 +35,11 @@ function convexShapeExpand<T>(shape: ConvexShape<T>, amount: number): ConvexShap
   });
 }
 
+function transformConvexShape<T>(
+  shape: ConvexShape<T>,
+  transform: ReadonlyMatrix4,
+): ConvexShape<T> {
+  return shape.map(plane => {
+    return transformPlane(plane, transform);
+  });
+}
