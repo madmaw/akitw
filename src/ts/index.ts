@@ -60,7 +60,7 @@ const VERTEX_SHADER = `#version 300 es
   }
 `;
 
-const STEP = .002;
+const STEP = .01;
 //const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
 //const MATERIAL_DEPTH_SCALE = (256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE)).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
@@ -1032,14 +1032,14 @@ window.onload = async () => {
         flatMaterial,
         featureMaterial(
           staticFeature,
-          4,
-          99999,
+          8,
+          9999,
           randomDistributionFactory(0, 1),
         ),  
         featureMaterial(
           riverStonesFeatureFactory(.6),
-          16,
-          9999,
+          48,
+          999,
           randomDistributionFactory(2, 2),
         ),  
       ],
@@ -1048,8 +1048,8 @@ window.onload = async () => {
         flatMaterial,
         featureMaterial(
           spikeFeatureFactory(4, 4),
-          8,
-          99999,
+          24,
+          9999,
           randomDistributionFactory(
             2,
             2,
@@ -1061,15 +1061,15 @@ window.onload = async () => {
         flatMaterial,
         featureMaterial(
           staticFeature,
-          8,
+          16,
           9999,
           randomDistributionFactory(3, 2),
         ),  
         featureMaterial(
           riverStonesFeatureFactory(1),
-          20,
-          9999,
-          clusteredDistributionFactory(12, 12, 2, 2, .7, 3),
+          32,
+          4999,
+          clusteredDistributionFactory(16, 16, 2, 2, .7, 3),
         ),  
       ],
     ],
