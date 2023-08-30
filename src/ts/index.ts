@@ -827,7 +827,7 @@ window.onload = async () => {
       bounds,
       faces,
       center,
-      minimalInternalRadius,
+      maximalInternalRadius: minimalInternalRadius,
       maximalExternalRadius,
       groupPointsToFaces,
       indexCount: indices.length,
@@ -892,14 +892,14 @@ window.onload = async () => {
   const [
     skyCylinderModel,
     cubeModel,
-    dragonBodyModel,
     billboardModel,
+    dragonBodyModel,
   ] = ([
-    skyCylinderFaces,
-    cubeFaces,
-    dragonFaces,
-    billboardFaces,
-  ]).map((faces) => {
+    SKY_CYLINDER_FACES,
+    CUBE_FACES_BODY,
+    BILLBOARD_FACES,
+    DRAGON_FACES,
+  ]).map<Model>((faces) => {
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
       faces,
@@ -1201,7 +1201,6 @@ window.onload = async () => {
   // add in the cube
   new Array(2).fill(0).forEach((_, i) => {
     const {
-      id: modelId,
       faces,
       bounds,
       maximalExternalRadius,
@@ -1226,9 +1225,7 @@ window.onload = async () => {
         bounds,
         renderGroupId,
         collisionRadius: maximalExternalRadius,
-        body: {
-          modelId,
-        },
+        body: CUBE_PART,
         rotateToPlaneCoordinates,
         worldToPlaneCoordinates,
         collisionGroup: COLLISION_GROUP_TERRAIN,
@@ -1258,8 +1255,7 @@ window.onload = async () => {
       
       const adjustedScale = Math.pow((terrainNormalZ - .9) * 9, 2) * scale;
       const {
-        id: modelId,
-        minimalInternalRadius,
+        maximalInternalRadius: minimalInternalRadius,
         bounds,
       } = billboardModel;
 
@@ -1272,7 +1268,7 @@ window.onload = async () => {
         z + collisionRadius*.8,
       ] as Vector3;
   
-      const entity: DynamicEntity = {
+      const entity: DynamicEntity<BillboardPartIds> = {
         entityType: ENTITY_TYPE_SCENERY,
         resolutions: new Array(adjustedScale * 4 + 3 + 2 * Math.random() | 0).fill(0).map((_, i) => i),
         position,
@@ -1282,7 +1278,7 @@ window.onload = async () => {
         gravity: 0,
         collisionRadius: collisionRadius,
         body: {
-          modelId,
+          ...BILLBOARD_PART,
           preRotationTransform: matrix4Scale(modelScale),
         },
         modelVariant: VARIANT_SYMBOLS,
@@ -1296,20 +1292,14 @@ window.onload = async () => {
   });
 
   const { 
-    id: modelId,
-    minimalInternalRadius,
+    maximalInternalRadius: minimalInternalRadius,
     maximalExternalRadius,
-    center,
   } = dragonBodyModel;
   // add in a "player"
   const player: ActiveEntity = {
     entityType: ENTITY_TYPE_ACTIVE,
     resolutions: [0],
-    body: {
-      id: MODEL_DRAGON_BODY,
-      modelId,
-      preRotationOffset: center,
-    },
+    body: DRAGON_PART,
     bounds: rect3FromRadius(minimalInternalRadius),
     xRotation: 0,
     zRotation: 0,
@@ -1356,10 +1346,6 @@ window.onload = async () => {
     }
   };
   window.onclick = (e: MouseEvent) => {
-    const {
-      id,
-      minimalInternalRadius,
-    } = cubeModel;
 
     const playerTransform = matrix4Multiply(
       matrix4Rotate(cameraZRotation, 0, 0, 1),
@@ -1373,13 +1359,15 @@ window.onload = async () => {
       ),
     );
 
+    const collisionRadius = .1;
+
     // fire a ball 
     const ball: DynamicEntity = {
       entityType: ENTITY_TYPE_FIREBALL,
       resolutions: [0, 1],
-      bounds: rect3FromRadius(minimalInternalRadius),
+      bounds: rect3FromRadius(collisionRadius),
       id: nextEntityId++,
-      collisionRadius: minimalInternalRadius,
+      collisionRadius,
       collisionGroup: COLLISION_GROUP_PLAYER,
       collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_TERRAIN,
       position: vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius+.3]),
@@ -1388,7 +1376,7 @@ window.onload = async () => {
       inverseMass: 9,
       transient: 1,
       //gravity: DEFAULT_GRAVITY,
-      fire: minimalInternalRadius * 2,
+      fire: collisionRadius * 2,
     };
 
     addEntity(ball);
@@ -2100,20 +2088,18 @@ window.onload = async () => {
             if (entity.health) {
               entity.health--;
             }
-            const {
-              minimalInternalRadius,
-              id: modelId,
-            } = billboardModel;
+            const radius = .1;
             addEntity({
               body: {
-                modelId,
+                ...BILLBOARD_PART,
+                preRotationTransform: matrix4Scale(radius*2),
               },
               modelVariant: VARIANT_SYMBOLS_BRIGHT,
               modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
               //modelAtlasIndex: 7,
-              bounds: rect3FromRadius(minimalInternalRadius),
+              bounds: rect3FromRadius(radius),
               collisionGroup: COLLISION_GROUP_NONE,
-              collisionRadius: minimalInternalRadius,
+              collisionRadius: radius,
               entityType: ENTITY_TYPE_PARTICLE,
               id: nextEntityId++,
               position: vectorNScaleThenAdd(

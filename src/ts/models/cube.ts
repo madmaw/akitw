@@ -1,12 +1,12 @@
-/// <reference path="./models.ts"/>
+/// <reference path="./types.ts"/>
 
-const MODEL_CUBE_BODY = 0;
+const CUBE_PART_ID_BODY = 0;
 
 type CubePartId = 
-  | typeof MODEL_CUBE_BODY
+  | typeof CUBE_PART_ID_BODY
   ;
 
-const cubeShapes: ConvexShape<PlaneMetadata> = [
+const CUBE_SHAPES_BODY: ConvexShape<PlaneMetadata> = [
   toPlane(0, 0, 1, .2, defaultPlaneMetadata),
   toPlane(0, 0, -1, .2, defaultPlaneMetadata),
   toPlane(1, 0, 0, .2, defaultPlaneMetadata),
@@ -15,4 +15,8 @@ const cubeShapes: ConvexShape<PlaneMetadata> = [
   toPlane(0, -1, 0, .2, defaultPlaneMetadata),
 ];
 
-const cubeFaces = decompose([[cubeShapes, []]]);
+const CUBE_FACES_BODY = decompose([[CUBE_SHAPES_BODY, []]]);
+
+const CUBE_PART: BodyPart<CubePartId> = {
+  modelId: MODEL_ID_CUBE,
+};

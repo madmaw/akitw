@@ -50,8 +50,6 @@ type RenderGroupId = number;
 type EntityId = number;
 type Entity = StaticEntity | DynamicEntity | ActiveEntity;
 
-type ModelId = number;
-
 // return true when done
 type EntityAnimation = (e: Entity, delta: number) => Booleanish;
 
@@ -60,6 +58,7 @@ type BodyPart<PartId extends number = number> = {
   readonly id?: PartId
   readonly preRotationTransform?: ReadonlyMatrix4,
   readonly preRotationOffset?: ReadonlyVector3,
+  readonly children?: readonly BodyPart<PartId>[],
 };
 
 type BaseEntity<PartId extends number = number> = {

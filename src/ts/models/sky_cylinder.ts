@@ -1,3 +1,4 @@
+/// <reference path="./types.ts"/>
 
 const skyCylinderRadius = HORIZON*.6;
 const skyCylinderBody = createCylinder(
@@ -6,8 +7,8 @@ const skyCylinderBody = createCylinder(
   12,
 );
 
-const skyCylinderShapes: Shape<PlaneMetadata>[] = [
+const SHAPES_SKY_CYLINDER: Shape<PlaneMetadata>[] = [
   [skyCylinderBody, []],
 ];
 
-const skyCylinderFaces = decompose(skyCylinderShapes);
+const SKY_CYLINDER_FACES = decompose(SHAPES_SKY_CYLINDER);

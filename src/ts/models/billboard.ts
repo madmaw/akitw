@@ -1,12 +1,14 @@
-const MODEL_BILLBOARD_BODY = 0;
+/// <reference path="./types.ts"/>
+
+const BILLBOARD_PART_ID_BODY = 0;
 
 type BillboardPartIds = 
-  | typeof MODEL_BILLBOARD_BODY
+  | typeof BILLBOARD_PART_ID_BODY
   ;
 
-const rotateToModelCoordinates = matrix4Rotate(-Math.PI/2, 0, 1, 0);
-const billboardFaces: Face<PlaneMetadata>[] = [{
-  rotateToModelCoordinates,
+const BILLBOARD_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(-Math.PI/2, 0, 1, 0);
+const BILLBOARD_FACES: Face<PlaneMetadata>[] = [{
+  rotateToModelCoordinates: BILLBOARD_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: matrix4Rotate(-Math.PI/2, 0, 1, 0),
   polygons: [
     [
@@ -28,3 +30,8 @@ const billboardFaces: Face<PlaneMetadata>[] = [{
     ),
   }
 }];
+
+const BILLBOARD_PART: BodyPart<BillboardPartIds> = {
+  modelId: MODEL_ID_BILLBOARD,
+  id: BILLBOARD_PART_ID_BODY,
+};
