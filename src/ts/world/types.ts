@@ -55,6 +55,12 @@ type ModelId = number;
 // return true when done
 type EntityAnimation = (e: Entity, delta: number) => Booleanish;
 
+type BodyPart<PartId extends number> = {
+  readonly modelId?: ModelId,
+  readonly id: PartId,
+  readonly preRotationTransform?: Matrix4,
+};
+
 type BaseEntity = {
   readonly renderGroupId: RenderGroupId,
   readonly collisionRadius: number,

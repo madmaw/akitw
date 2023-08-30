@@ -1,4 +1,4 @@
-const U_WORLD_POSITION_MATRIX = 'uWorldPosition';
+const U_WORLD_POSITION = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
 const U_PROJECTION_MATRIX = 'uProjection';
 const U_CAMERA_POSITION = 'uCameraPosition';
@@ -33,7 +33,7 @@ const VERTEX_SHADER = `#version 300 es
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
   in mat4 ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX};
 
-  uniform mat4 ${U_WORLD_POSITION_MATRIX};
+  uniform vec4 ${U_WORLD_POSITION};
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform mat4 ${U_PROJECTION_MATRIX};
   
@@ -47,8 +47,8 @@ const VERTEX_SHADER = `#version 300 es
 
   void main(void) {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
-    ${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} = ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX} * inverse(${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX});
-    ${V_WORLD_POSITION} = ${U_WORLD_POSITION_MATRIX} * ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
+    ${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} = ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX} * inverse(${U_WORLD_ROTATION_MATRIX});
+    ${V_WORLD_POSITION} = ${U_WORLD_POSITION} + ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
     ${V_MODEL_ROTATION_MATRIX} = ${A_VERTEX_MODEL_ROTATION_MATRIX};
     ${V_WORLD_PLANE_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
     
@@ -81,6 +81,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
+  uniform vec4 ${U_WORLD_POSITION};
   uniform lowp sampler2DArray ${U_MATERIAL_ATLAS};
   uniform lowp sampler2DArray ${U_MATERIAL_TEXTURE};
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
@@ -88,7 +89,7 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
   uniform mat4 ${U_LASERS}[${MAX_LASERS}];
   uniform mat4 ${U_FIREBALLS}[${MAX_FIREBALLS}];
-  
+
   out vec4 ${O_COLOR};
 
   void main(void) {
@@ -104,7 +105,7 @@ const FRAGMENT_SHADER = `#version 300 es
     // TODO probably needs to be another matrix to do this
     vec4 materialness = texture(
       ${U_MATERIAL_ATLAS},
-      vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.x)
+      vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (${V_WORLD_POSITION} - ${U_WORLD_POSITION})).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.x)
     );
     if (materialness.w < .5) {
       discard;
@@ -141,7 +142,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
         vec4 tm1 = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
+          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (p - ${U_WORLD_POSITION})).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
         );
   
         float surfaceDepth = (tm1.z - .5) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
@@ -160,7 +161,7 @@ const FRAGMENT_SHADER = `#version 300 es
         }
         tm = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * p).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
+          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (p - ${U_WORLD_POSITION})).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
         );  
       }
 
@@ -175,16 +176,6 @@ const FRAGMENT_SHADER = `#version 300 es
         );
       }
     }
-    // maxPixel = texture(
-    //   ${U_MATERIAL_TEXTURE},
-    //   vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * ${V_WORLD_POSITION}).xy, 1)
-    // );
-    // maxColor = mix(
-    //   ${U_MATERIAL_COLORS}[2],
-    //   ${U_MATERIAL_COLORS}[3],
-    //   maxPixel.a * 2. - 1.
-    // );
-
 
     vec2 n = maxPixel.xy * 2. - 1.;
     vec3 m = normalize(
@@ -287,38 +278,45 @@ window.onload = async () => {
     toPlane(0, -1, 0, .4, defaultPlaneMetadata),
   ];
 
-  const dragonBody: ConvexShape<PlaneMetadata> = [
-    // upper back
-    toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
-    // side back right
-    toPlane(1, -.2, 1, .25, defaultPlaneMetadata),
-    // side back left
-    toPlane(-1, -.2, 1, .25, defaultPlaneMetadata),
-    // undercarridge
-    toPlane(-1, -.3, -1, 0, defaultPlaneMetadata),
-    toPlane(1, -.3, -1, 0, defaultPlaneMetadata),
-    // chest (below)
-    toPlane(0, -.5, -1, 0, defaultPlaneMetadata),
-    toPlane(0, 0, -1, 0, defaultPlaneMetadata),
-    // check (forward)
-    toPlane(0, 1, -1, .1, defaultPlaneMetadata),
-    // right side
-    toPlane(1, -.1, -.1, .1, defaultPlaneMetadata),
-    // left side
-    toPlane(-1, -.1, -.1, .1, defaultPlaneMetadata),
-    // front (left)
-    toPlane(-1, 1, 1, .3, defaultPlaneMetadata),
-    toPlane(-1, 1, -1, .1, defaultPlaneMetadata),
-    // front (right)
-    toPlane(1, 1, 1, .3, defaultPlaneMetadata),
-    toPlane(1, 1, -1, .1, defaultPlaneMetadata),
-    // front
-    toPlane(0, 1, 0, .25, defaultPlaneMetadata),
-    // rear
-    toPlane(0, -1, 0, .1, defaultPlaneMetadata),    
-  ]
+  const dragonBodyTransform = matrix4Translate(
+    0, 0, -.35,
+  );
+  const dragonBody: ConvexShape<PlaneMetadata> = transformConvexShape(
+    [
+      // upper back
+      toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
+      // side back right
+      toPlane(1, -.2, 1, .25, defaultPlaneMetadata),
+      // side back left
+      toPlane(-1, -.2, 1, .25, defaultPlaneMetadata),
+      // undercarridge
+      toPlane(-1, -.3, -1, 0, defaultPlaneMetadata),
+      toPlane(1, -.3, -1, 0, defaultPlaneMetadata),
+      // chest (below)
+      toPlane(0, -1, -1, 0, defaultPlaneMetadata),
+      toPlane(0, 0, -1, 0, defaultPlaneMetadata),
+      // chect (forward)
+      toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+      // right side
+      toPlane(1, -.1, -.1, .1, defaultPlaneMetadata),
+      // left side
+      toPlane(-1, -.1, -.1, .1, defaultPlaneMetadata),
+      // front (left)
+      toPlane(-1, 1, 1, .3, defaultPlaneMetadata),
+      toPlane(-1, 1, -1, .1, defaultPlaneMetadata),
+      // front (right)
+      toPlane(1, 1, 1, .3, defaultPlaneMetadata),
+      toPlane(1, 1, -1, .1, defaultPlaneMetadata),
+      // front
+      toPlane(0, 1, 0, .25, defaultPlaneMetadata),
+      // rear
+      toPlane(0, -1, -.1, .2, defaultPlaneMetadata),    
+    ],
+    dragonBodyTransform,
+  );
 
   const dragonNeckMatrix = matrix4Multiply(
+    dragonBodyTransform,
     matrix4Translate(0, .3, .3),
     matrix4Rotate(Math.PI/6, 1, 0, 0),
   );
@@ -355,6 +353,10 @@ window.onload = async () => {
       toPlane(0, .3, 1, .05, defaultPlaneMetadata),
       // bottom
       toPlane(0, .2, -1, 0, defaultPlaneMetadata),
+      // jaw
+      toPlane(.2, 0, -1, .02, defaultPlaneMetadata),
+      toPlane(-.2, 0, -1, .02, defaultPlaneMetadata),
+
       // right
       toPlane(1, .3, .3, .04, defaultPlaneMetadata),
       // left
@@ -374,6 +376,87 @@ window.onload = async () => {
       matrix4Rotate(-Math.PI/4, 1, 0, 0),
     ),
   );
+
+  const dragonTail: ConvexShape<PlaneMetadata> = transformConvexShape(
+    [
+      // top
+      toPlane(0, 0, 1, .05, defaultPlaneMetadata),
+      // top right
+      toPlane(-1, 0, 1, .055, defaultPlaneMetadata),
+      // top left
+      toPlane(1, 0, 1, .055, defaultPlaneMetadata),
+      // bottom
+      toPlane(0, -.2, -1, .05, defaultPlaneMetadata),
+      // right
+      toPlane(1, -.1, 0, .05, defaultPlaneMetadata),
+      // left
+      toPlane(-1, -.1, 0, .05, defaultPlaneMetadata),
+      // front
+      toPlane(0, 1, 0, .2, defaultPlaneMetadata),  
+    ],
+    matrix4Multiply(
+      dragonBodyTransform,
+      matrix4Translate(0, -.3, .23),
+    )
+  );
+
+  const dragonQuadMatrix = matrix4Multiply(
+    dragonBodyTransform,
+    matrix4Translate(.11, 0, .1),
+    matrix4Rotate(-Math.PI/6, 1, 0, 0),
+  );
+  const dragonQuadRight: ConvexShape<PlaneMetadata> = transformConvexShape(
+    [
+      // right
+      toPlane(1, 0, 0, .03, defaultPlaneMetadata),
+      // left
+      toPlane(-1, 0, 0, .03, defaultPlaneMetadata),
+      // front
+      toPlane(0, 1, 0, .1, defaultPlaneMetadata),
+      // front/top smoothing
+      toPlane(0, 1, 1, .1, defaultPlaneMetadata),
+      // front/bottom smoothing
+      toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+      // rear
+      toPlane(0, -1, 0, .1, defaultPlaneMetadata),
+      // rear/top smoothing
+      toPlane(0, -1, 1, .1, defaultPlaneMetadata),
+      // top
+      toPlane(0, 0, 1, .1, defaultPlaneMetadata),
+      // bottom
+      toPlane(0, 0, -1, .15, defaultPlaneMetadata),
+      // knee smoothing
+      toPlane(0, -1, -1, .15, defaultPlaneMetadata),
+      // outer knee smoothing
+      toPlane(3, 0, -1, .05, defaultPlaneMetadata),
+    ],
+    dragonQuadMatrix,
+  );
+
+  const dragonShinRight: ConvexShape<PlaneMetadata> = transformConvexShape(
+    [
+      // right
+      toPlane(1, 0, 0, 0, defaultPlaneMetadata),
+      // left
+      toPlane(-1, 0, 0, .03, defaultPlaneMetadata),
+      // front
+      toPlane(0, 1, 0, .03, defaultPlaneMetadata),
+      // rear
+      toPlane(0, -1, -.2, .04, defaultPlaneMetadata),
+      // knee
+      toPlane(0, 0, 1, 0, defaultPlaneMetadata),
+      // foot
+      toPlane(0, -1, -1, .15, defaultPlaneMetadata),
+    ],
+    matrix4Multiply(
+      dragonQuadMatrix,
+      matrix4Translate(0, -.05, -.11),
+      matrix4Rotate(Math.PI/3, 1, 0, 0),
+    )
+  );
+
+  const dragonQuadLeft = transformConvexShape(dragonQuadRight, matrix4Scale(-1, 1, 1));
+  const dragonShinLeft = transformConvexShape(dragonShinRight, matrix4Scale(-1, 1, 1));
 
   // const shapes: readonly Shape[] = ([
   //   [shape5, [shape6]],
@@ -716,7 +799,7 @@ window.onload = async () => {
     attribute => gl.getAttribLocation(program, attribute)
   );
   const [
-    uWorldPositionMatrix,
+    uWorldPosition,
     uWorldRotationMatrix,
     uProjectionMatrix,
     uCameraPosition,
@@ -728,7 +811,7 @@ window.onload = async () => {
     uLasers,
     uFireballs,
   ] = [
-    U_WORLD_POSITION_MATRIX,
+    U_WORLD_POSITION,
     U_WORLD_ROTATION_MATRIX,
     U_PROJECTION_MATRIX,
     U_CAMERA_POSITION,
@@ -1000,7 +1083,12 @@ window.onload = async () => {
     [
       [dragonBody, []],
       [dragonNeck, []],
-      [dragonHead, []]
+      [dragonHead, []],
+      [dragonTail, []],
+      [dragonQuadRight, []],
+      [dragonQuadLeft, []],
+      [dragonShinRight, []],
+      [dragonShinLeft, []],
     ],
   ] as Shape<PlaneMetadata>[][]).map((shapes) => {
     let modelShapeFaces = decompose(shapes);
@@ -2245,8 +2333,8 @@ window.onload = async () => {
           if (entity.dead) {
             removeEntity(entity);
           } else if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
-          // render
-          renderedEntities[renderId] = 1;
+            // render
+            renderedEntities[renderId] = 1;
             // TODO maybe we could make model id always non zero?
             if (modelId != null) {
               const { 
@@ -2293,7 +2381,7 @@ window.onload = async () => {
     // render
     //
 
-    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius * 3]);
+    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius]);
     const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
     const cameraPositionAndRotationMatrix = matrix4Multiply(
       cameraPositionMatrix,
@@ -2368,10 +2456,11 @@ window.onload = async () => {
     ]);
 
     gl.bindVertexArray(skyCylinderModel.vao);
-    gl.uniformMatrix4fv(
-      uWorldPositionMatrix,
-      false,
-      matrix4Translate(...(player.position.slice(0, 2) as Vector2), 0) as any,
+    gl.uniform4f(
+      uWorldPosition,
+      ...player.position.slice(0, 2) as Vector2,
+      0,
+      0,
     );
     //gl.uniformMatrix4fv(uWorldPositionMatrix, false, matrix4Translate(WORLD_DIMENSION/2, 0, 0) as any);
     gl.uniformMatrix4fv(uWorldRotationMatrix, false, MATRIX4_IDENTITY as any);
@@ -2405,8 +2494,10 @@ window.onload = async () => {
         } = models[modelId];
         gl.bindVertexArray(vao);
         modelRenders.forEach(([position, rotationMatrix, resolution, atlasIndex]) => {
-          const offsetPosition = vectorNScaleThenAdd(position, center);
-          const positionMatrix = matrix4Translate(...offsetPosition);
+          const offsetPosition = vectorNScaleThenAdd(
+            position,
+            vector3TransformMatrix4(rotationMatrix, ...center),
+          );
           gl.uniform1i(uMaterialTexture, materialTextureId + (resolution < 2 && materialDepth ? 0 : 1) );
           // TODO can we move (some of) this out of the loop?
           gl.uniform3f(
@@ -2416,7 +2507,7 @@ window.onload = async () => {
             materialDepth,
           );
 
-          gl.uniformMatrix4fv(uWorldPositionMatrix, false, positionMatrix);
+          gl.uniform4f(uWorldPosition, ...offsetPosition, 0);
           gl.uniformMatrix4fv(uWorldRotationMatrix, false, rotationMatrix as any);
           gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
         });
