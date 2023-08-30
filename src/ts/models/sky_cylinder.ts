@@ -6,6 +6,8 @@ const skyCylinderBody = createCylinder(
   12,
 );
 
-const skyCylinder: Shape<PlaneMetadata>[] = [
+const skyCylinderShapes: Shape<PlaneMetadata>[] = [
   [skyCylinderBody, []],
 ];
+
+const skyCylinderFaces = decompose(skyCylinderShapes);

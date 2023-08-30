@@ -248,8 +248,6 @@ const FRAGMENT_SHADER = `#version 300 es
 
 window.onload = async () => {
 
-  const defaultPlaneMetadata: PlaneMetadata = {}
-
   // cube
   const cube: ConvexShape<PlaneMetadata> = [
     toPlane(0, 0, 1, .2, defaultPlaneMetadata),
@@ -277,186 +275,6 @@ window.onload = async () => {
     toPlane(0, 1, 0, .4, defaultPlaneMetadata),
     toPlane(0, -1, 0, .4, defaultPlaneMetadata),
   ];
-
-  const dragonBodyTransform = matrix4Translate(
-    0, 0, -.35,
-  );
-  const dragonBody: ConvexShape<PlaneMetadata> = transformConvexShape(
-    [
-      // upper back
-      toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
-      // side back right
-      toPlane(1, -.2, 1, .25, defaultPlaneMetadata),
-      // side back left
-      toPlane(-1, -.2, 1, .25, defaultPlaneMetadata),
-      // undercarridge
-      toPlane(-1, -.3, -1, 0, defaultPlaneMetadata),
-      toPlane(1, -.3, -1, 0, defaultPlaneMetadata),
-      // chest (below)
-      toPlane(0, -1, -1, 0, defaultPlaneMetadata),
-      toPlane(0, 0, -1, 0, defaultPlaneMetadata),
-      // chect (forward)
-      toPlane(0, 1, -1, .1, defaultPlaneMetadata),
-      // right side
-      toPlane(1, -.1, -.1, .1, defaultPlaneMetadata),
-      // left side
-      toPlane(-1, -.1, -.1, .1, defaultPlaneMetadata),
-      // front (left)
-      toPlane(-1, 1, 1, .3, defaultPlaneMetadata),
-      toPlane(-1, 1, -1, .1, defaultPlaneMetadata),
-      // front (right)
-      toPlane(1, 1, 1, .3, defaultPlaneMetadata),
-      toPlane(1, 1, -1, .1, defaultPlaneMetadata),
-      // front
-      toPlane(0, 1, 0, .25, defaultPlaneMetadata),
-      // rear
-      toPlane(0, -1, -.1, .2, defaultPlaneMetadata),    
-    ],
-    dragonBodyTransform,
-  );
-
-  const dragonNeckMatrix = matrix4Multiply(
-    dragonBodyTransform,
-    matrix4Translate(0, .3, .3),
-    matrix4Rotate(Math.PI/6, 1, 0, 0),
-  );
-  const dragonNeck: ConvexShape<PlaneMetadata> = transformConvexShape(
-    [
-      // top
-      toPlane(0, .2, 1, .07, defaultPlaneMetadata),
-      // top left
-      toPlane(-1, .3, 1, .07, defaultPlaneMetadata),
-      // top right
-      toPlane(1, .3, 1, .07, defaultPlaneMetadata),
-      // bottom
-      toPlane(0, .2, -1, .07, defaultPlaneMetadata),
-      // bottom left
-      toPlane(-1, .3, -1, .07, defaultPlaneMetadata),
-      // bottom right
-      toPlane(1, .3, -1, .07, defaultPlaneMetadata),      
-      // right
-      toPlane(1, .2, 0, .07, defaultPlaneMetadata),
-      // left
-      toPlane(-1, .2, 0, .07, defaultPlaneMetadata),
-      // front
-      toPlane(0, 1, 1, .1, defaultPlaneMetadata),
-      toPlane(0, 1, -1, .1, defaultPlaneMetadata),
-      // rear
-      toPlane(0, -1, 0, .15, defaultPlaneMetadata),
-    ],
-    dragonNeckMatrix,
-  );
-
-  const dragonHead: ConvexShape<PlaneMetadata> = transformConvexShape(
-    [
-      // top
-      toPlane(0, .3, 1, .05, defaultPlaneMetadata),
-      // bottom
-      toPlane(0, .2, -1, 0, defaultPlaneMetadata),
-      // jaw
-      toPlane(.2, 0, -1, .02, defaultPlaneMetadata),
-      toPlane(-.2, 0, -1, .02, defaultPlaneMetadata),
-
-      // right
-      toPlane(1, .3, .3, .04, defaultPlaneMetadata),
-      // left
-      toPlane(-1, .3, .3, .04, defaultPlaneMetadata),
-      // rear top
-      toPlane(0, -.6, 1, .15, defaultPlaneMetadata),
-      // rear back
-      toPlane(0, -1, 0, .25, defaultPlaneMetadata),
-      // rear right
-      toPlane(1, -.5, .2, .15, defaultPlaneMetadata),
-      // read left
-      toPlane(-1, -.5, .2, .15, defaultPlaneMetadata),
-    ],
-    matrix4Multiply(
-      dragonNeckMatrix,
-      matrix4Translate(0, .25, -.15),
-      matrix4Rotate(-Math.PI/4, 1, 0, 0),
-    ),
-  );
-
-  const dragonTail: ConvexShape<PlaneMetadata> = transformConvexShape(
-    [
-      // top
-      toPlane(0, 0, 1, .05, defaultPlaneMetadata),
-      // top right
-      toPlane(-1, 0, 1, .055, defaultPlaneMetadata),
-      // top left
-      toPlane(1, 0, 1, .055, defaultPlaneMetadata),
-      // bottom
-      toPlane(0, -.2, -1, .05, defaultPlaneMetadata),
-      // right
-      toPlane(1, -.1, 0, .05, defaultPlaneMetadata),
-      // left
-      toPlane(-1, -.1, 0, .05, defaultPlaneMetadata),
-      // front
-      toPlane(0, 1, 0, .2, defaultPlaneMetadata),  
-    ],
-    matrix4Multiply(
-      dragonBodyTransform,
-      matrix4Translate(0, -.3, .23),
-    )
-  );
-
-  const dragonQuadMatrix = matrix4Multiply(
-    dragonBodyTransform,
-    matrix4Translate(.11, 0, .1),
-    matrix4Rotate(-Math.PI/6, 1, 0, 0),
-  );
-  const dragonQuadRight: ConvexShape<PlaneMetadata> = transformConvexShape(
-    [
-      // right
-      toPlane(1, 0, 0, .03, defaultPlaneMetadata),
-      // left
-      toPlane(-1, 0, 0, .03, defaultPlaneMetadata),
-      // front
-      toPlane(0, 1, 0, .1, defaultPlaneMetadata),
-      // front/top smoothing
-      toPlane(0, 1, 1, .1, defaultPlaneMetadata),
-      // front/bottom smoothing
-      toPlane(0, 1, -1, .1, defaultPlaneMetadata),
-      // rear
-      toPlane(0, -1, 0, .1, defaultPlaneMetadata),
-      // rear/top smoothing
-      toPlane(0, -1, 1, .1, defaultPlaneMetadata),
-      // top
-      toPlane(0, 0, 1, .1, defaultPlaneMetadata),
-      // bottom
-      toPlane(0, 0, -1, .15, defaultPlaneMetadata),
-      // knee smoothing
-      toPlane(0, -1, -1, .15, defaultPlaneMetadata),
-      // outer knee smoothing
-      toPlane(3, 0, -1, .05, defaultPlaneMetadata),
-    ],
-    dragonQuadMatrix,
-  );
-
-  const dragonShinRight: ConvexShape<PlaneMetadata> = transformConvexShape(
-    [
-      // right
-      toPlane(1, 0, 0, 0, defaultPlaneMetadata),
-      // left
-      toPlane(-1, 0, 0, .03, defaultPlaneMetadata),
-      // front
-      toPlane(0, 1, 0, .03, defaultPlaneMetadata),
-      // rear
-      toPlane(0, -1, -.2, .04, defaultPlaneMetadata),
-      // knee
-      toPlane(0, 0, 1, 0, defaultPlaneMetadata),
-      // foot
-      toPlane(0, -1, -1, .15, defaultPlaneMetadata),
-    ],
-    matrix4Multiply(
-      dragonQuadMatrix,
-      matrix4Translate(0, -.05, -.11),
-      matrix4Rotate(Math.PI/3, 1, 0, 0),
-    )
-  );
-
-  const dragonQuadLeft = transformConvexShape(dragonQuadRight, matrix4Scale(-1, 1, 1));
-  const dragonShinLeft = transformConvexShape(dragonShinRight, matrix4Scale(-1, 1, 1));
 
   // const shapes: readonly Shape[] = ([
   //   [shape5, [shape6]],
@@ -714,7 +532,9 @@ window.onload = async () => {
           id,
           renderGroupId,
           renderTile: tile,
-          modelId,
+          body: {
+            modelId,
+          },
           modelVariant: VARIANT_TERRAIN,
           collisionGroup: COLLISION_GROUP_TERRAIN,
         };
@@ -1018,87 +838,76 @@ window.onload = async () => {
     return model;
   }
 
-  const [
-    billboardSmallModel,
-    billboardMediumModel,
-    billboardLargeModel,
-    billboardHugeModel,
-  ] = [
-    .5,
-    1,
-    2,
-    4,
-  ].map(dimension => {
-    const rotateToModelCoordinates = matrix4Rotate(-Math.PI/2, 0, 1, 0);
-    const halfDimension = dimension/2;
-    const points: ReadonlyVector3[] = [
-      [-halfDimension, -halfDimension, 0],
-      [-halfDimension, halfDimension, 0],
-      [halfDimension, halfDimension, 0],
-      [halfDimension, -halfDimension, 0],
-    ];
-    const polygons: ReadonlyVector3[][] = [
-      points
-    ];
-    const face: Face<PlaneMetadata> = {
-      rotateToModelCoordinates,
-      toModelCoordinates: rotateToModelCoordinates,
-      polygons,
-      t: {
-        textureCoordinateTransform: matrix4Multiply(
-          matrix4Translate(.5, -.5, 0),
-          matrix4Rotate(-Math.PI/2, 0, 0, 1),
-          matrix4Scale(1/dimension),
-          matrix4Rotate(Math.PI/2, 0, 1, 0),
-        ),
-      }
-    };
-    const planeToModelCoordinates = new Map(
-      points.map(point => [point, vector3TransformMatrix4(rotateToModelCoordinates, ...point)]),
-    );
-    const model = appendModel(
-      [face], 
-      (point) => {
-        return planeToModelCoordinates.get(point);
-      },
-      () => {
-        // there's only one face
-        return NORMAL_X;
-      },
-    );
-    return model;
-  });
+  // const [
+  //   billboardSmallModel,
+  //   billboardMediumModel,
+  //   billboardLargeModel,
+  //   billboardHugeModel,
+  // ] = [
+  //   .5,
+  //   1,
+  //   2,
+  //   4,
+  // ].map(dimension => {
+  //   const rotateToModelCoordinates = matrix4Rotate(-Math.PI/2, 0, 1, 0);
+  //   const halfDimension = dimension/2;
+  //   const points: ReadonlyVector3[] = [
+  //     [-halfDimension, -halfDimension, 0],
+  //     [-halfDimension, halfDimension, 0],
+  //     [halfDimension, halfDimension, 0],
+  //     [halfDimension, -halfDimension, 0],
+  //   ];
+  //   const polygons: ReadonlyVector3[][] = [
+  //     points
+  //   ];
+  //   const face: Face<PlaneMetadata> = {
+  //     rotateToModelCoordinates,
+  //     toModelCoordinates: rotateToModelCoordinates,
+  //     polygons,
+  //     t: {
+  //       textureCoordinateTransform: matrix4Multiply(
+  //         matrix4Translate(.5, -.5, 0),
+  //         matrix4Rotate(-Math.PI/2, 0, 0, 1),
+  //         matrix4Scale(1/dimension),
+  //         matrix4Rotate(Math.PI/2, 0, 1, 0),
+  //       ),
+  //     }
+  //   };
+  //   const planeToModelCoordinates = new Map(
+  //     points.map(point => [point, vector3TransformMatrix4(rotateToModelCoordinates, ...point)]),
+  //   );
+  //   const model = appendModel(
+  //     [face], 
+  //     (point) => {
+  //       return planeToModelCoordinates.get(point);
+  //     },
+  //     () => {
+  //       // there's only one face
+  //       return NORMAL_X;
+  //     },
+  //   );
+  //   return model;
+  // });
 
   const [
     skyCylinderModel,
     cubeModel,
-    cubeSmallModel,
-    cubeBigModel,
     dragonBodyModel,
+    billboardModel,
   ] = ([
-    skyCylinder,
-    [[cube, []]],
-    [[cubeSmall, []]],
-    [[cubeBig, []]],
-    [
-      [dragonBody, []],
-      [dragonNeck, []],
-      [dragonHead, []],
-      [dragonTail, []],
-      [dragonQuadRight, []],
-      [dragonQuadLeft, []],
-      [dragonShinRight, []],
-      [dragonShinLeft, []],
-    ],
-  ] as Shape<PlaneMetadata>[][]).map((shapes) => {
-    let modelShapeFaces = decompose(shapes);
+    skyCylinderFaces,
+    cubeFaces,
+    dragonFaces,
+    billboardFaces,
+  ]).map((faces) => {
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
-      modelShapeFaces,
+      faces,
       (point, toModelCoordinates) => {
         const modelPoint = vector3TransformMatrix4(toModelCoordinates, ...point);
         const cachedModelPoint = modelPointCache.find(cachedPoint => {
           const d = vectorNLength(vectorNScaleThenAdd(cachedPoint, modelPoint, -1));
+          // TODO * 9 seems arbitrary
           return d < EPSILON * 9;
         });
         if (cachedModelPoint != null) {
@@ -1330,7 +1139,7 @@ window.onload = async () => {
         });
         return Promise.resolve([materialCanvas, dimension, frames.length]);
       }).concat([
-        SVG_DRAGON_BODY_ATLAS,
+        // SVG textures (if any)
       ].map(svg => {
         const image = new Image(MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
         let blob = new Blob(
@@ -1392,11 +1201,11 @@ window.onload = async () => {
   // add in the cube
   new Array(2).fill(0).forEach((_, i) => {
     const {
-      id,
+      id: modelId,
       faces,
       bounds,
       maximalExternalRadius,
-    } = cubeBigModel;
+    } = cubeModel;
     const renderGroupId = nextRenderGroupId++;
     const cx = WORLD_DIMENSION/2 + i * 2;
     const cy = WORLD_DIMENSION/2;
@@ -1417,7 +1226,9 @@ window.onload = async () => {
         bounds,
         renderGroupId,
         collisionRadius: maximalExternalRadius,
-        modelId: id,
+        body: {
+          modelId,
+        },
         rotateToPlaneCoordinates,
         worldToPlaneCoordinates,
         collisionGroup: COLLISION_GROUP_TERRAIN,
@@ -1427,7 +1238,6 @@ window.onload = async () => {
   });
 
   // add in some trees
-  const treeBillboards = [billboardMediumModel, billboardLargeModel, billboardHugeModel];
   const treeDistribution = clusteredDistributionFactory(
     1/WORLD_DIMENSION,
     5/WORLD_DIMENSION,
@@ -1446,53 +1256,60 @@ window.onload = async () => {
     if (z > .5 && terrainNormalZ > .9) {
       const atlasIndex = (z + 7 + Math.random())/9 | 0;
       
-      // TODO could probably just scale the one billboard
-      const billboardIndex = Math.min(
-        Math.pow((terrainNormalZ - .9) * 9, 2) * scale * treeBillboards.length | 0,
-        treeBillboards.length - 1,
-      );
+      const adjustedScale = Math.pow((terrainNormalZ - .9) * 9, 2) * scale;
       const {
-        id,
+        id: modelId,
         minimalInternalRadius,
         bounds,
-      } = treeBillboards[billboardIndex];
+      } = billboardModel;
+
+      const modelScale = (adjustedScale + .5) * MAX_TREE_HEIGHT;
+      const collisionRadius = minimalInternalRadius * modelScale;
   
       const renderGroupId = nextRenderGroupId++;
       const position: Vector3 = [
         ...vectorNScale(scaledCoordinates, WORLD_DIMENSION),
-        z + minimalInternalRadius*.8,
+        z + collisionRadius*.8,
       ] as Vector3;
   
       const entity: DynamicEntity = {
         entityType: ENTITY_TYPE_SCENERY,
-        resolutions: [...new Set([0, 1, 2, billboardIndex+1, billboardIndex+2, billboardIndex+3])],
+        resolutions: new Array(adjustedScale * 4 + 3 + 2 * Math.random() | 0).fill(0).map((_, i) => i),
         position,
         id: nextEntityId++,
         bounds,
         renderGroupId,
         gravity: 0,
-        collisionRadius: minimalInternalRadius,
-        modelId: id,
+        collisionRadius: collisionRadius,
+        body: {
+          modelId,
+          preRotationTransform: matrix4Scale(modelScale),
+        },
         modelVariant: VARIANT_SYMBOLS,
         modelAtlasIndex: atlasIndex,
         velocity: [0, 0, 0],
         collisionGroup: COLLISION_GROUP_TERRAIN,
-        health: (billboardIndex+1) * 9,
+        health: (adjustedScale+1) * 9,
       };
       addEntity(entity);
     }
   });
 
   const { 
-    id,
+    id: modelId,
     minimalInternalRadius,
     maximalExternalRadius,
+    center,
   } = dragonBodyModel;
   // add in a "player"
   const player: ActiveEntity = {
-    modelId: id,
     entityType: ENTITY_TYPE_ACTIVE,
     resolutions: [0],
+    body: {
+      id: MODEL_DRAGON_BODY,
+      modelId,
+      preRotationOffset: center,
+    },
     bounds: rect3FromRadius(minimalInternalRadius),
     xRotation: 0,
     zRotation: 0,
@@ -1801,7 +1618,7 @@ window.onload = async () => {
             renderGroupId: renderId,
             renderTile,
             face,
-            modelId,
+            body,
           } = entity;
 
           if (!face && entity.inverseMass) {
@@ -2286,9 +2103,11 @@ window.onload = async () => {
             const {
               minimalInternalRadius,
               id: modelId,
-            } = billboardSmallModel;
+            } = billboardModel;
             addEntity({
-              modelId,
+              body: {
+                modelId,
+              },
               modelVariant: VARIANT_SYMBOLS_BRIGHT,
               modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
               //modelAtlasIndex: 7,
@@ -2336,12 +2155,17 @@ window.onload = async () => {
             // render
             renderedEntities[renderId] = 1;
             // TODO maybe we could make model id always non zero?
-            if (modelId != null) {
+            if (body?.modelId != null) {
               const { 
                 modelVariant = VARIANT_NULL,
                 modelAtlasIndex = 0,
                 xRotation,
                 zRotation,
+                body: {
+                  modelId,
+                  preRotationTransform,
+                  preRotationOffset,
+                }
               } = entity;
               let variantRenders = toRender[modelVariant];
               if (!variantRenders) {
@@ -2353,17 +2177,24 @@ window.onload = async () => {
                 modelRenders = [];
                 variantRenders[modelId] = modelRenders;
               }
-              const rotation = zRotation || xRotation
-                ? matrix4Multiply(
-                  entity.animationTransform,
-                  matrix4Rotate(zRotation || 0, 0, 0, 1),
-                  matrix4Rotate(xRotation || 0, 1, 0, 0),
-                  entity.modelTransform,
+              const rotation = matrix4Multiply(
+                // remove?
+                entity.animationTransform,
+                preRotationTransform,
+                zRotation && matrix4Rotate(zRotation, 0, 0, 1),
+                xRotation && matrix4Rotate(xRotation, 1, 0, 0),
+              );
+              const offsetPosition = preRotationOffset
+                ? vectorNScaleThenAdd(
+                  entity.position,
+                  vector3TransformMatrix4(
+                    rotation,
+                    ...preRotationOffset,
+                  )
                 )
-                : entity.animationTransform || MATRIX4_IDENTITY;
+                : entity.position;
               modelRenders.push([
-                entity.position,
-                // TODO allow undefined/Falesy
+                offsetPosition,
                 rotation,
                 tile.resolution,
                 modelAtlasIndex,
@@ -2490,14 +2321,9 @@ window.onload = async () => {
         const {
           vao,
           indexCount,
-          center,
         } = models[modelId];
         gl.bindVertexArray(vao);
         modelRenders.forEach(([position, rotationMatrix, resolution, atlasIndex]) => {
-          const offsetPosition = vectorNScaleThenAdd(
-            position,
-            vector3TransformMatrix4(rotationMatrix, ...center),
-          );
           gl.uniform1i(uMaterialTexture, materialTextureId + (resolution < 2 && materialDepth ? 0 : 1) );
           // TODO can we move (some of) this out of the loop?
           gl.uniform3f(
@@ -2507,7 +2333,7 @@ window.onload = async () => {
             materialDepth,
           );
 
-          gl.uniform4f(uWorldPosition, ...offsetPosition, 0);
+          gl.uniform4f(uWorldPosition, ...position, 0);
           gl.uniformMatrix4fv(uWorldRotationMatrix, false, rotationMatrix as any);
           gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
         });

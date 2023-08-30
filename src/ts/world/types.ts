@@ -55,13 +55,14 @@ type ModelId = number;
 // return true when done
 type EntityAnimation = (e: Entity, delta: number) => Booleanish;
 
-type BodyPart<PartId extends number> = {
+type BodyPart<PartId extends number = number> = {
   readonly modelId?: ModelId,
-  readonly id: PartId,
-  readonly preRotationTransform?: Matrix4,
+  readonly id?: PartId
+  readonly preRotationTransform?: ReadonlyMatrix4,
+  readonly preRotationOffset?: ReadonlyVector3,
 };
 
-type BaseEntity = {
+type BaseEntity<PartId extends number = number> = {
   readonly renderGroupId: RenderGroupId,
   readonly collisionRadius: number,
   readonly id: EntityId,
@@ -77,12 +78,13 @@ type BaseEntity = {
   // by how much this entity is on fire (0/undefined = not on fire)
   onFire?: number,
 
-  readonly modelId?: ModelId,
+  readonly bodyJointTransforms?: Partial<Record<PartId, Matrix4>>,
+  readonly body?: BodyPart<PartId>,
   // reference to textures/colours/etc...
   modelVariant?: VariantId;
   // the index of the atlas to use
   modelAtlasIndex?: number,
-  readonly modelTransform?: ReadonlyMatrix4,
+
   dead?: Booleanish,
   // what will hit us
   collisionGroup: CollisionGroup,
@@ -99,7 +101,7 @@ type PlaneMetadata = {
   readonly textureCoordinateTransform?: ReadonlyMatrix4,
 };
 
-type StaticEntity = {
+type StaticEntity<PartId extends number = number> = {
   readonly entityType: EntityTypeTerrain,
   readonly face: Face<PlaneMetadata>,
   readonly rotateToPlaneCoordinates: ReadonlyMatrix4,
@@ -111,9 +113,9 @@ type StaticEntity = {
   readonly inverseMass?: undefined,
   xRotation?: undefined,
   zRotation?: undefined,
-} & BaseEntity;
+} & BaseEntity<PartId>;
 
-type BaseDynamicEntity = {
+type BaseDynamicEntity<PartId extends number = number> = {
   readonly face?: undefined,
   velocity: Vector3,
   xRotation?: number,
@@ -127,20 +129,20 @@ type BaseDynamicEntity = {
   lastOnGroundTime?: number,
   // the angle at which we last made contact with the ground
   lastOnGroundNormal?: Vector3,
-} & BaseEntity
+} & BaseEntity<PartId>;
 
-type DynamicEntity = {
+type DynamicEntity<PartId extends number = number> = {
   readonly entityType:
   | EntityTypeFireball
   | EntityTypeParticle
   | EntityTypeScenery
   | EntityTypeExplosion,
-} & BaseDynamicEntity;
+} & BaseDynamicEntity<PartId>;
 
-type ActiveEntity = {
+type ActiveEntity<PartId extends number = number> = {
   readonly entityType: 
     | EntityTypeDragon,
   targetLateralPosition?: Vector2 | Vector3;
   maximumLateralVelocity: number,
   maximumLateralAcceleration: number,
-} & BaseDynamicEntity;
+} & BaseDynamicEntity<PartId>;
