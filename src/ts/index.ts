@@ -2,6 +2,7 @@ const U_WORLD_POSITION = 'uWorldPosition';
 const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
 const U_PROJECTION_MATRIX = 'uProjection';
 const U_CAMERA_POSITION = 'uCameraPosition';
+const U_FOCUS_POSITION = 'uFocusPosition';
 const U_MATERIAL_ATLAS = 'uMaterialAtlas';
 const U_MATERIAL_TEXTURE = 'uMaterialTexture';
 const U_MATERIAL_COLORS = 'uMaterialColors';
@@ -59,7 +60,7 @@ const VERTEX_SHADER = `#version 300 es
   }
 `;
 
-const STEP = .001;
+const STEP = .002;
 //const NUM_STEPS = MATERIAL_DEPTH_RANGE/STEP | 0;
 //const MATERIAL_DEPTH_SCALE = (256/(MATERIAL_TEXTURE_DIMENSION * MATERIAL_DEPTH_RANGE)).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
@@ -82,6 +83,7 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
   uniform vec4 ${U_WORLD_POSITION};
+  uniform vec3 ${U_FOCUS_POSITION};
   uniform lowp sampler2DArray ${U_MATERIAL_ATLAS};
   uniform lowp sampler2DArray ${U_MATERIAL_TEXTURE};
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
@@ -97,7 +99,7 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 d = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(distance), 1);
     // NOTE: c will be positive for camera facing surfaces
     float c = dot(${V_WORLD_PLANE_NORMAL}.xyz, d.xyz);
-    float il = max(1. - pow(length(distance)/4., 2.), 0.);
+    float il = max(1. - pow(length(${U_FOCUS_POSITION} - ${V_WORLD_POSITION}.xyz)/4., 2.), 0.);
     float maxDepth = -1.;
     vec4 maxPixel;
     vec4 maxColor;
@@ -566,6 +568,7 @@ window.onload = async () => {
   let previousPosition: ReadonlyVector2 | undefined;
   let cameraZoom = -2;
   let cameraZRotation = 0;
+  let cameraXRotation = 0;
 
   const onResize = () => {
     Z.width = Z.clientWidth;
@@ -623,6 +626,7 @@ window.onload = async () => {
     uWorldRotationMatrix,
     uProjectionMatrix,
     uCameraPosition,
+    uFocusPosition,
     uMaterialAtlas,
     uMaterialTexture,
     uMaterialColors,
@@ -635,6 +639,7 @@ window.onload = async () => {
     U_WORLD_ROTATION_MATRIX,
     U_PROJECTION_MATRIX,
     U_CAMERA_POSITION,
+    U_FOCUS_POSITION,
     U_MATERIAL_ATLAS,
     U_MATERIAL_TEXTURE,
     U_MATERIAL_COLORS,
@@ -838,67 +843,22 @@ window.onload = async () => {
     return model;
   }
 
-  // const [
-  //   billboardSmallModel,
-  //   billboardMediumModel,
-  //   billboardLargeModel,
-  //   billboardHugeModel,
-  // ] = [
-  //   .5,
-  //   1,
-  //   2,
-  //   4,
-  // ].map(dimension => {
-  //   const rotateToModelCoordinates = matrix4Rotate(-Math.PI/2, 0, 1, 0);
-  //   const halfDimension = dimension/2;
-  //   const points: ReadonlyVector3[] = [
-  //     [-halfDimension, -halfDimension, 0],
-  //     [-halfDimension, halfDimension, 0],
-  //     [halfDimension, halfDimension, 0],
-  //     [halfDimension, -halfDimension, 0],
-  //   ];
-  //   const polygons: ReadonlyVector3[][] = [
-  //     points
-  //   ];
-  //   const face: Face<PlaneMetadata> = {
-  //     rotateToModelCoordinates,
-  //     toModelCoordinates: rotateToModelCoordinates,
-  //     polygons,
-  //     t: {
-  //       textureCoordinateTransform: matrix4Multiply(
-  //         matrix4Translate(.5, -.5, 0),
-  //         matrix4Rotate(-Math.PI/2, 0, 0, 1),
-  //         matrix4Scale(1/dimension),
-  //         matrix4Rotate(Math.PI/2, 0, 1, 0),
-  //       ),
-  //     }
-  //   };
-  //   const planeToModelCoordinates = new Map(
-  //     points.map(point => [point, vector3TransformMatrix4(rotateToModelCoordinates, ...point)]),
-  //   );
-  //   const model = appendModel(
-  //     [face], 
-  //     (point) => {
-  //       return planeToModelCoordinates.get(point);
-  //     },
-  //     () => {
-  //       // there's only one face
-  //       return NORMAL_X;
-  //     },
-  //   );
-  //   return model;
-  // });
-
   const [
     skyCylinderModel,
     cubeModel,
     billboardModel,
-    dragonBodyModel,
   ] = ([
     SKY_CYLINDER_FACES,
     CUBE_FACES_BODY,
     BILLBOARD_FACES,
-    DRAGON_FACES,
+    DRAGON_FACES_BODY,
+    DRAGON_FACES_NECK,
+    DRAGON_FACES_HEAD,
+    DRAGON_FACES_TAIL,
+    DRAGON_FACES_QUAD_RIGHT,
+    DRAGON_FACES_QUAD_LEFT,
+    DRAGON_FACES_SHIN_RIGHT,
+    DRAGON_FACES_SHIN_LEFT,
   ]).map<Model>((faces) => {
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
@@ -1240,7 +1200,7 @@ window.onload = async () => {
     5/WORLD_DIMENSION,
     2,
     2,
-    .1,
+    .3,
     3,
   );
   new Array(WORLD_DIMENSION*4).fill(0).forEach(() => {
@@ -1291,26 +1251,31 @@ window.onload = async () => {
     }
   });
 
-  const { 
-    maximalInternalRadius: minimalInternalRadius,
-    maximalExternalRadius,
-  } = dragonBodyModel;
+  const playerRadius = .3;
   // add in a "player"
-  const player: ActiveEntity = {
+  const player: ActiveEntity<DragonPartIds> = {
     entityType: ENTITY_TYPE_ACTIVE,
     resolutions: [0],
     body: DRAGON_PART,
-    bounds: rect3FromRadius(minimalInternalRadius),
-    xRotation: 0,
-    zRotation: 0,
+    joints: {
+      [DRAGON_PART_ID_BODY]: {},
+      [DRAGON_PART_ID_NECK]: {},
+      [DRAGON_PART_ID_HEAD]: {},
+      [DRAGON_PART_ID_TAIL]: {},
+      [DRAGON_PART_ID_QUAD_RIGHT]: {},
+      [DRAGON_PART_ID_QUAD_LEFT]: {},
+      [DRAGON_PART_ID_SHIN_RIGHT]: {},
+      [DRAGON_PART_ID_SHIN_LEFT]: {},
+    },
+    bounds: rect3FromRadius(playerRadius),
     // collision radius must fit within the bounds, so the model render radius will almost certainly
     // be larger than that
-    collisionRadius: minimalInternalRadius,
+    collisionRadius: playerRadius,
     id: nextEntityId++,
     position: [
       WORLD_DIMENSION*.5,
       WORLD_DIMENSION*.1,
-      terrain(.5, .1) + maximalExternalRadius,
+      terrain(.5, .1) + playerRadius,
     ],
     renderGroupId: nextRenderGroupId++,
     velocity: [0, 0, 0],
@@ -1334,11 +1299,11 @@ window.onload = async () => {
       const rotation = vectorNLength(delta)/399;
       if (rotation > EPSILON) {
         cameraZRotation -= delta[0]/399;
-        player.xRotation = Math.max(
+        cameraXRotation = Math.max(
           -Math.PI/2,
           Math.min(
             Math.PI/6,
-            player.xRotation - delta[1]/199,
+            cameraXRotation - delta[1]/199,
           ),
         );
       }
@@ -1347,9 +1312,10 @@ window.onload = async () => {
   };
   window.onclick = (e: MouseEvent) => {
 
+    // TODO use exact player transform chain
     const playerTransform = matrix4Multiply(
       matrix4Rotate(cameraZRotation, 0, 0, 1),
-      matrix4Rotate(player.xRotation + Math.PI/20, 1, 0, 0),
+      matrix4Rotate(cameraXRotation + Math.PI/20, 1, 0, 0),
     );
     const velocity: Vector3 = vectorNScaleThenAdd(
       player.velocity,
@@ -1370,7 +1336,7 @@ window.onload = async () => {
       collisionRadius,
       collisionGroup: COLLISION_GROUP_PLAYER,
       collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_TERRAIN,
-      position: vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius+.3]),
+      position: vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius]),
       velocity,
       renderGroupId: nextRenderGroupId++,
       inverseMass: 9,
@@ -1648,6 +1614,21 @@ window.onload = async () => {
                     entity.lastOnGroundTime = 0;
                   }
                 }
+                // align the neck/head with the camera rotation
+                let deltaZRotation = mathAngleDiff(entity.zRotation, cameraZRotation);
+                deltaZRotation = deltaZRotation > 0
+                  ? Math.min(deltaZRotation, Math.PI/3)
+                  : Math.max(deltaZRotation, -Math.PI/3);
+                const neckAndHeadTransform = matrix4Multiply(
+                  matrix4Rotate(deltaZRotation/2, 0, 0, 1),
+                  matrix4Rotate(cameraXRotation/2, 1, 0, 0),
+                );
+                player.joints[DRAGON_PART_ID_NECK].transform = neckAndHeadTransform;
+                player.joints[DRAGON_PART_ID_HEAD].transform = matrix4Multiply(
+                  matrix4Invert(neckAndHeadTransform),
+                  matrix4Rotate(deltaZRotation, 0, 0, 1),
+                  matrix4Rotate(cameraXRotation, 1, 0, 0),
+                );
               }
               if (entity.lastOnGroundTime + 99 > time) {
                 const targetLateralPosition = entity.targetLateralPosition || entity.position;
@@ -2140,52 +2121,72 @@ window.onload = async () => {
           } else if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
             // render
             renderedEntities[renderId] = 1;
-            // TODO maybe we could make model id always non zero?
-            if (body?.modelId != null) {
-              const { 
-                modelVariant = VARIANT_NULL,
-                modelAtlasIndex = 0,
-                xRotation,
-                zRotation,
-                body: {
-                  modelId,
+            const { 
+              modelVariant = VARIANT_NULL,
+              modelAtlasIndex = 0,
+              zRotation,
+              body,
+            } = entity;
+
+            function appendRender(
+              {
+                id,
+                modelId,
+                preRotationOffset,
+                preRotationTransform,
+                children,
+              }: BodyPart,
+              position: ReadonlyVector3,
+              transform: ReadonlyMatrix4,
+            ) {
+              // as the sky cylinder consumes the first model id, and is drawn explicitly above,
+              // model id should always be > 0
+              if (modelId || children) {
+                const rotation = matrix4Multiply(
+                  transform,
                   preRotationTransform,
-                  preRotationOffset,
+                  entity.joints?.[id].transform,
+                );
+                const offsetPosition = preRotationOffset
+                  ? vectorNScaleThenAdd(
+                    position,
+                    vector3TransformMatrix4(
+                      transform,
+                      ...preRotationOffset,
+                    )
+                  )
+                  : position;
+
+                if (modelId) {
+                  let variantRenders = toRender[modelVariant];
+                  if (!variantRenders) {
+                    variantRenders = {};
+                    toRender[modelVariant] = variantRenders;
+                  }
+                  let modelRenders = variantRenders[modelId];
+                  if (!modelRenders) {
+                    modelRenders = [];
+                    variantRenders[modelId] = modelRenders;
+                  }
+                  modelRenders.push([
+                    offsetPosition,
+                    rotation,
+                    tile.resolution,
+                    modelAtlasIndex,
+                  ]);
                 }
-              } = entity;
-              let variantRenders = toRender[modelVariant];
-              if (!variantRenders) {
-                variantRenders = {};
-                toRender[modelVariant] = variantRenders;
+                children?.forEach(child => appendRender(child, offsetPosition, rotation));
               }
-              let modelRenders = variantRenders[modelId];
-              if (!modelRenders) {
-                modelRenders = [];
-                variantRenders[modelId] = modelRenders;
-              }
-              const rotation = matrix4Multiply(
+            }
+            body && appendRender(
+              body,
+              entity.position,
+              matrix4Multiply(
                 // remove?
                 entity.animationTransform,
-                preRotationTransform,
                 zRotation && matrix4Rotate(zRotation, 0, 0, 1),
-                xRotation && matrix4Rotate(xRotation, 1, 0, 0),
-              );
-              const offsetPosition = preRotationOffset
-                ? vectorNScaleThenAdd(
-                  entity.position,
-                  vector3TransformMatrix4(
-                    rotation,
-                    ...preRotationOffset,
-                  )
-                )
-                : entity.position;
-              modelRenders.push([
-                offsetPosition,
-                rotation,
-                tile.resolution,
-                modelAtlasIndex,
-              ]);  
-            }
+              ),
+            );
             if (entity.fire) {
               fireballs.push([...entity.position, entity.fire]);
             }
@@ -2198,12 +2199,12 @@ window.onload = async () => {
     // render
     //
 
-    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius]);
+    const playerHeadPosition = vectorNScaleThenAdd(player.position, [0, 0, 1]);
     const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
     const cameraPositionAndRotationMatrix = matrix4Multiply(
       cameraPositionMatrix,
       cameraZRotationMatrix,
-      matrix4Rotate(player.xRotation, 1, 0, 0),
+      matrix4Rotate(cameraXRotation, 1, 0, 0),
       matrix4Translate(0, cameraZoom, 0),
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
@@ -2220,6 +2221,7 @@ window.onload = async () => {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, cameraPosition);
+    gl.uniform3fv(uFocusPosition, player.position);
     gl.uniform1f(uTime, now);
     const fireballMatrices = fireballs.slice(0, MAX_FIREBALLS).map(fireball => {
       const fireballPosition = fireball.slice(0, 3) as Vector3;

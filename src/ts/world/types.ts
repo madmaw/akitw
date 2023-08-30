@@ -61,6 +61,10 @@ type BodyPart<PartId extends number = number> = {
   readonly children?: readonly BodyPart<PartId>[],
 };
 
+type Joint = {
+  transform?: ReadonlyMatrix4,
+}
+
 type BaseEntity<PartId extends number = number> = {
   readonly renderGroupId: RenderGroupId,
   readonly collisionRadius: number,
@@ -77,7 +81,7 @@ type BaseEntity<PartId extends number = number> = {
   // by how much this entity is on fire (0/undefined = not on fire)
   onFire?: number,
 
-  readonly bodyJointTransforms?: Partial<Record<PartId, Matrix4>>,
+  readonly joints?: Record<PartId, Joint>,
   readonly body?: BodyPart<PartId>,
   // reference to textures/colours/etc...
   modelVariant?: VariantId;
@@ -117,7 +121,6 @@ type StaticEntity<PartId extends number = number> = {
 type BaseDynamicEntity<PartId extends number = number> = {
   readonly face?: undefined,
   velocity: Vector3,
-  xRotation?: number,
   zRotation?: number,
   readonly restitution?: number,
   inverseFriction?: number,
