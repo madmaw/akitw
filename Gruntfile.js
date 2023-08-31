@@ -291,7 +291,8 @@ module.exports = function (grunt) {
           cmd: 'advzip -4 -a index.zip dist/index.html'
         },
         dir: {
-          cmd: 'stat -c "%N %s" index.zip'
+          //cmd: 'stat -c "%N %s" index.zip'
+          cmd: 'dir index.zip'
         }
       }     
   });

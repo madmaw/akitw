@@ -1,13 +1,15 @@
 /// <reference path="./types.ts"/>
+/// <reference path="../world/types.ts"/>
 
 const DRAGON_PART_ID_BODY = 0;
 const DRAGON_PART_ID_NECK= 1;
 const DRAGON_PART_ID_HEAD = 2;
 const DRAGON_PART_ID_TAIL = 3;
 const DRAGON_PART_ID_QUAD_RIGHT = 4;
-const DRAGON_PART_ID_QUAD_LEFT = 5;
-const DRAGON_PART_ID_SHIN_RIGHT = 6;
-const DRAGON_PART_ID_SHIN_LEFT = 7;
+// opposites have negated id
+const DRAGON_PART_ID_QUAD_LEFT = -4;
+const DRAGON_PART_ID_SHIN_RIGHT = 5;
+const DRAGON_PART_ID_SHIN_LEFT = -5;
 
 
 type DragonPartIds = 
@@ -21,7 +23,6 @@ type DragonPartIds =
   | typeof DRAGON_PART_ID_SHIN_LEFT
   ;
 
-  
 const DRAGON_SHAPES_BODY: ConvexShape<PlaneMetadata> = [
   // upper back
   toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
@@ -109,7 +110,7 @@ const DRAGON_SHAPES_HEAD: ConvexShape<PlaneMetadata> = transformConvexShape([
   toPlane(-1, -.5, .2, .15, defaultPlaneMetadata),
 ], DRAGON_SHAPES_HEAD_TRANSFORM);
 
-const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
+const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = transformConvexShape([
   // top
   toPlane(0, 0, 1, .05, defaultPlaneMetadata),
   // top right
@@ -124,7 +125,9 @@ const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
   toPlane(-1, -.1, 0, .05, defaultPlaneMetadata),
   // front
   toPlane(0, 1, 0, .2, defaultPlaneMetadata),  
-];
+], matrix4Multiply(
+  matrix4Translate(0, -.15, 0),
+));
 
 const DRAGON_SHAPES_QUAD_RIGHT: ConvexShape<PlaneMetadata> = [
   // right
@@ -194,7 +197,7 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
   }, {
     id: DRAGON_PART_ID_TAIL,
     modelId: MODEL_ID_DRAGON_TAIL,
-    preRotationOffset: [0, -.3, .23],
+    preRotationOffset: [0, -.2, .23],
   }, {
     id: DRAGON_PART_ID_QUAD_RIGHT,
     modelId: MODEL_ID_DRAGON_QUAD_RIGHT,
@@ -211,6 +214,7 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
     modelId: MODEL_ID_DRAGON_QUAD_LEFT,
     preRotationOffset: [-.11, 0, .1],
     preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
+    oppositeAnimationScaling: [1, 1, 1],
     children: [{
       id: DRAGON_PART_ID_SHIN_LEFT,
       modelId: MODEL_ID_DRAGON_SHIN_LEFT,
@@ -219,3 +223,143 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
     }]
   }],
 };
+  
+const DRAGON_ANIMATION_RUN_FRAME_DURATION = 150;
+const DRAGON_ANIMATION_RUN: ActionJointAnimationSequences<DragonPartIds> = [
+  ACTION_ID_RUN,
+  ...synthesizeFromOppositeJointAnimationSequences(
+    DRAGON_PART,
+    [
+      [
+        DRAGON_PART_ID_QUAD_RIGHT,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [Math.PI*.5, 0, 0],
+        [-Math.PI*.3, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_SHIN_RIGHT,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION,
+        EASING_QUAD_IN,
+        [-Math.PI*.3, 0, 0],
+        [-Math.PI*.5, 0, 0],
+        [Math.PI*.4, 0, 0],
+        [-Math.PI*.5, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [-Math.PI*.05, Math.PI*.05, 0],
+        [-Math.PI*.05, -Math.PI*.05, 0],
+        [-Math.PI*.1, Math.PI*.05, 0],
+        [-Math.PI*.1, -Math.PI*.05, 0],
+      ],
+      [
+        DRAGON_PART_ID_TAIL,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [0, 0, Math.PI*.05],
+        [0, 0, -Math.PI*.05],
+      ],
+    ],
+  ),
+];
+
+const DRAGON_ANIMATION_WALK_FRAME_DURATION = 250;
+const DRAGON_ANIMATION_WALK: ActionJointAnimationSequences<DragonPartIds> = [
+  ACTION_ID_WALK,
+  ...synthesizeFromOppositeJointAnimationSequences(
+    DRAGON_PART,
+    [
+      [
+        DRAGON_PART_ID_QUAD_RIGHT,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [Math.PI*.3, 0, 0],
+        [-Math.PI*.1, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_SHIN_RIGHT,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION,
+        EASING_QUAD_IN,
+        [0, 0, 0],
+        [-Math.PI*.2, 0, 0],
+        [Math.PI*.1, 0, 0],
+        [-Math.PI*.2, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [0, Math.PI*.05, 0],
+        [0, -Math.PI*.05, 0],
+      ],
+      [
+        DRAGON_PART_ID_TAIL,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [0, 0, Math.PI*.05],
+        [0, 0, -Math.PI*.05],
+      ],
+    ],
+  ),
+];
+
+const DRAGON_ANIMATION_WALK_BACKWARD: ActionJointAnimationSequences<DragonPartIds> = [
+  ACTION_ID_WALK_BACKWARD,
+  ...synthesizeFromOppositeJointAnimationSequences(
+    DRAGON_PART,
+    [
+      [
+        DRAGON_PART_ID_QUAD_RIGHT,
+        300,
+        EASING_QUAD_IN,
+        [-Math.PI/4, 0, 0],
+        [Math.PI/2, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_SHIN_RIGHT,
+        300,
+        EASING_QUAD_IN_OUT,
+        [-Math.PI/3, 0, 0],
+        [Math.PI/4, 0, 0],
+      ],    
+    ]
+  ),
+];
+
+const DRAGON_ANIMATION_IDLE_FRAME_DURATION = 250;
+const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
+  ACTION_ID_IDLE,
+  ...synthesizeFromOppositeJointAnimationSequences(
+    DRAGON_PART,
+    [
+      [
+        DRAGON_PART_ID_QUAD_RIGHT,
+        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+        EASING_QUAD_IN,
+        [0, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_SHIN_RIGHT,
+        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_TAIL,
+        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],    
+    ]
+  )
+];
+  

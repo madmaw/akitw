@@ -35,6 +35,26 @@ type CollisionGroup =
   | typeof COLLISION_GROUP_TERRAIN
   ;
 
+// action ids are also masks
+// order is priority 
+const ACTION_ID_IDLE = 1;
+const ACTION_ID_WALK = 2;
+const ACTION_ID_WALK_BACKWARD = 4;
+const ACTION_ID_RUN = 8;
+const ACTION_ID_JUMP = 16;
+const ACTION_ID_CANCEL = 512;
+const ACTION_ID_TAKE_DAMAGE = 1024;
+
+type ActionId = 
+    | typeof ACTION_ID_IDLE 
+    | typeof ACTION_ID_WALK
+    | typeof ACTION_ID_WALK_BACKWARD
+    | typeof ACTION_ID_RUN
+    | typeof ACTION_ID_JUMP
+    | typeof ACTION_ID_CANCEL
+    | typeof ACTION_ID_TAKE_DAMAGE
+    ;
+
 type World = Grid[];
 
 type GridId = 1;
@@ -48,10 +68,15 @@ type Tile = {
 
 type RenderGroupId = number;
 type EntityId = number;
-type Entity = StaticEntity | DynamicEntity | ActiveEntity;
+type Entity<PartId extends number = number> = 
+  | StaticEntity<PartId>
+  | DynamicEntity<PartId>
+  | ActiveEntity<PartId>
+  ;
 
 // return true when done
 type EntityAnimation = (e: Entity, delta: number) => Booleanish;
+type JointAnimation = (j: Joint, delta: number) => Booleanish;
 
 type BodyPart<PartId extends number = number> = {
   readonly modelId?: ModelId,
@@ -59,10 +84,13 @@ type BodyPart<PartId extends number = number> = {
   readonly preRotationTransform?: ReadonlyMatrix4,
   readonly preRotationOffset?: ReadonlyVector3,
   readonly children?: readonly BodyPart<PartId>[],
+  readonly oppositeAnimationScaling?: ReadonlyVector3,
 };
 
 type Joint = {
-  transform?: ReadonlyMatrix4,
+  rotation?: ReadonlyVector3,
+  anim?: JointAnimation | Falsey,
+  animAction?: ActionId | 0,
 }
 
 type BaseEntity<PartId extends number = number> = {
@@ -97,7 +125,7 @@ type BaseEntity<PartId extends number = number> = {
   // indicates that the entity dies when it goes out of view
   transient?: Booleanish,
   animationTransform?: ReadonlyMatrix4,
-  animations?: EntityAnimation[],
+  anims?: EntityAnimation[],
 };
 
 type PlaneMetadata = {

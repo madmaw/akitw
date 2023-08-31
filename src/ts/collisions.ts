@@ -46,7 +46,7 @@ function handleCollision(
         renderGroupId: nextRenderGroupId++,
         resolutions: [0, 1],
         velocity: [0, 0, 0],
-        animations: [createAttributeAnimation(
+        anims: [createAttributeAnimation(
           300,
           'fire',
           EASING_BACK_IN,
@@ -61,11 +61,11 @@ function handleCollision(
       }
       if (check && check.health) {
         check.health--;
-        check.animations = [...(check.animations || []), createAttributeAnimation(
+        check.anims = [...(check.anims || []), createAttributeAnimation(
           200 + 99 * Math.random(),
           'animationTransform',
           EASING_BOUNCE,
-          createEntityMatrixUpdate(p => matrix4Multiply(
+          createMatrixUpdate(p => matrix4Multiply(
             matrix4Translate(0, 0, -check.collisionRadius),
             //matrix4Rotate(-Math.PI*p/4, 0, 1, 0),
             matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random())),

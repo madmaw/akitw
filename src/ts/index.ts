@@ -1038,7 +1038,7 @@ window.onload = async () => {
         ),  
         featureMaterial(
           riverStonesFeatureFactory(.6),
-          48,
+          64,
           999,
           randomDistributionFactory(2, 2),
         ),  
@@ -1049,7 +1049,7 @@ window.onload = async () => {
         featureMaterial(
           spikeFeatureFactory(4, 4),
           24,
-          9999,
+          29999,
           randomDistributionFactory(
             2,
             2,
@@ -1067,9 +1067,9 @@ window.onload = async () => {
         ),  
         featureMaterial(
           riverStonesFeatureFactory(1),
-          32,
+          48,
           4999,
-          clusteredDistributionFactory(16, 16, 2, 2, .7, 3),
+          clusteredDistributionFactory(9, 9, 2, 2, .7, 3),
         ),  
       ],
     ],
@@ -1572,19 +1572,19 @@ window.onload = async () => {
             renderGroupId: renderId,
             renderTile,
             face,
-            body,
           } = entity;
 
           if (!face && entity.inverseMass) {
-
             if (entityType == ENTITY_TYPE_ACTIVE) {
+              const onGround = entity.lastOnGroundTime + 99 > time;
               // do AI stuff
               const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
               const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
               if (entity == player) {
                 const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(([input]) => someInputUnread(input) || readInput(input));
+                const running = readInput(INPUT_RUN);
                 const targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [input, vector, runMultiplier = 0]) => {
-                  const multiplier = (readInput(input) * (readInput(INPUT_RUN) * 2 * runMultiplier + 1))/3;
+                  const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
                   return vectorNScaleThenAdd(
                     velocity,
                     vector,
@@ -1604,7 +1604,7 @@ window.onload = async () => {
                   ? 1
                   : 0;
                 entity.targetLateralPosition = vectorNScaleThenAdd(entity.position, targetLateralOffset);
-                if (entity.lastOnGroundTime + 99 > time) {
+                if (onGround) {
                   if (readInput(INPUT_JUMP)) {
                     entity.velocity = vectorNScaleThenAdd(
                       entity.velocity,
@@ -1614,21 +1614,38 @@ window.onload = async () => {
                     entity.lastOnGroundTime = 0;
                   }
                 }
+                // animate behaviour
+                setJointAnimations(
+                  entity,
+                  someLateralInputsWereUnreadOrNonZero
+                    ? targetUnrotatedLateralOffset[1] > 0 && onGround
+                      ? running
+                        ? DRAGON_ANIMATION_RUN
+                        : DRAGON_ANIMATION_WALK
+                      : DRAGON_ANIMATION_WALK_BACKWARD
+                    : DRAGON_ANIMATION_IDLE,
+                );
+
                 // align the neck/head with the camera rotation
-                let deltaZRotation = mathAngleDiff(entity.zRotation, cameraZRotation);
+                let deltaZRotation = mathAngleDiff(entity.zRotation || 0, cameraZRotation);
                 deltaZRotation = deltaZRotation > 0
                   ? Math.min(deltaZRotation, Math.PI/3)
                   : Math.max(deltaZRotation, -Math.PI/3);
-                const neckAndHeadTransform = matrix4Multiply(
-                  matrix4Rotate(deltaZRotation/2, 0, 0, 1),
-                  matrix4Rotate(cameraXRotation/2, 1, 0, 0),
-                );
-                player.joints[DRAGON_PART_ID_NECK].transform = neckAndHeadTransform;
-                player.joints[DRAGON_PART_ID_HEAD].transform = matrix4Multiply(
-                  matrix4Invert(neckAndHeadTransform),
-                  matrix4Rotate(deltaZRotation, 0, 0, 1),
-                  matrix4Rotate(cameraXRotation, 1, 0, 0),
-                );
+                // const neckAndHeadTransform = matrix4Multiply(
+                //   matrix4Rotate(deltaZRotation/2, 0, 0, 1),
+                //   matrix4Rotate(cameraXRotation/2, 1, 0, 0),
+                // );
+                // player.joints[DRAGON_PART_ID_NECK].transform = neckAndHeadTransform;
+                // player.joints[DRAGON_PART_ID_HEAD].transform = matrix4Multiply(
+                //   matrix4Invert(neckAndHeadTransform),
+                //   matrix4Rotate(deltaZRotation, 0, 0, 1),
+                //   matrix4Rotate(cameraXRotation, 1, 0, 0),
+                // );
+                // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
+                // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
+                const rotation: ReadonlyVector3 = [cameraXRotation/2, 0, deltaZRotation/2];
+                player.joints[DRAGON_PART_ID_NECK].rotation = rotation;
+                player.joints[DRAGON_PART_ID_HEAD].rotation = rotation;
               }
               if (entity.lastOnGroundTime + 99 > time) {
                 const targetLateralPosition = entity.targetLateralPosition || entity.position;
@@ -1796,7 +1813,6 @@ window.onload = async () => {
                             }
                           }
 
-                            
                           if (
                             maxPlaneIntersectionTime >= 0
                             && minPlaneIntersectionTime <= remainingCollisionTime
@@ -2092,11 +2108,11 @@ window.onload = async () => {
               renderGroupId: nextRenderGroupId++,
               resolutions: [0, 1],
               transient: 1,
-              animations: [createAttributeAnimation(
+              anims: [createAttributeAnimation(
                 300 + Math.random() * 300,
                 'animationTransform',
-                EASING_EASE_IN,
-                createEntityMatrixUpdate(p => matrix4Scale(1 - p)),
+                EASING_QUAD_IN,
+                createMatrixUpdate(p => matrix4Scale(1 - p)),
                 e => e.dead = 1,
               )],
             });
@@ -2114,7 +2130,7 @@ window.onload = async () => {
 
           // update any animations
           entity.animationTransform = MATRIX4_IDENTITY;
-          entity.animations = entity.animations?.filter(a => !a(entity, delta));
+          entity.anims = entity.anims?.filter(anim => !anim(entity, cappedDelta));
 
           if (entity.dead) {
             removeEntity(entity);
@@ -2139,13 +2155,22 @@ window.onload = async () => {
               position: ReadonlyVector3,
               transform: ReadonlyMatrix4,
             ) {
+              const joint = entity.joints?.[id];
+              const anim = joint?.anim;
+              if (anim) {
+                // animatinos return true when done
+                if (anim(joint, cappedDelta)) {
+                  joint.anim = 0;
+                }
+              }
               // as the sky cylinder consumes the first model id, and is drawn explicitly above,
               // model id should always be > 0
               if (modelId || children) {
+                const jointRotation = joint?.rotation;
                 const rotation = matrix4Multiply(
                   transform,
                   preRotationTransform,
-                  entity.joints?.[id].transform,
+                  jointRotation && matrix4RotateInReverseOrder(...jointRotation),
                 );
                 const offsetPosition = preRotationOffset
                   ? vectorNScaleThenAdd(
