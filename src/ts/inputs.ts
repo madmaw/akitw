@@ -81,17 +81,21 @@ type InputValue = {
 };
 const keyStates: Partial<Record<KeyCode, InputValue>> = {};
 
-function readInput(input: Input): number {
+function readInput(input: Input, peeking?: Booleanish): number {
   const value = keyStates[input] || { value: 0 };
   keyStates[input] = value;
-  value.read = 1;
+  if (!peeking) {
+    value.read = 1;
+  }
   return value.value;
 }
 
 function setKeyState(keyCode: KeyCode, value: number) {
-  keyStates[keyCode] = {
-    value,
-  };
+  if (!keyStates[keyCode]?.value || !value) {
+    keyStates[keyCode] = {
+      value,
+    };  
+  }
 }
 
 function someInputUnread(input: Input) {

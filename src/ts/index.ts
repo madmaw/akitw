@@ -492,7 +492,6 @@ window.onload = async () => {
       const {
         faces,
         bounds,
-        maximalExternalRadius,
         id: modelId,
       } = appendModel(
         groundFaces,
@@ -529,7 +528,6 @@ window.onload = async () => {
           worldToPlaneCoordinates,
           rotateToPlaneCoordinates,
           bounds,
-          collisionRadius: maximalExternalRadius,
           face,
           id,
           renderGroupId,
@@ -1188,7 +1186,6 @@ window.onload = async () => {
         id: nextEntityId++,
         bounds,
         renderGroupId,
-        collisionRadius: maximalExternalRadius,
         body: CUBE_PART,
         rotateToPlaneCoordinates,
         worldToPlaneCoordinates,
@@ -1197,6 +1194,60 @@ window.onload = async () => {
       addEntity(entity);
     });
   });
+
+  if (FLAG_ENFORCE_BOUNDARY) {
+    // add in the walls
+    new Array(4).fill(0).forEach((_, i) => {
+      const zRotationMatrix = matrix4Rotate(i * Math.PI/2, 0, 0, 1);
+      const polygons: ConvexPolygon[] = [[
+        [WORLD_DIMENSION_MINUS_1/2, WORLD_DIMENSION_MINUS_1/2, 0],
+        [WORLD_DIMENSION_MINUS_1/2, -WORLD_DIMENSION_MINUS_1/2, 0],
+        [-WORLD_DIMENSION_MINUS_1/2, -WORLD_DIMENSION_MINUS_1/2, 0],
+        [-WORLD_DIMENSION_MINUS_1/2, WORLD_DIMENSION_MINUS_1/2, 0],
+      ]];
+      const rotateToModelCoordinates = matrix4Multiply(
+        zRotationMatrix,
+        matrix4Rotate(-Math.PI/2, 0, 1, 0),
+      );
+      const toModelCoordinates = matrix4Multiply(
+        matrix4Translate(WORLD_DIMENSION/2, WORLD_DIMENSION/2, 0),
+        matrix4Translate(
+          ...vector3TransformMatrix4(zRotationMatrix, WORLD_DIMENSION_MINUS_1/2, 0, 0),
+        ),
+        rotateToModelCoordinates,
+      );
+      const face: Face<PlaneMetadata> = {
+        polygons,
+        rotateToModelCoordinates,
+        toModelCoordinates,
+        t: {},
+      };
+
+      // append a model just to calculate the bounds
+      const {
+        bounds,
+      } = appendModel(
+        [face],
+        (v, transform) => vector3TransformMatrix4(transform, ...v),
+        // wrong, but we don't use this model anyway
+        () => NORMAL_Z,
+        VECTOR3_EMPTY,
+      );
+
+      addEntity({
+        entityType: ENTITY_TYPE_TERRAIN,
+        resolutions: [0],
+        face,
+        bounds,
+        collisionGroup: COLLISION_GROUP_TERRAIN,
+        id: nextEntityId++,
+        position: VECTOR3_EMPTY,
+        renderGroupId: nextRenderGroupId++,
+        rotateToPlaneCoordinates: matrix4Invert(rotateToModelCoordinates),
+        worldToPlaneCoordinates: matrix4Invert(toModelCoordinates),
+      });
+    });
+  }
 
   // add in some trees
   const treeDistribution = clusteredDistributionFactory(
@@ -1586,7 +1637,9 @@ window.onload = async () => {
               const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
               const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
               if (entity == player) {
-                const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(([input]) => someInputUnread(input) || readInput(input));
+                const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(
+                  ([input]) => someInputUnread(input) || readInput(input),
+                );
                 const running = readInput(INPUT_RUN);
                 const targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [input, vector, runMultiplier = 0]) => {
                   const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
@@ -1609,14 +1662,34 @@ window.onload = async () => {
                   ? 1
                   : 0;
                 entity.targetLateralPosition = vectorNScaleThenAdd(entity.position, targetLateralOffset);
-                if (onGround) {
-                  if (readInput(INPUT_JUMP)) {
-                    entity.velocity = vectorNScaleThenAdd(
-                      entity.velocity,
-                      entity.lastOnGroundNormal,
-                      .003,
-                    );
-                    entity.lastOnGroundTime = 0;
+                const jumpUnread = someInputUnread(INPUT_JUMP);
+                entity.gravity = DEFAULT_GRAVITY;
+                if (onGround || jumpUnread) {
+                  if (!hasJointAnimation(entity, ACTION_ID_FLAP)) {
+                    if (readInput(INPUT_JUMP)) {
+                      // TODO just supply numbers that don't require normalisation
+                      const targetNormal = vectorNNormalize(
+                        vector3TransformMatrix4(
+                          matrix4Rotate(player.zRotation, 0, 0, 1),
+                          0, 1, 1,
+                        )
+                      );
+                      console.log('onGround', onGround, targetNormal);
+                      entity.velocity = vectorNScaleThenAdd(
+                        entity.velocity,
+                        onGround
+                          ? entity.lastOnGroundNormal
+                          : targetNormal,
+                        .002,
+                      );
+                      entity.lastOnGroundTime = 0;
+                      setJointAnimations(entity, DRAGON_ANIMATION_FLAP);    
+                    }
+                  }
+                } else {
+                  if (readInput(INPUT_JUMP, 1)) {
+                    setJointAnimations(entity, DRAGON_ANIMATION_GLIDE);
+                    entity.gravity = DEFAULT_GRAVITY/9;
                   }
                 }
                 // animate behaviour
@@ -1944,7 +2017,7 @@ window.onload = async () => {
                         -1
                       );
                       const entityDistance = vectorNLength(entityDelta);
-                      const entityOverlap = collisionRadiusFromCenter + check.collisionRadius - entityDistance;
+                      const entityOverlap = collisionRadiusFromCenter + (check as DynamicEntity).collisionRadius - entityDistance;
                       // push both away
                       if (entityOverlap > 0) {
                         // TODO move collision handling out of here as it will alter the velocity
@@ -2105,7 +2178,7 @@ window.onload = async () => {
               position: vectorNScaleThenAdd(
                 entity.position,
                 new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
-                entity.collisionRadius,
+                (entity as DynamicEntity).collisionRadius,
               ),
               velocity: [0, 0, 0],
               renderGroupId: nextRenderGroupId++,
@@ -2251,7 +2324,7 @@ window.onload = async () => {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, cameraPosition);
-    gl.uniform3fv(uFocusPosition, player.position);
+    gl.uniform3fv(uFocusPosition, player.position as any);
     gl.uniform1f(uTime, now);
     const fireballMatrices = fireballs.slice(0, MAX_FIREBALLS).map(fireball => {
       const fireballPosition = fireball.slice(0, 3) as Vector3;

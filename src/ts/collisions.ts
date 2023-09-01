@@ -6,7 +6,6 @@ function handleCollision(
   const {
     position,
     inverseMass = 0,
-    collisionRadius: collisionRadiusFromCenter,
     bounds,
     face,
   } = entity;
@@ -18,7 +17,9 @@ function handleCollision(
       -1
     );
     const entityDistance = vectorNLength(entityDelta);
-    const entityOverlap = collisionRadiusFromCenter + check.collisionRadius - entityDistance;
+    const entityOverlap = (entity as DynamicEntity).collisionRadius
+      + (check as DynamicEntity).collisionRadius
+      - entityDistance;
 
     const divisor = 999*(inverseMass + (check.inverseMass || 0));
     entity.velocity = entity.velocity && vectorNScaleThenAdd(
@@ -39,7 +40,7 @@ function handleCollision(
       addEntity({
         bounds,
         collisionGroup: COLLISION_GROUP_PLAYER,
-        collisionRadius: collisionRadiusFromCenter,
+        collisionRadius: entity.collisionRadius,
         entityType: ENTITY_TYPE_EXPLOSION,
         id: nextEntityId++,
         position: entity.position,
@@ -66,10 +67,10 @@ function handleCollision(
           'animationTransform',
           EASING_BOUNCE,
           createMatrixUpdate(p => matrix4Multiply(
-            matrix4Translate(0, 0, -check.collisionRadius),
+            matrix4Translate(0, 0, -(check as DynamicEntity).collisionRadius),
             //matrix4Rotate(-Math.PI*p/4, 0, 1, 0),
             matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random())),
-            matrix4Translate(0, 0, check.collisionRadius),
+            matrix4Translate(0, 0, (check as DynamicEntity).collisionRadius),
           )),
         )];
       }

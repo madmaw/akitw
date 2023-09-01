@@ -25,6 +25,20 @@ function setJointAnimation<PartId extends number>(
   }
 }
 
+function hasJointAnimation<PartId extends number>(
+  e: Entity<PartId>,
+  actionId: ActionId,
+) {
+  if (e.joints) {
+    for (let jointId in e.joints) {
+      const joint = e.joints[jointId]
+      if (joint.anim && joint.animAction == actionId) {
+        return 1;
+      }
+    }
+  }
+}
+
 function setJointAnimations<PartId extends number>(
   e: Entity<PartId>,
   [actionId, ...animationSequences]: ActionJointAnimationSequences<PartId>,
@@ -32,7 +46,7 @@ function setJointAnimations<PartId extends number>(
   animationSequences.forEach(([jointId, duration, easing, ...rotations]) => {
     const joint = e.joints[jointId] || {};
     e.joints[jointId] = joint;
-    if (!joint.anim || joint.animAction != actionId) {
+    if (!joint.anim || joint.animAction < actionId) {
       joint.anim = createCompositeAnimation(...rotations.map(rotation => {
         return createAttributeAnimation<Joint, 'rotation'>(
           duration,
@@ -50,6 +64,7 @@ function setJointAnimations<PartId extends number>(
 function synthesizeFromOppositeJointAnimationSequences<PartId extends number>(
   part: BodyPart<PartId>,
   animationSequences: JointAnimationSequences<PartId>,
+  alternate?: Booleanish,
 ): JointAnimationSequences<PartId> {
   const synthesized = part.id < 0;
   const sourcePartId = synthesized ? -part.id : part.id;
@@ -58,7 +73,7 @@ function synthesizeFromOppositeJointAnimationSequences<PartId extends number>(
     return partId == sourcePartId;
   });
   const synthesizedAnimations = part.children?.map(child => {
-    return synthesizeFromOppositeJointAnimationSequences(child, animationSequences);
+    return synthesizeFromOppositeJointAnimationSequences(child, animationSequences, alternate);
   }).flat(1) || [];
 
   if (animationSequence) {
@@ -68,7 +83,9 @@ function synthesizeFromOppositeJointAnimationSequences<PartId extends number>(
       const synthesizedRotations = rotations.map(
         rotation => vectorNScaleThenAdd<ReadonlyVector3>([Math.PI, Math.PI, Math.PI], rotation, -1)
       );
-      synthesizedRotations.push(...synthesizedRotations.splice(0, synthesizedRotations.length/2 | 0));
+      if (alternate) {
+        synthesizedRotations.push(...synthesizedRotations.splice(0, synthesizedRotations.length/2 | 0));
+      }
       const synthesizedAnimation: JointAnimationSequence<PartId> = [
         part.id,
         duration,

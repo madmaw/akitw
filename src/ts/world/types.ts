@@ -44,7 +44,8 @@ const ACTION_ID_IDLE = 1;
 const ACTION_ID_WALK = 2;
 const ACTION_ID_WALK_BACKWARD = 4;
 const ACTION_ID_RUN = 8;
-const ACTION_ID_JUMP = 16;
+const ACTION_ID_GLIDE = 16;
+const ACTION_ID_FLAP = 32;
 const ACTION_ID_CANCEL = 512;
 const ACTION_ID_TAKE_DAMAGE = 1024;
 
@@ -53,7 +54,8 @@ type ActionId =
     | typeof ACTION_ID_WALK
     | typeof ACTION_ID_WALK_BACKWARD
     | typeof ACTION_ID_RUN
-    | typeof ACTION_ID_JUMP
+    | typeof ACTION_ID_FLAP
+    | typeof ACTION_ID_GLIDE
     | typeof ACTION_ID_CANCEL
     | typeof ACTION_ID_TAKE_DAMAGE
     ;
@@ -98,12 +100,12 @@ type Joint = {
 
 type BaseEntity<PartId extends number = number> = {
   readonly renderGroupId: RenderGroupId,
-  readonly collisionRadius: number,
   readonly id: EntityId,
   // all the resolutions that this entity renders in
   readonly resolutions: number[];
 
-  position: Vector3,
+  // TODO remove position from static entity
+  position: ReadonlyVector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
   logs?: any[][];
@@ -155,9 +157,10 @@ type BaseDynamicEntity<PartId extends number = number> = {
   readonly face?: undefined,
   velocity: Vector3,
   zRotation?: number,
+  readonly collisionRadius: number,
   readonly restitution?: number,
   inverseFriction?: number,
-  readonly gravity?: number,
+  gravity?: number,
   readonly renderTile?: undefined,
   readonly inverseMass?: number,
   // the time the dynamic entity last made contact with the ground
@@ -177,7 +180,7 @@ type DynamicEntity<PartId extends number = number> = {
 type ActiveEntity<PartId extends number = number> = {
   readonly entityType: 
     | EntityTypeDragon,
-  targetLateralPosition?: Vector2 | Vector3;
+  targetLateralPosition?: ReadonlyVector2 | ReadonlyVector3;
   maximumLateralVelocity: number,
   maximumLateralAcceleration: number,
 } & BaseDynamicEntity<PartId>;
