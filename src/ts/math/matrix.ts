@@ -143,6 +143,14 @@ const matrix4RotateInReverseOrder = (rx: number, ry: number, rz: number): Readon
   );
 };
 
+const matrix4RotateZXY = (rx: number, ry: number, rz: number): ReadonlyMatrix4 => {
+  return matrix4Multiply(
+    matrix4Rotate(rz, 0, 0, 1),
+    matrix4Rotate(rx, 1, 0, 0),
+    matrix4Rotate(ry, 0, 1, 0),
+  );
+};
+
 const matrix4Rotate = (rad: number, x: number, y: number, z: number): ReadonlyMatrix4 => {
   let s_, c_, t_;
 

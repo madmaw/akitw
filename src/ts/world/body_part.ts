@@ -2,24 +2,30 @@ function synthesizeOppositeBodyPart<PartId extends number>(
   {
     id,
     modelId,
-    postRotationTransform,
+    postRotation,
     preRotationOffset,
-    preRotationTransform,
+    preRotation,
     children
   }: BodyPart<PartId>,
 ): BodyPart<PartId> {
-
-  const flipMatrix = matrix4Scale(-1, 1, 1);
+  const flipXVector: ReadonlyVector3 = [-1, 1, 1];
   const synthesizedChildren = children?.map(synthesizeOppositeBodyPart);
+  // want to flip the rotations at 90 degrees
+  const [newPostRotation, newPreRotation] = [postRotation, preRotation].map<ReadonlyVector3>(rotation => {
+    if (rotation) {
+      const [x, y, z] = rotation;
+      const newY = Math.PI - y;
+      const newX = Math.PI - x;
+      const newZ = Math.PI - z;
+      return [newX, newY, newZ];  
+    }
+  });
   return {
     id: (id && -id) as PartId,
     children: synthesizedChildren,
     modelId: modelId && (modelId + 1),
-    oppositeAnimationScaling: [1, 1, 1],
-    //postRotationTransform,
-    postRotationTransform: postRotationTransform && matrix4Multiply(flipMatrix, postRotationTransform, flipMatrix),
-    preRotationOffset: preRotationOffset && vector3TransformMatrix4(flipMatrix, ...preRotationOffset),
-    //preRotationTransform,
-    preRotationTransform: preRotationTransform && matrix4Multiply(flipMatrix, preRotationTransform, flipMatrix),
+    postRotation: newPostRotation,
+    preRotationOffset: preRotationOffset && vectorNMultiply(preRotationOffset, flipXVector),
+    preRotation: newPreRotation,
   };
 }

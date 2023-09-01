@@ -1241,10 +1241,8 @@ window.onload = async () => {
         renderGroupId,
         gravity: 0,
         collisionRadius: collisionRadius,
-        body: {
-          ...BILLBOARD_PART,
-          preRotationTransform: matrix4Scale(modelScale),
-        },
+        body: BILLBOARD_PART,
+        transform: matrix4Scale(modelScale),
         modelVariant: VARIANT_SYMBOLS,
         modelAtlasIndex: atlasIndex,
         velocity: [0, 0, 0],
@@ -1599,7 +1597,7 @@ window.onload = async () => {
                   );
                 }, [0, 0]);
                 if (someLateralInputsWereUnreadOrNonZero) {
-                  //player.zRotation = cameraZRotation;
+                  player.zRotation = cameraZRotation;
                 }
                 const targetLateralOffset = vector3TransformMatrix4(
                   cameraZRotationMatrix,
@@ -2094,10 +2092,8 @@ window.onload = async () => {
             }
             const radius = .1;
             addEntity({
-              body: {
-                ...BILLBOARD_PART,
-                preRotationTransform: matrix4Scale(radius*2),
-              },
+              body: BILLBOARD_PART,
+              transform: matrix4Scale(radius*2),
               modelVariant: VARIANT_SYMBOLS_BRIGHT,
               modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
               //modelAtlasIndex: 7,
@@ -2136,7 +2132,7 @@ window.onload = async () => {
           }
 
           // update any animations
-          entity.animationTransform = MATRIX4_IDENTITY;
+          entity.animationTransform = entity.transform;
           entity.anims = entity.anims?.filter(anim => !anim(entity, cappedDelta));
 
           if (entity.dead) {
@@ -2156,8 +2152,8 @@ window.onload = async () => {
                 id,
                 modelId,
                 preRotationOffset,
-                preRotationTransform,
-                postRotationTransform,
+                preRotation,
+                postRotation,
                 children,
               }: BodyPart,
               position: ReadonlyVector3,
@@ -2177,9 +2173,9 @@ window.onload = async () => {
                 const jointRotation = joint?.rotation;
                 const rotation = matrix4Multiply(
                   transform,
-                  postRotationTransform,
-                  jointRotation && matrix4RotateInReverseOrder(...jointRotation),
-                  preRotationTransform,
+                  postRotation && matrix4RotateZXY(...postRotation),
+                  jointRotation && matrix4RotateZXY(...jointRotation),
+                  preRotation && matrix4RotateZXY(...preRotation),
                 );
                 const offsetPosition = preRotationOffset
                   ? vectorNScaleThenAdd(

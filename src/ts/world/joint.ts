@@ -50,23 +50,24 @@ function setJointAnimations<PartId extends number>(
 function synthesizeFromOppositeJointAnimationSequences<PartId extends number>(
   part: BodyPart<PartId>,
   animationSequences: JointAnimationSequences<PartId>,
-  parentWasSynthesized?: Booleanish | ReadonlyVector3,
 ): JointAnimationSequences<PartId> {
-  const synthesized = part.oppositeAnimationScaling || parentWasSynthesized;
-  const animationScaling = part.oppositeAnimationScaling || [1, 1, 1];
+  const synthesized = part.id < 0;
   const sourcePartId = synthesized ? -part.id : part.id;
   // find the relevant animation
   const animationSequence = animationSequences.find(([partId]) => {
     return partId == sourcePartId;
   });
   const synthesizedAnimations = part.children?.map(child => {
-    return synthesizeFromOppositeJointAnimationSequences(child, animationSequences, synthesized);
+    return synthesizeFromOppositeJointAnimationSequences(child, animationSequences);
   }).flat(1) || [];
 
   if (animationSequence) {
     const [_, duration, easing, ...rotations] = animationSequence;
     if (synthesized) {
-      const synthesizedRotations = rotations.map(rotation => vectorNMultiply(rotation, animationScaling));
+      //const synthesizedRotations = rotations.map(rotation => vectorNMultiply(rotation, animationScaling));
+      const synthesizedRotations = rotations.map(
+        rotation => vectorNScaleThenAdd<ReadonlyVector3>([Math.PI, Math.PI, Math.PI], rotation, -1)
+      );
       synthesizedRotations.push(...synthesizedRotations.splice(0, synthesizedRotations.length/2 | 0));
       const synthesizedAnimation: JointAnimationSequence<PartId> = [
         part.id,

@@ -84,11 +84,10 @@ type JointAnimation = (j: Joint, delta: number) => Booleanish;
 type BodyPart<PartId extends number = number> = {
   readonly modelId?: ModelId,
   readonly id?: PartId
-  readonly preRotationTransform?: ReadonlyMatrix4,
-  readonly postRotationTransform?: ReadonlyMatrix4,
+  readonly preRotation?: ReadonlyVector3,
+  readonly postRotation?: ReadonlyVector3,
   readonly preRotationOffset?: ReadonlyVector3,
   readonly children?: readonly BodyPart<PartId>[],
-  readonly oppositeAnimationScaling?: ReadonlyVector3,
 };
 
 type Joint = {
@@ -128,6 +127,9 @@ type BaseEntity<PartId extends number = number> = {
   health?: number,
   // indicates that the entity dies when it goes out of view
   transient?: Booleanish,
+  // persistent transform applied to the body
+  transform?: ReadonlyMatrix4;
+  // temporary attribute used to pass info between animations
   animationTransform?: ReadonlyMatrix4,
   anims?: EntityAnimation[],
 };

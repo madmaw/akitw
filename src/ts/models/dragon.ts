@@ -207,15 +207,17 @@ const DRAGON_FACE_WING_1_RIGHT: Face<PlaneMetadata> = {
 
 // intentionally swapping x, y as we want to rotate back to y axis, which we bend on 
 // from wing 1
-const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
+const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR: ReadonlyVector3 = [
+  0,
+  0,
   Math.atan2(
     // (A1 - B1).x
     -.1,
     // (A1 - B1).y
     .2
   ),
-  0, 0, 1
-);
+];
+const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4RotateZXY(...DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR);
 
 const DRAGON_FACE_WING_2_RIGHT: Face<PlaneMetadata> = {
   rotateToModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
@@ -237,14 +239,17 @@ const DRAGON_FACE_WING_2_RIGHT: Face<PlaneMetadata> = {
 //   DRAGON_FACE_WING_2_RIGHT,
 //   flipFace(DRAGON_FACE_WING_2_RIGHT, [1, 1, -1]),
 // ];
-
-const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
+const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES_VECTOR: ReadonlyVector3 = [
+  0,
+  0,
   Math.atan2(
     // (A2 - B2).x
     .15,
     // (A2 - B2).y
     .4
-  ), 0, 0, 1);
+  ),
+];
+const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4RotateZXY(...DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES_VECTOR);
 const DRAGON_FACE_WING_3_RIGHT: Face<PlaneMetadata> = {
   rotateToModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
@@ -286,13 +291,13 @@ const DRAGON_WING_RIGHT: BodyPart<DragonPartIds> = {
   modelId: MODEL_ID_DRAGON_WING_1_RIGHT,
   preRotationOffset: [.05, .13, .31],
   //preRotationOffset: [.3, .11, .28],
-  preRotationTransform: matrix4Rotate(Math.PI * .1, 1, 0, 0),
+  preRotation: [Math.PI * .1, 0, 0],
   //preRotationTransform: MATRIX4_IDENTITY,
   children: [{
     id: DRAGON_PART_ID_WING_2_RIGHT,
     modelId: MODEL_ID_DRAGON_WING_2_RIGHT,
     //postRotationTransform: matrix4Rotate(Math.atan2(.3, -.3), 0, 0, 1),
-    postRotationTransform: matrix4Invert(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES),
+    postRotation: vectorNScale(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR, -1),
     preRotationOffset: [.1, 0, 0],
     children: [{
       id: DRAGON_PART_ID_WING_3_RIGHT,
@@ -303,9 +308,10 @@ const DRAGON_WING_RIGHT: BodyPart<DragonPartIds> = {
         -.3, // B2.y
         0
       ),
-      postRotationTransform: matrix4Multiply(
-        matrix4Invert(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES),
-        DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+      postRotation: vectorNScaleThenAdd(
+        DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR,
+        DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES_VECTOR,
+        -1,
       ),
       //postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
     }]
@@ -317,12 +323,12 @@ const DRAGON_LEG_RIGHT: BodyPart<DragonPartIds> = {
   id: DRAGON_PART_ID_QUAD_RIGHT,
   modelId: MODEL_ID_DRAGON_QUAD_RIGHT,
   preRotationOffset: [.11, 0, .1],
-  preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
+  preRotation: [-Math.PI/6, 0, 0],
   children: [{
     id: DRAGON_PART_ID_SHIN_RIGHT,
     modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
     preRotationOffset: [0, -.05, -.11],
-    preRotationTransform: matrix4Rotate(Math.PI/3, 1, 0, 0),
+    preRotation: [Math.PI/3, 0, 0],
   }],
 };
 const DRAGON_LEG_LEFT = synthesizeOppositeBodyPart(DRAGON_LEG_RIGHT);
@@ -470,20 +476,22 @@ const DRAGON_ANIMATION_WALK: ActionJointAnimationSequences<DragonPartIds> = [
         DRAGON_PART_ID_WING_1_RIGHT,
         DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
         EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.2, 0],
-        [0, -Math.PI*.1, 0],
+        [0, Math.PI*.2, 0],
+        [0, Math.PI*.1, 0],
       ],
       [
         DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
         EASING_QUAD_IN_OUT,
-        [0, 0, 0],
+        [0, -Math.PI*.6, 0],
+        [0, -Math.PI*.4, 0],
       ],
       [
         DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
         EASING_QUAD_IN_OUT,
-        [0, 0, 0],
+        [0, Math.PI*.4, 0],
+        [0, Math.PI*.6, 0],
       ],
     ],
   ),
