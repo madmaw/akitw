@@ -858,8 +858,11 @@ window.onload = async () => {
     DRAGON_FACES_SHIN_RIGHT,
     DRAGON_FACES_SHIN_LEFT,
     DRAGON_FACES_WING_1_RIGHT,
+    DRAGON_FACES_WING_1_LEFT,
     DRAGON_FACES_WING_2_RIGHT,
+    DRAGON_FACES_WING_2_LEFT,
     DRAGON_FACES_WING_3_RIGHT,
+    DRAGON_FACES_WING_3_LEFT,
   ]).map<Model>((faces) => {
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
@@ -1596,7 +1599,7 @@ window.onload = async () => {
                   );
                 }, [0, 0]);
                 if (someLateralInputsWereUnreadOrNonZero) {
-                  player.zRotation = cameraZRotation;
+                  //player.zRotation = cameraZRotation;
                 }
                 const targetLateralOffset = vector3TransformMatrix4(
                   cameraZRotationMatrix,
@@ -2144,8 +2147,8 @@ window.onload = async () => {
             const { 
               modelVariant = VARIANT_NULL,
               modelAtlasIndex = 0,
-              zRotation,
               body,
+              zRotation,
             } = entity;
 
             function appendRender(
@@ -2216,7 +2219,7 @@ window.onload = async () => {
                 // remove?
                 entity.animationTransform,
                 zRotation && matrix4Rotate(zRotation, 0, 0, 1),
-              ),
+              ),              
             );
             if (entity.fire) {
               fireballs.push([...entity.position, entity.fire]);

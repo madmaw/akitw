@@ -1,6 +1,3 @@
-let nextEntityId = 1;
-let nextRenderGroupId = 1;
-
 type JointAnimationSequence<PartId extends number> = readonly [
   PartId,
   number,

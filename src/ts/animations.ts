@@ -4,6 +4,7 @@ const EASING_BOUNCE: Easing = t => Math.sin(Math.pow(t, 2) * Math.PI*2) * (1 - M
 const EASING_BACK_IN: Easing = t => t * t * (9 * t - 8);
 const EASING_QUAD_IN: Easing = t => t * t;
 const EASING_QUAD_IN_OUT: Easing = t => t <= .5 ? t * t * 2 : 1 - (--t) * t * 2;
+const EASING_LINEAR: Easing = t => t;
 
 type Anim<T> = (e: T, delta: number) => Booleanish;
 

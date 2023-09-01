@@ -187,7 +187,7 @@ const DRAGON_FACES_SHIN_RIGHT = decompose([[DRAGON_SHAPES_SHIN_RIGHT, []]]);
 const DRAGON_FACES_SHIN_LEFT = decompose([[DRAGON_SHAPES_SHIN_LEFT, []]]);
 
 // don't want to rotate as it will make the wing flap calculations difficult
-const DRAGON_FACES_WING_1_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
+const DRAGON_FACE_WING_1_RIGHT: Face<PlaneMetadata> = {
   rotateToModelCoordinates: MATRIX4_IDENTITY,
   toModelCoordinates: MATRIX4_IDENTITY,
   polygons: [
@@ -199,7 +199,11 @@ const DRAGON_FACES_WING_1_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
     ],
   ],
   t: {}
-});
+};
+// const DRAGON_FACES_WING_1_RIGHT: Face<PlaneMetadata>[] = [
+//   DRAGON_FACE_WING_1_RIGHT,
+//   flipFace(DRAGON_FACE_WING_1_RIGHT, [1, 1, -1]),
+// ];
 
 // intentionally swapping x, y as we want to rotate back to y axis, which we bend on 
 // from wing 1
@@ -212,7 +216,8 @@ const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
   ),
   0, 0, 1
 );
-const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
+
+const DRAGON_FACE_WING_2_RIGHT: Face<PlaneMetadata> = {
   rotateToModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
   polygons: [
@@ -227,7 +232,11 @@ const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
     ],
   ],
   t: {}
-});
+};
+// const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = [
+//   DRAGON_FACE_WING_2_RIGHT,
+//   flipFace(DRAGON_FACE_WING_2_RIGHT, [1, 1, -1]),
+// ];
 
 const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
   Math.atan2(
@@ -236,7 +245,7 @@ const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
     // (A2 - B2).y
     .4
   ), 0, 0, 1);
-const DRAGON_FACES_WING_3_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
+const DRAGON_FACE_WING_3_RIGHT: Face<PlaneMetadata> = {
   rotateToModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   polygons: [
@@ -249,82 +258,113 @@ const DRAGON_FACES_WING_3_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
     ],
   ],
   t: {}
-});
+}
+// const DRAGON_FACES_WING_3_RIGHT: Face<PlaneMetadata>[] = [DRAGON_FACE_WING_3_RIGHT, flipFace(DRAGON_FACE_WING_3_RIGHT, []);
 // console.log(DRAGON_FACES_WING_3_RIGHT[0].polygons[0].map(
 //   p => vector3TransformMatrix4(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES, ...p)
 // ));
 
+const [
+  [DRAGON_FACES_WING_1_RIGHT, DRAGON_FACES_WING_1_LEFT],
+  [DRAGON_FACES_WING_2_RIGHT, DRAGON_FACES_WING_2_LEFT],
+  [DRAGON_FACES_WING_3_RIGHT, DRAGON_FACES_WING_3_LEFT],
+] = [
+  DRAGON_FACE_WING_1_RIGHT,
+  DRAGON_FACE_WING_2_RIGHT,
+  DRAGON_FACE_WING_3_RIGHT,
+].map<[Face<PlaneMetadata>[], Face<PlaneMetadata>[]]>(
+  face => {
+    const right = [face, flipFace(face, [1, 1, -1])];
+    const left = right.map(face => flipFace(face, [-1, 1, 1]));
+    return [right, left];
+  },
+);
+
+
+const DRAGON_WING_RIGHT: BodyPart<DragonPartIds> = {
+  id: DRAGON_PART_ID_WING_1_RIGHT,
+  modelId: MODEL_ID_DRAGON_WING_1_RIGHT,
+  preRotationOffset: [.05, .13, .31],
+  //preRotationOffset: [.3, .11, .28],
+  preRotationTransform: matrix4Rotate(Math.PI * .1, 1, 0, 0),
+  //preRotationTransform: MATRIX4_IDENTITY,
+  children: [{
+    id: DRAGON_PART_ID_WING_2_RIGHT,
+    modelId: MODEL_ID_DRAGON_WING_2_RIGHT,
+    //postRotationTransform: matrix4Rotate(Math.atan2(.3, -.3), 0, 0, 1),
+    postRotationTransform: matrix4Invert(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES),
+    preRotationOffset: [.1, 0, 0],
+    children: [{
+      id: DRAGON_PART_ID_WING_3_RIGHT,
+      modelId: MODEL_ID_DRAGON_WING_3_RIGHT,  
+      preRotationOffset: vector3TransformMatrix4(
+        DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+        .2, // B2.x
+        -.3, // B2.y
+        0
+      ),
+      postRotationTransform: matrix4Multiply(
+        matrix4Invert(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES),
+        DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+      ),
+      //postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+    }]
+  }]
+};
+const DRAGON_WING_LEFT = synthesizeOppositeBodyPart(DRAGON_WING_RIGHT);
+
+const DRAGON_LEG_RIGHT: BodyPart<DragonPartIds> = {
+  id: DRAGON_PART_ID_QUAD_RIGHT,
+  modelId: MODEL_ID_DRAGON_QUAD_RIGHT,
+  preRotationOffset: [.11, 0, .1],
+  preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
+  children: [{
+    id: DRAGON_PART_ID_SHIN_RIGHT,
+    modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
+    preRotationOffset: [0, -.05, -.11],
+    preRotationTransform: matrix4Rotate(Math.PI/3, 1, 0, 0),
+  }],
+};
+const DRAGON_LEG_LEFT = synthesizeOppositeBodyPart(DRAGON_LEG_RIGHT);
 
 const DRAGON_PART: BodyPart<DragonPartIds> = {
   id: DRAGON_PART_ID_BODY,
   modelId: MODEL_ID_DRAGON_BODY,
   preRotationOffset: [0, 0, -.15],
-  children: [{
-    id: DRAGON_PART_ID_NECK,
-    modelId: MODEL_ID_DRAGON_NECK,
-    preRotationOffset: [0, .19, .29],
-    children: [{
-      id: DRAGON_PART_ID_HEAD,
-      modelId: MODEL_ID_DRAGON_HEAD,
-      preRotationOffset: [0, .15, .05],
-    }],
-  }, {
-    id: DRAGON_PART_ID_TAIL,
-    modelId: MODEL_ID_DRAGON_TAIL,
-    preRotationOffset: [0, -.2, .23],
-  }, {
-    id: DRAGON_PART_ID_QUAD_RIGHT,
-    modelId: MODEL_ID_DRAGON_QUAD_RIGHT,
-    preRotationOffset: [.11, 0, .1],
-    preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
-    children: [{
-      id: DRAGON_PART_ID_SHIN_RIGHT,
-      modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
-      preRotationOffset: [0, -.05, -.11],
-      preRotationTransform: matrix4Rotate(Math.PI/3, 1, 0, 0),
-    }],
-  }, {
-    id: DRAGON_PART_ID_QUAD_LEFT,
-    modelId: MODEL_ID_DRAGON_QUAD_LEFT,
-    preRotationOffset: [-.11, 0, .1],
-    preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
-    oppositeAnimationScaling: [1, 1, 1],
-    children: [{
-      id: DRAGON_PART_ID_SHIN_LEFT,
-      modelId: MODEL_ID_DRAGON_SHIN_LEFT,
-      preRotationOffset: [0, -.05, -.11],
-      preRotationTransform: matrix4Rotate(Math.PI/3, 1, 0, 0),
-    }]
-  }, {
-    id: DRAGON_PART_ID_WING_1_RIGHT,
-    modelId: MODEL_ID_DRAGON_WING_1_RIGHT,
-    preRotationOffset: [.05, .13, .33],
-    //preRotationOffset: [.3, .11, .28],
-    preRotationTransform: matrix4Rotate(Math.PI * .1, 1, 0, 0),
-    //preRotationTransform: MATRIX4_IDENTITY,
-    children: [{
-      id: DRAGON_PART_ID_WING_2_RIGHT,
-      modelId: MODEL_ID_DRAGON_WING_2_RIGHT,
-      //postRotationTransform: matrix4Rotate(Math.atan2(.3, -.3), 0, 0, 1),
-      postRotationTransform: matrix4Invert(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES),
-      preRotationOffset: [.1, 0, 0],
+  children: [
+    {
+      id: DRAGON_PART_ID_NECK,
+      modelId: MODEL_ID_DRAGON_NECK,
+      preRotationOffset: [0, .19, .29],
       children: [{
-        id: DRAGON_PART_ID_WING_3_RIGHT,
-        modelId: MODEL_ID_DRAGON_WING_3_RIGHT,  
-        preRotationOffset: vector3TransformMatrix4(
-          DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
-          .2, // B2.x
-          -.3, // B2.y
-          0
-        ),
-        postRotationTransform: matrix4Multiply(
-          matrix4Invert(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES),
-          DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
-        ),
-        //postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
-      }]
-    }]
-  }],
+        id: DRAGON_PART_ID_HEAD,
+        modelId: MODEL_ID_DRAGON_HEAD,
+        preRotationOffset: [0, .15, .05],
+      }],
+    },
+    {
+      id: DRAGON_PART_ID_TAIL,
+      modelId: MODEL_ID_DRAGON_TAIL,
+      preRotationOffset: [0, -.2, .23],
+    },
+    DRAGON_LEG_RIGHT,
+    DRAGON_LEG_LEFT,
+    // {
+    //   id: DRAGON_PART_ID_QUAD_LEFT,
+    //   modelId: MODEL_ID_DRAGON_QUAD_LEFT,
+    //   preRotationOffset: [-.11, 0, .1],
+    //   preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
+    //   oppositeAnimationScaling: [1, 1, 1],
+    //   children: [{
+    //     id: DRAGON_PART_ID_SHIN_LEFT,
+    //     modelId: MODEL_ID_DRAGON_SHIN_LEFT,
+    //     preRotationOffset: [0, -.05, -.11],
+    //     preRotationTransform: matrix4Rotate(Math.PI/3, 1, 0, 0),
+    //   }]
+    // },
+    DRAGON_WING_RIGHT,
+    DRAGON_WING_LEFT,
+  ],
 };
   
 const DRAGON_ANIMATION_RUN_FRAME_DURATION = 200;

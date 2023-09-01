@@ -1,3 +1,6 @@
+let nextEntityId = 1;
+let nextRenderGroupId = 1;
+
 const ENTITY_TYPE_ACTIVE = 1;
 const ENTITY_TYPE_SCENERY = 2;
 const ENTITY_TYPE_FIREBALL = 3;
@@ -143,7 +146,6 @@ type StaticEntity<PartId extends number = number> = {
   readonly renderTile?: Tile,
   velocity?: undefined,
   readonly inverseMass?: undefined,
-  xRotation?: undefined,
   zRotation?: undefined,
 } & BaseEntity<PartId>;
 
