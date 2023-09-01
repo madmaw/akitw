@@ -187,31 +187,32 @@ const DRAGON_FACES_SHIN_RIGHT = decompose([[DRAGON_SHAPES_SHIN_RIGHT, []]]);
 const DRAGON_FACES_SHIN_LEFT = decompose([[DRAGON_SHAPES_SHIN_LEFT, []]]);
 
 // don't want to rotate as it will make the wing flap calculations difficult
-const DRAGON_FACES_WING_1_RIGHT: Face<PlaneMetadata>[] = [{
+const DRAGON_FACES_WING_1_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
   rotateToModelCoordinates: MATRIX4_IDENTITY,
   toModelCoordinates: MATRIX4_IDENTITY,
   polygons: [
     [
-      [0, 0, 0], // A1
       [0, -.1, 0], 
-      [.2, -.3, 0], // B1
+      [.2, -.2, 0], // B1
+      [.1, 0, 0], // A1
+      [0, 0, 0], 
     ],
   ],
   t: {}
-}];
+});
 
 // intentionally swapping x, y as we want to rotate back to y axis, which we bend on 
 // from wing 1
 const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
   Math.atan2(
     // (A1 - B1).x
-    -.2,
+    -.1,
     // (A1 - B1).y
-    .3
+    .2
   ),
   0, 0, 1
 );
-const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = [{
+const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
   rotateToModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
   polygons: [
@@ -220,38 +221,38 @@ const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = [{
       // model generator will support non-convex shapes
       [.1, 0, 0], 
       [0, 0, 0], // sticks to A1
-      [.2, -.3, 0], // A2, sticks to B1
-      [.5, .2, 0], // B2
+      [.1, -.2, 0], // sticks to B1
+      [.2, -.3, 0], // B2
+      [.35, .1, 0], // A2
     ],
   ],
   t: {}
-}];
+});
 
 const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
   Math.atan2(
     // (A2 - B2).x
-    .3,
+    .15,
     // (A2 - B2).y
-    .5
+    .4
   ), 0, 0, 1);
-const DRAGON_FACES_WING_3_RIGHT: Face<PlaneMetadata>[] = [{
+const DRAGON_FACES_WING_3_RIGHT: Face<PlaneMetadata>[] = copyAndFlipFace({
   rotateToModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   polygons: [
     [
-      
-      [.2, 0, 0], // inset
-      [.5, -.1, 0],
-      [.4, .2, 0],
-      [.3, .5, 0], // sticks to B2
+      [.15, -.05, 0], // inset
+      [.4, -.2, 0],
+      [.3, .2, 0],
+      [.15, .4, 0], // sticks to B2
       [0, 0, 0], // sticks to A2
     ],
   ],
   t: {}
-}];
-console.log(DRAGON_FACES_WING_3_RIGHT[0].polygons[0].map(
-  p => vector3TransformMatrix4(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES, ...p)
-));
+});
+// console.log(DRAGON_FACES_WING_3_RIGHT[0].polygons[0].map(
+//   p => vector3TransformMatrix4(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES, ...p)
+// ));
 
 
 const DRAGON_PART: BodyPart<DragonPartIds> = {
@@ -297,8 +298,8 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
   }, {
     id: DRAGON_PART_ID_WING_1_RIGHT,
     modelId: MODEL_ID_DRAGON_WING_1_RIGHT,
-    preRotationOffset: [.05, .11, .28],
-    //preRotationOffset: [.3, 0, .3],
+    preRotationOffset: [.05, .13, .33],
+    //preRotationOffset: [.3, .11, .28],
     preRotationTransform: matrix4Rotate(Math.PI * .1, 1, 0, 0),
     //preRotationTransform: MATRIX4_IDENTITY,
     children: [{
@@ -306,21 +307,21 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
       modelId: MODEL_ID_DRAGON_WING_2_RIGHT,
       //postRotationTransform: matrix4Rotate(Math.atan2(.3, -.3), 0, 0, 1),
       postRotationTransform: matrix4Invert(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES),
-      //preRotationOffset: [0, .1, 0],
+      preRotationOffset: [.1, 0, 0],
       children: [{
         id: DRAGON_PART_ID_WING_3_RIGHT,
         modelId: MODEL_ID_DRAGON_WING_3_RIGHT,  
         preRotationOffset: vector3TransformMatrix4(
           DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
-          .2, // wing 2 x          
-          -.3, // wing 3 y
+          .2, // B2.x
+          -.3, // B2.y
           0
         ),
         postRotationTransform: matrix4Multiply(
-          DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
           matrix4Invert(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES),
+          DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
         ),
-        //postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES),
+        //postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
       }]
     }]
   }],
@@ -425,6 +426,25 @@ const DRAGON_ANIMATION_WALK: ActionJointAnimationSequences<DragonPartIds> = [
         [0, 0, Math.PI*.05],
         [0, 0, -Math.PI*.05],
       ],
+      [
+        DRAGON_PART_ID_WING_1_RIGHT,
+        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [0, -Math.PI*.2, 0],
+        [0, -Math.PI*.1, 0],
+      ],
+      [
+        DRAGON_PART_ID_WING_2_RIGHT,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_WING_3_RIGHT,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
     ],
   ),
 ];
@@ -486,22 +506,22 @@ const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
         DRAGON_PART_ID_WING_1_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        //[0, Math.PI*.3, 0],
-        [0, 0, 0],
+        [-Math.PI*.1, Math.PI*.3, 0],
+        // [0, 0, 0],
       ],
       [
         DRAGON_PART_ID_WING_2_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        //[0, -Math.PI*.8, 0],
-        [0, 0, 0],
+        [0, -Math.PI*.8, 0],
+        //[0, 0, 0],
       ],
       [
         DRAGON_PART_ID_WING_3_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        //[0, Math.PI*.8, 0],
-        [0, 0, 0],
+        [0, Math.PI*.8, 0],
+        //[0, 0, 0],
       ],
 
     ]

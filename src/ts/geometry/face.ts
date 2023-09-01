@@ -99,3 +99,21 @@ function measureFace({
     radius,
   ];
 }
+
+function copyAndFlipFace<T>(face: Face<T>): [Face<T>, Face<T>] {
+  const flippedPolygons = face.polygons.map(polygon => {
+    const flippedPolygon = [...polygon].reverse();
+    // ensure that the point at 0 is the same so our non-convex polygon hack still works
+    flippedPolygon.unshift(flippedPolygon.pop());
+    return flippedPolygon;
+  });
+  // unflip using rotations
+  const additionalTransform = matrix4Scale(1, 1, -1);
+  const flipped: Face<T> = {
+    ...face,
+    polygons: flippedPolygons,
+    toModelCoordinates: matrix4Multiply(additionalTransform, face.toModelCoordinates),
+    rotateToModelCoordinates: matrix4Multiply(additionalTransform, face.rotateToModelCoordinates),
+  };
+  return [face, flipped];
+}
