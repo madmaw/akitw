@@ -192,17 +192,25 @@ const DRAGON_FACES_WING_1_RIGHT: Face<PlaneMetadata>[] = [{
   toModelCoordinates: MATRIX4_IDENTITY,
   polygons: [
     [
-      [0, 0, 0],
-      [0, -.2, 0],
-      [.3, -.3, 0],
-      //[.1, .2, 0],
+      [0, 0, 0], // A1
+      [0, -.1, 0], 
+      [.2, -.3, 0], // B1
     ],
   ],
   t: {}
 }];
 
-// intentionally swapping x, y as we want to rotate back to y axis, which we bend on
-const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(Math.atan2(-.3, .3), 0, 0, 1);
+// intentionally swapping x, y as we want to rotate back to y axis, which we bend on 
+// from wing 1
+const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
+  Math.atan2(
+    // (A1 - B1).x
+    -.2,
+    // (A1 - B1).y
+    .3
+  ),
+  0, 0, 1
+);
 const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = [{
   rotateToModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
@@ -210,36 +218,40 @@ const DRAGON_FACES_WING_2_RIGHT: Face<PlaneMetadata>[] = [{
     [
       // provided the first point is the only inset, the
       // model generator will support non-convex shapes
-      [.1, 0, 0],
-      [0, 0, 0],
-      [.3, -.3, 0],
-      //[.4, .3, 0],
-      [.3, .2, 0],
+      [.1, 0, 0], 
+      [0, 0, 0], // sticks to A1
+      [.2, -.3, 0], // A2, sticks to B1
+      [.5, .2, 0], // B2
     ],
   ],
   t: {}
 }];
-// console.log(DRAGON_FACES_WING_2_RIGHT[0].polygons[0].map(
-//   p => vector3TransformMatrix4(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES, ...p)
-// ));
 
-const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = MATRIX4_IDENTITY;
+const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(
+  Math.atan2(
+    // (A2 - B2).x
+    .3,
+    // (A2 - B2).y
+    .5
+  ), 0, 0, 1);
 const DRAGON_FACES_WING_3_RIGHT: Face<PlaneMetadata>[] = [{
   rotateToModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES,
   polygons: [
     [
-      // inset
-      [.2, -.3, 0],
-      [.5, -.4, 0],
-      [.4, -.1, 0],
-      //[.1, .5, 0],
-      [0, .2, 0],
-      [0, -.3, 0],
+      
+      [.2, 0, 0], // inset
+      [.5, -.1, 0],
+      [.4, .2, 0],
+      [.3, .5, 0], // sticks to B2
+      [0, 0, 0], // sticks to A2
     ],
   ],
   t: {}
 }];
+console.log(DRAGON_FACES_WING_3_RIGHT[0].polygons[0].map(
+  p => vector3TransformMatrix4(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES, ...p)
+));
 
 
 const DRAGON_PART: BodyPart<DragonPartIds> = {
@@ -298,8 +310,16 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
       children: [{
         id: DRAGON_PART_ID_WING_3_RIGHT,
         modelId: MODEL_ID_DRAGON_WING_3_RIGHT,  
-        preRotationOffset: vector3TransformMatrix4(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES, .3, 0, 0),
-        postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+        preRotationOffset: vector3TransformMatrix4(
+          DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+          .2, // wing 2 x          
+          -.3, // wing 3 y
+          0
+        ),
+        postRotationTransform: matrix4Multiply(
+          DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES,
+          matrix4Invert(DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES),
+        ),
         //postRotationTransform: DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES),
       }]
     }]
@@ -466,22 +486,22 @@ const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
         DRAGON_PART_ID_WING_1_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        [0, Math.PI*.3, 0],
-        //[0, 0, 0],
+        //[0, Math.PI*.3, 0],
+        [0, 0, 0],
       ],
       [
         DRAGON_PART_ID_WING_2_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.8, 0],
-        //[0, 0, 0],
+        //[0, -Math.PI*.8, 0],
+        [0, 0, 0],
       ],
       [
         DRAGON_PART_ID_WING_3_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        [0, Math.PI*.8, 0],
-        //[0, 0, 0],
+        //[0, Math.PI*.8, 0],
+        [0, 0, 0],
       ],
 
     ]
