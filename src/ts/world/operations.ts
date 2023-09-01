@@ -35,7 +35,7 @@ function setJointAnimations<PartId extends number>(
   animationSequences.forEach(([jointId, duration, easing, ...rotations]) => {
     const joint = e.joints[jointId] || {};
     e.joints[jointId] = joint;
-    if (!joint.anim || joint.animAction < actionId) {
+    if (!joint.anim || joint.animAction != actionId) {
       joint.anim = createCompositeAnimation(...rotations.map(rotation => {
         return createAttributeAnimation<Joint, 'rotation'>(
           duration,

@@ -632,7 +632,6 @@ window.onload = async () => {
     uMaterialColors,
     uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
     uTime,
-    uLasers,
     uFireballs,
   ] = [
     U_WORLD_POSITION,
@@ -645,7 +644,6 @@ window.onload = async () => {
     U_MATERIAL_COLORS,
     U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH,
     U_TIME,
-    U_LASERS,
     U_FIREBALLS,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
@@ -859,6 +857,9 @@ window.onload = async () => {
     DRAGON_FACES_QUAD_LEFT,
     DRAGON_FACES_SHIN_RIGHT,
     DRAGON_FACES_SHIN_LEFT,
+    DRAGON_FACES_WING_1_RIGHT,
+    DRAGON_FACES_WING_2_RIGHT,
+    DRAGON_FACES_WING_3_RIGHT,
   ]).map<Model>((faces) => {
     const modelPointCache: ReadonlyVector3[] = [];
     return appendModel(
@@ -1266,6 +1267,9 @@ window.onload = async () => {
       [DRAGON_PART_ID_QUAD_LEFT]: {},
       [DRAGON_PART_ID_SHIN_RIGHT]: {},
       [DRAGON_PART_ID_SHIN_LEFT]: {},
+      [DRAGON_PART_ID_WING_1_RIGHT]: {},
+      [DRAGON_PART_ID_WING_2_RIGHT]: {},
+      [DRAGON_PART_ID_WING_3_RIGHT]: {},
     },
     bounds: rect3FromRadius(playerRadius),
     // collision radius must fit within the bounds, so the model render radius will almost certainly
@@ -2150,6 +2154,7 @@ window.onload = async () => {
                 modelId,
                 preRotationOffset,
                 preRotationTransform,
+                postRotationTransform,
                 children,
               }: BodyPart,
               position: ReadonlyVector3,
@@ -2169,8 +2174,9 @@ window.onload = async () => {
                 const jointRotation = joint?.rotation;
                 const rotation = matrix4Multiply(
                   transform,
-                  preRotationTransform,
+                  postRotationTransform,
                   jointRotation && matrix4RotateInReverseOrder(...jointRotation),
+                  preRotationTransform,
                 );
                 const offsetPosition = preRotationOffset
                   ? vectorNScaleThenAdd(

@@ -82,6 +82,7 @@ type BodyPart<PartId extends number = number> = {
   readonly modelId?: ModelId,
   readonly id?: PartId
   readonly preRotationTransform?: ReadonlyMatrix4,
+  readonly postRotationTransform?: ReadonlyMatrix4,
   readonly preRotationOffset?: ReadonlyVector3,
   readonly children?: readonly BodyPart<PartId>[],
   readonly oppositeAnimationScaling?: ReadonlyVector3,
