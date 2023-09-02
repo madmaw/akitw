@@ -375,10 +375,16 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
 
 const DRAGON_ANIMATION_GLIDE_FRAME_DURATION = 400;
 const DRAGON_ANIMATION_GLIDE: ActionJointAnimationSequences<DragonPartIds> = [
-  ACTION_ID_FLAP,
+  ACTION_ID_GLIDE,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
     [
+      [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
       [
         DRAGON_PART_ID_QUAD_RIGHT,
         DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
@@ -420,6 +426,12 @@ const DRAGON_ANIMATION_FLAP: ActionJointAnimationSequences<DragonPartIds> = [
     DRAGON_PART,
     [
       [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_FLAP_FRAME_DURATION*2,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
+      [
         DRAGON_PART_ID_QUAD_RIGHT,
         DRAGON_ANIMATION_FLAP_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
@@ -427,7 +439,7 @@ const DRAGON_ANIMATION_FLAP: ActionJointAnimationSequences<DragonPartIds> = [
       ],
       [
         DRAGON_PART_ID_SHIN_RIGHT,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+        DRAGON_ANIMATION_FLAP_FRAME_DURATION*2,
         EASING_QUAD_IN,
         [-Math.PI*.2, 0, 0],
       ],

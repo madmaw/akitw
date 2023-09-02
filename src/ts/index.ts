@@ -1334,6 +1334,8 @@ window.onload = async () => {
       terrain(.5, .1) + playerRadius,
     ],
     renderGroupId: nextRenderGroupId++,
+    xRotation: 0,
+    zRotation: 0,
     velocity: [0, 0, 0],
     maximumLateralVelocity: .01,
     maximumLateralAcceleration: .00002,
@@ -1632,11 +1634,19 @@ window.onload = async () => {
 
           if (!face && entity.inverseMass) {
             if (entityType == ENTITY_TYPE_ACTIVE) {
-              const onGround = entity.lastOnGroundTime + 99 > time;
+              const onGround = entity.lastOnGroundTime + 99 > time && entity.lastOnGroundNormal;
               // do AI stuff
               const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
               const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
+              const gliding = hasJointAnimation(entity, ACTION_ID_GLIDE);
+              const flapping = hasJointAnimation(entity, ACTION_ID_FLAP);
+              const entityZRotationNormal = matrix4Rotate(entity.zRotation, 0, 0, 1);
+
               if (entity == player) {
+                const playerFacingNormal = vector3TransformMatrix4(
+                  matrix4Rotate(player.zRotation, 0, 0, 1),
+                  0, 1, 0,
+                );
                 const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(
                   ([input]) => someInputUnread(input) || readInput(input),
                 );
@@ -1650,10 +1660,35 @@ window.onload = async () => {
                   );
                 }, [0, 0]);
                 if (someLateralInputsWereUnreadOrNonZero) {
-                  player.zRotation = cameraZRotation;
+                  // turn nicely
+                  const zDiff = mathAngleDiff(player.zRotation, cameraZRotation);
+                  player.zRotation += zDiff > 0
+                    ? Math.min(zDiff, cappedDelta * Z_TORQUE)
+                    : Math.max(zDiff, cappedDelta * -Z_TORQUE);
+                  
                 }
+                let targetXRotation: number;
+                if (onGround) {
+                  // set the xRotation to match the ground 
+                  const cosXRotation = vectorNDotProduct(
+                    playerFacingNormal,
+                    player.lastOnGroundNormal,
+                  );
+                  
+                  targetXRotation = Math.acos(cosXRotation) - Math.PI/2;
+                } else {
+                  targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
+                    ? cameraXRotation
+                    : player.xRotation;
+                  
+                }
+                const xDiff = mathAngleDiff(player.xRotation, targetXRotation);
+                player.xRotation += xDiff > 0
+                  ? Math.min(xDiff, cappedDelta * X_TORQUE)
+                  : Math.max(xDiff, cappedDelta * -X_TORQUE);
+
                 const targetLateralOffset = vector3TransformMatrix4(
-                  cameraZRotationMatrix,
+                  entityZRotationNormal,
                   ...targetUnrotatedLateralOffset,
                   0,
                 );
@@ -1663,23 +1698,23 @@ window.onload = async () => {
                   : 0;
                 entity.targetLateralPosition = vectorNScaleThenAdd(entity.position, targetLateralOffset);
                 const jumpUnread = someInputUnread(INPUT_JUMP);
-                entity.gravity = DEFAULT_GRAVITY;
-                if (onGround || jumpUnread) {
-                  if (!hasJointAnimation(entity, ACTION_ID_FLAP)) {
+                if (jumpUnread) {
+                  if (!flapping) {
                     if (readInput(INPUT_JUMP)) {
                       // TODO just supply numbers that don't require normalisation
                       const targetNormal = vectorNNormalize(
                         vector3TransformMatrix4(
-                          matrix4Rotate(player.zRotation, 0, 0, 1),
+                          matrix4Multiply(
+                            matrix4Rotate(player.zRotation, 0, 0, 1),
+                            matrix4Rotate(player.xRotation, 1, 0, 0),
+                          ),
                           0, 1, 1,
                         )
                       );
                       console.log('onGround', onGround, targetNormal);
                       entity.velocity = vectorNScaleThenAdd(
                         entity.velocity,
-                        onGround
-                          ? entity.lastOnGroundNormal
-                          : targetNormal,
+                        targetNormal,
                         .002,
                       );
                       entity.lastOnGroundTime = 0;
@@ -1687,9 +1722,8 @@ window.onload = async () => {
                     }
                   }
                 } else {
-                  if (readInput(INPUT_JUMP, 1)) {
+                  if (readInput(INPUT_JUMP, 1) && !onGround) {
                     setJointAnimations(entity, DRAGON_ANIMATION_GLIDE);
-                    entity.gravity = DEFAULT_GRAVITY/9;
                   }
                 }
                 // animate behaviour
@@ -1764,8 +1798,44 @@ window.onload = async () => {
                 ];
                 
               } else {
-                // TODO flying/falling
-
+                // flying/falling
+                const gravity = entity.gravity;
+                if (gliding && gravity) {
+                  const xRotation = entity.xRotation || 0;
+                  const zRotation = entity.zRotation || 0;
+                  const velocityLength = vectorNLength(entity.velocity);
+                  const velocityNormal = vectorNNormalize(entity.velocity);
+                  const targetVelocityNormal = vector3TransformMatrix4(
+                    matrix4Multiply(
+                      matrix4Rotate(zRotation, 0, 0, 1),
+                      matrix4Rotate(xRotation, 1, 0, 0),
+                    ),
+                    0, 1, 0,
+                  );
+                  let achievableVelocity = entity.velocity;
+                  const cosa = vectorNDotProduct(velocityNormal, targetVelocityNormal);
+                  if (cosa < 1 - EPSILON) {
+                    const targetAngle = Math.acos(cosa);
+                    const axis = vectorNNormalize(
+                      vector3CrossProduct(velocityNormal, targetVelocityNormal),
+                    );
+                    
+                    const achievableAngle = targetAngle > 0
+                      ? Math.min(targetAngle, cappedDelta * TURN_TORQUE)
+                      : Math.max(targetAngle, cappedDelta * -TURN_TORQUE);
+                    // TODO maybe rotate on the y axis by the amount missing?
+                    achievableVelocity = vector3TransformMatrix4(
+                      matrix4Rotate(achievableAngle, ...axis),
+                      ...vectorNScale(achievableVelocity, 1),
+                    );
+                    
+                  }
+                  // reverse the effects of gravity by the amount we are facing up
+                  // achievableVelocity[2] = gravity * cappedDelta
+                  //   * (1 + Math.sin(xRotation))
+                  //   * Math.min(1, velocityLength*99);
+                  entity.velocity = achievableVelocity;
+                }
               }
             }
             
@@ -2218,6 +2288,7 @@ window.onload = async () => {
               modelAtlasIndex = 0,
               body,
               zRotation,
+              xRotation,
             } = entity;
 
             function appendRender(
@@ -2285,9 +2356,9 @@ window.onload = async () => {
               body,
               entity.position,
               matrix4Multiply(
-                // remove?
                 entity.animationTransform,
                 zRotation && matrix4Rotate(zRotation, 0, 0, 1),
+                xRotation && matrix4Rotate(xRotation, 1, 0, 0),
               ),              
             );
             if (entity.fire) {

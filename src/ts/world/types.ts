@@ -151,6 +151,7 @@ type StaticEntity<PartId extends number = number> = {
   velocity?: undefined,
   readonly inverseMass?: undefined,
   zRotation?: undefined,
+  xRotation?: undefined,
 } & BaseEntity<PartId>;
 
 type BaseDynamicEntity<PartId extends number = number> = {
@@ -175,6 +176,8 @@ type DynamicEntity<PartId extends number = number> = {
   | EntityTypeParticle
   | EntityTypeScenery
   | EntityTypeExplosion,
+  xRotation?: undefined,
+
 } & BaseDynamicEntity<PartId>;
 
 type ActiveEntity<PartId extends number = number> = {
@@ -183,4 +186,6 @@ type ActiveEntity<PartId extends number = number> = {
   targetLateralPosition?: ReadonlyVector2 | ReadonlyVector3;
   maximumLateralVelocity: number,
   maximumLateralAcceleration: number,
+  xRotation: number,
+  zRotation: number,
 } & BaseDynamicEntity<PartId>;

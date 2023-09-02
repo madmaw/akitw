@@ -12,3 +12,4 @@ const FLAG_STONEY_SLOPES = false;
 const FLAG_SAFE_STRING_TO_INT = false;
 const FLAG_CLOUDS = true;
 const FLAG_ENFORCE_BOUNDARY = true;
+const FLAG_USE_CAMERA_POSITION_TO_MOVE = false;

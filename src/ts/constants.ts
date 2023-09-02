@@ -5,6 +5,9 @@ const NORMAL_Z: ReadonlyVector3 = [0, 0, 1];
 
 const EPSILON = .0001;
 const DEFAULT_GRAVITY = .00001;
+const Z_TORQUE = .002;
+const X_TORQUE = .001;
+const TURN_TORQUE = .001;
 
 
 const RESOLUTIONS = 8;
