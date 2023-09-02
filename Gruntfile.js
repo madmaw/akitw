@@ -154,7 +154,7 @@ module.exports = function (grunt) {
             overwrite: true,
             replacements: [{
               from: /build\/out\.js/g,
-              to:"out.min.rr.js"
+              to:"out.min.js"
             }, { // gut the HTML entirely!
               from: "</body></html>",
               to: ""
@@ -226,9 +226,6 @@ module.exports = function (grunt) {
                 from: /(\,|\{)\["(\w+)"\]:/g,
                 to: "$1$2:"
               }, {
-                from: "${Math.random()/999}",
-                to: "0.",
-              }, {
                 from: "forEach",
                 to: "map"
               }, {
@@ -239,12 +236,13 @@ module.exports = function (grunt) {
           js2: { // second pass for the bits that we changed above
             src: ['dist/out.min.js'],
             overwrite: true,
-            replacements: [{
-              from: /(\s)+/g,
-              to:" "
-            }, {
-              from: /((\\n)\s*)+/g,
-              to:" "
+            replacements: [
+              {
+              // from: /(\s)+/g,
+              // to:" "
+            // }, {
+            //   from: /([^s]\s*\\n\s*)+/g,
+            //   to:" "
             }, {
               from: /([^a-zA-Z0-9$])\s(\w)/g,
               to: "$1$2"
@@ -256,6 +254,9 @@ module.exports = function (grunt) {
               to: "$1$2"
             }, {
               from: ",null)",
+              to: ")",
+            }, {
+              from: ",undefined)",
               to: ")",
             }]
         },
@@ -331,11 +332,11 @@ module.exports = function (grunt) {
     'prod', 
     'replace:hax',
     'closure-compiler:es2021', 
-    'exec:roadroller',
+    /*'exec:roadroller',*/
     'copy',
     'cssmin', 
     'replace:html', 
-    'replace:js', 'replace:js2', 'replace:js2', 
+    //'replace:js', 'replace:js2', 'replace:js2', 
     'inline', 
     'htmlmin',
     /* 'replace:html2',*/

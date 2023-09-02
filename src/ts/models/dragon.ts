@@ -386,6 +386,12 @@ const DRAGON_ANIMATION_GLIDE: ActionJointAnimationSequences<DragonPartIds> = [
         [0, 0, 0],
       ],
       [
+        DRAGON_PART_ID_TAIL,
+        DRAGON_ANIMATION_GLIDE_FRAME_DURATION * 2,
+        EASING_QUAD_IN_OUT,
+        [Math.PI*.1, 0, 0],
+      ],
+      [
         DRAGON_PART_ID_QUAD_RIGHT,
         DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
@@ -402,6 +408,7 @@ const DRAGON_ANIMATION_GLIDE: ActionJointAnimationSequences<DragonPartIds> = [
         DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
         [0, 0, 0],
+        [0, -Math.PI*.02, 0],
       ],
       [
         DRAGON_PART_ID_WING_2_RIGHT,

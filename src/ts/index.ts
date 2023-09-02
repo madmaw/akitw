@@ -563,7 +563,6 @@ window.onload = async () => {
 
   );
   
-  let previousPosition: ReadonlyVector2 | undefined;
   let cameraZoom = -2;
   let cameraZRotation = 0;
   let cameraXRotation = 0;
@@ -1348,28 +1347,22 @@ window.onload = async () => {
   };
   addEntity(player);
 
-  window.onmousedown = (e: MouseEvent) => previousPosition = [e.clientX, e.clientY];
-  window.onmouseup = () => previousPosition = null;
+  window.onmousedown = () => Z.requestPointerLock();
   window.onmousemove = (e: MouseEvent) => {
-    const currentPosition: ReadonlyVector2 = [e.clientX, e.clientY];
-    if (previousPosition) {
-      const delta = vectorNScaleThenAdd(currentPosition, previousPosition, -1);
-      const rotation = vectorNLength(delta)/399;
-      if (rotation > EPSILON) {
-        cameraZRotation -= delta[0]/399;
-        cameraXRotation = Math.max(
-          -Math.PI/2,
-          Math.min(
-            Math.PI/6,
-            cameraXRotation - delta[1]/199,
-          ),
-        );
-      }
-      previousPosition = currentPosition;
+    const movement: ReadonlyVector2 = [e.movementX, e.movementY];
+    const rotation = vectorNLength(movement)/399;
+    if (rotation > EPSILON) {
+      cameraZRotation -= movement[0]/399;
+      cameraXRotation = Math.max(
+        -Math.PI/2,
+        Math.min(
+          Math.PI/6,
+          cameraXRotation - movement[1]/199,
+        ),
+      );
     }
   };
-  window.onclick = (e: MouseEvent) => {
-
+  window.onclick = () => {
     // TODO use exact player transform chain
     const playerTransform = matrix4Multiply(
       matrix4Rotate(cameraZRotation, 0, 0, 1),
@@ -1619,7 +1612,7 @@ window.onload = async () => {
     // const tiles = grid.map((gridX, x) => gridX.map((_, y) => getOrCreateGridTile(x, y, 0))).flat(1);    
 
     // NOTE: we convert all forEaches to maps, so although set does support forEach, obfuscation will break
-    [...tiles].forEach((tile) => {
+    tiles.forEach((tile) => {
       for (let entityId in tile.entities) {
         const entity: Entity = tile.entities[entityId];
         if (!handledEntities[entityId]) {
