@@ -11,6 +11,6 @@ const FLAG_SHRINK_FACES = false;
 const FLAG_DEBUG_PHYSICS = ENVIRONMENT == 'test';
 const FLAG_FAST_READ_CANVASES = ENVIRONMENT != 'ultra';
 const FLAG_STONEY_SLOPES = ENVIRONMENT != 'test';
-const FLAG_CLOUDS = true;
+const FLAG_CLOUDS = ENVIRONMENT != 'ultra';
 const FLAG_ENFORCE_BOUNDARY = true;
 const FLAG_SHORT_GLSL_VARIABLE_NAMES = true;

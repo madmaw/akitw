@@ -581,13 +581,13 @@ window.onload = async () => {
   const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
 
   const program = gl.createProgram();
-  if (program == null) {
+  if (program == null && FLAG_SHOW_GL_ERRORS) {
     throw new Error();
   }
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS) && FLAG_SHOW_GL_ERRORS) {
     throw new Error(gl.getProgramInfoLog(program));
   }
   gl.useProgram(program);

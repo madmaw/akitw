@@ -96,16 +96,6 @@ module.exports = function (grunt) {
                 to: "ENVIRONMENT = 'ultra';"
               },
               // math
-              // remove all consts so CC can aggregate consecutive declarations
-              { 
-                from: /(\s)const(\s)/g, 
-                to: "$1let$2"
-              },
-              // flat(1) is identical to flat
-              { 
-                from: ".flat(1)", 
-                to: ".flat()"
-              },
               // webgl constants
               { from: "gl.RENDERBUFFER", to: "0x8D41" },
               { from: "gl.FRAMEBUFFER", to: "0x8D40" },
@@ -159,7 +149,7 @@ module.exports = function (grunt) {
             overwrite: true,
             replacements: [{
               from: /build\/out\.js/g,
-              to:"out.min.js"
+              to:"out.min.rr.js"
             }, { // gut the HTML entirely!
               from: "</body></html>",
               to: ""
@@ -185,86 +175,179 @@ module.exports = function (grunt) {
               to: "name=$1"
             }]
           },          
-          js: {
-              src: ['dist/out.min.js'],
-              overwrite: true,
-              replacements: [{
-                from: "'use strict';",
-                to:""
-              }, {
-                from: "window.",
-                to:""
-              }, /* GLSL comments */ {
-                from: /\/\/([^\n])*\n/g,
-                to:""
-              }, /*{
-                from: /\/\*(.|\\n)*\*\//g,
-                to:""
-              }, */{
-                from: /\$\{\"((\w|\d|\.)*)\"\}/g,
-                to: "$1"
-              }, {
-                from: /\$\{(\-?(\d|\.)*)\}/g,
-                to: "$1"
-              }, {
-                from: "void 0",
-                to: "null"
-              }, {
-                from: "const ",
-                to: "var "
-              }, {
-                from: "const[",
-                to: "var["
-              }, {
-                from: "const{",
-                to: "var{"
-              }, {
-                from: "let ",
-                to: "var "
-              }, {
-                from: "let{",
-                to: "var{"
-              }, {
-                from: "let[",
-                to: "var["
-              }, {
-                from: /(\,|\{)\["(\w+)"\]:/g,
-                to: "$1$2:"
-              }, {
-                from: "forEach",
-                to: "map"
-              }, {
-                from: /var ([a-zA-Z_$]+=[^;\{]+);var/g,
-                to: "var $1,",
-              }]
-          },
-          js2: { // second pass for the bits that we changed above
+          js0: {
             src: ['dist/out.min.js'],
             overwrite: true,
             replacements: [
+              // convert from back ticks as regex ignores stuff in backticks?!
               {
-              // from: /(\s)+/g,
-              // to:" "
+                from: "`",
+                to:"\""
+              },
+            ]
+          },
+          js1: {
+            src: ['dist/out.min.js'],
+            overwrite: true,
+            replacements: [
+              // remove all consts so CC can aggregate consecutive declarations
+              { 
+                from: /(\s)const(\s)/g, 
+                to: "$1let$2"
+              },
+              // flat(1) is identical to flat
+              { 
+                from: ".flat(1)", 
+                to: ".flat()"
+              },
+              {
+                from: "'use strict';",
+                to:""
+              },
+              {
+                from: "window.",
+                to:""
+              },
+              /* GLSL // comments */ 
+              {
+                from: /\/\/([^\n])*\n/g,
+                to:""
+              }, 
+              // GLSL /* */ comments
+              {
+                from: /\/\*(.|\\n)*\*\//g,
+                to:""
+              },
+              // `${"X"}` -> `X`
+              {
+                from: /\$\{\"((\w|\d|\.)*)\"\}/g,
+                to: "$1"
+              },
+              // `${-1.2}` -> `-1.2`
+              {
+                from: /\$\{(\-?(\d|\.)*)\}/g,
+                to: "$1"
+              },
+              {
+                from: "void 0",
+                to: "null"
+              },
+              // new lines 
+              {
+                from: /\\n/g,
+                to:" "
+              },
+              
+              // turn consts to lets
+              {
+                from: "const ",
+                to: "let "
+              },
+              {
+                from: "const[",
+                to: "let["
+              },
+              {
+                from: "const{",
+                to: "let{"
+              },
+             /*
+              {
+                from: /(\,|\{)\["(\w+)"\]:/g,
+                to: "$1$2:"
+              },
+              */
+              /*
+              {
+                from: /var ([a-zA-Z_$]+=[^;\{]+);var/g,
+                to: "var $1,",
+              }
+              */
+            ]
+          },
+          js2: { 
+            src: ['dist/out.min.js'],
+            overwrite: true,
+            replacements: [
+              // {
+              //   from: /(([^s])\s*(\\n)\s*)+/g,
+              //   to:"$2 "
+              // },
+              // remove duplicate white space characters
+              {
+                from: /\s+/g,
+                to:" "
+              },
+              // everything back to back ticks
+              {
+                from: "\"",
+                to:"`"
+              },
+              // GLSL demands a new line here
+              {
+                from: "#version 300 es",
+                to:"#version 300 es\n"
+              },
+              // turn lets to vars, black hat, look here if you get weird behaviour
+              {
+                from: "let ",
+                to: "var "
+              },
+              {
+                from: "let{",
+                to: "var{"
+              },
+              {
+                from: "let[",
+                to: "var["
+              },
+
             // }, {
-            //   from: /([^s]\s*\\n\s*)+/g,
-            //   to:" "
-            }, {
-              from: /([^a-zA-Z0-9$])\s(\w)/g,
-              to: "$1$2"
-            }, {
-              from: /(\w)\s([^a-zA-Z0-9$])/g,
-              to: "$1$2"
-            }, {
-              from: /([^a-zA-Z0-9$])\s([^a-zA-Z0-9$])/g,
-              to: "$1$2"
-            }, {
+            //   from: /([^a-zA-Z0-9$])\s(\w)/g,
+            //   to: "$1$2"
+            // }, {
+            //   from: /(\w)\s([^a-zA-Z0-9$])/g,
+            //   to: "$1$2"
+            // }, {
+            //   from: /([^a-zA-Z0-9$])\s([^a-zA-Z0-9$])/g,
+            //   to: "$1$2"
+            // }, , 
+          ]
+        },
+        js3: { 
+          src: ['dist/out.min.js'],
+          overwrite: true,
+          replacements: [
+            // remove spaces after special characters
+            {
+              from: /\s*(\;|\,|\)|\(|\+|\=|\*|\}|\{|\:|\?|\>|\<|\/)\s*/g,
+              to:"$1"
+            },
+            // remove spaces between minus signs provided it's not followed
+            // by another minus sign
+            {
+              from: /\-\s*([^\-])/g,
+              to:"-$1"
+            },
+            // remove spaces between minus signs provided it's not preceeded
+            // by another minus sign
+            {
+              from: /([^\-])\s*\-/g,
+              to:"$1-"
+            },
+
+            // null params can just be left off
+            {
               from: ",null)",
               to: ")",
-            }, {
+            },
+            // undefined params can just be left off
+            {
               from: ",undefined)",
               to: ")",
-            }]
-        },
+            }
+          ]
+        }
       },
       copy: {
           html: {
@@ -337,10 +420,14 @@ module.exports = function (grunt) {
     'prod', 
     'replace:hax',
     'closure-compiler:es2021', 
-    /*'exec:roadroller',*/
     'copy',
     'cssmin', 
     'replace:html', 
+    'replace:js0',
+    'replace:js1',
+    'replace:js2',
+    'replace:js3',
+    'exec:roadroller',
     //'replace:js', 'replace:js2', 'replace:js2', 
     'inline', 
     'htmlmin',
