@@ -93,13 +93,18 @@ module.exports = function (grunt) {
               // turn on production mode
               {
                 from: /ENVIRONMENT = '\w+';/g,
-                to: "ENVIRONMENT = 'small';"
+                to: "ENVIRONMENT = 'ultra';"
               },
               // math
               // remove all consts so CC can aggregate consecutive declarations
               { 
                 from: /(\s)const(\s)/g, 
                 to: "$1let$2"
+              },
+              // flat(1) is identical to flat
+              { 
+                from: ".flat(1)", 
+                to: ".flat()"
               },
               // webgl constants
               { from: "gl.RENDERBUFFER", to: "0x8D41" },

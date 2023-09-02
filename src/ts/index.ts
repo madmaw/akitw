@@ -1,30 +1,29 @@
-const U_WORLD_POSITION = 'uWorldPosition';
-const U_WORLD_ROTATION_MATRIX = 'uWorldRotation';
-const U_PROJECTION_MATRIX = 'uProjection';
-const U_CAMERA_POSITION = 'uCameraPosition';
-const U_FOCUS_POSITION = 'uFocusPosition';
-const U_MATERIAL_ATLAS = 'uMaterialAtlas';
-const U_MATERIAL_TEXTURE = 'uMaterialTexture';
-const U_MATERIAL_COLORS = 'uMaterialColors';
-const U_TIME = 'uTime';
-const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = 'uAtlasTextureIndex';
-const U_LASERS = 'uLasers';
-const U_FIREBALLS = 'uFireballs';
+const U_WORLD_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'a' : 'uWorldPosition';
+const U_WORLD_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'b' : 'uWorldRotation';
+const U_PROJECTION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'c' : 'uProjection';
+const U_CAMERA_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'd' : 'uCameraPosition';
+const U_FOCUS_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'e' : 'uFocusPosition';
+const U_MATERIAL_ATLAS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'f' : 'uMaterialAtlas';
+const U_MATERIAL_TEXTURE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'g' : 'uMaterialTexture';
+const U_MATERIAL_COLORS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'h' : 'uMaterialColors';
+const U_TIME = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'i' : 'uTime';
+const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'j' : 'uAtlasTextureIndex';
+const U_FIREBALLS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'k' : 'uFireballs';
 
-const A_VERTEX_MODEL_POSITION = "aVertexModelPosition";
-const A_VERTEX_MODEL_ROTATION_MATRIX = 'aVertexModelRotation';
-const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = 'aVertexModelSmoothingRotation';
-const A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX = 'aModelTexturePosition';
+const A_VERTEX_MODEL_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'z' : "aVertexModelPosition";
+const A_VERTEX_MODEL_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'y' : 'aVertexModelRotation';
+const A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'x' : 'aVertexModelSmoothingRotation';
+const A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'w' : 'aModelTexturePosition';
 
-const V_MODEL_POSITION = 'vModelPosition';
-const V_WORLD_POSITION = 'vWorldPosition';
-const V_MODEL_ROTATION_MATRIX = 'vModelRotation';
-const V_MODEL_SMOOTHING_ROTATION_MATRIX = 'vModelSmoothingRotation';
-const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = 'vInverseModelSmoothingRotation';
-const V_WORLD_PLANE_NORMAL = 'vWorldPlaneNormal';
-const V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX = 'vWorldTexturePosition'
+const V_MODEL_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Z' : 'vModelPosition';
+const V_WORLD_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Y' : 'vWorldPosition';
+const V_MODEL_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'X' : 'vModelRotation';
+const V_MODEL_SMOOTHING_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'W' : 'vModelSmoothingRotation';
+const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'V' : 'vInverseModelSmoothingRotation';
+const V_WORLD_PLANE_NORMAL = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'U' : 'vWorldPlaneNormal';
+const V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'T' : 'vWorldTexturePosition';
 
-const O_COLOR = "oColor";
+const O_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'S' : "oColor";
 
 const VERTEX_SHADER = `#version 300 es
   precision lowp float;
@@ -66,8 +65,25 @@ const STEP = .01;
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
 const MAX_MATERIAL_TEXTURE_COUNT = 3;
-const MAX_LASERS = 1;
 const MAX_FIREBALLS = 9;
+
+const L_MAX_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'A' : 'maxDepth';
+const L_CAMERA_DELTA = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'B' : 'cameraDistance';
+const L_SURFACE_CAMERA_DIRECTION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'C' : 'surfaceCameraDirection';
+const L_SURFACE_SCALING = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'D' : 'surfaceScaling';
+const L_MAX_PIXEL = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'E' : 'maxPixel';
+const L_MAX_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'F' : 'maxColor';
+const L_MATERIALNESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'G' : 'materialness';
+const L_TEXTURE_INDEX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'H' : 'textureIndex';
+const L_BASE_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'I' : 'baseColor';
+const L_DEPTH_ADJUST = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'J' : 'depthAdjust';
+const L_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'K' : 'depth';
+const L_MAX_STEP_COUNT = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'L' : 'maxStepCount';
+const L_STEP_COUNT = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'M' : 'stepCount';
+const L_SURFACE_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'N' : 'surfaceDepth';
+const L_DIVISOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'O' : 'divisor';
+const L_WATERINESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'P' : 'wateriness';
+const L_WATER_DISTANCE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Q' : 'waterDistance';
 
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
@@ -89,97 +105,105 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
   uniform float ${U_TIME};
   uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
-  uniform mat4 ${U_LASERS}[${MAX_LASERS}];
   uniform mat4 ${U_FIREBALLS}[${MAX_FIREBALLS}];
 
   out vec4 ${O_COLOR};
 
   void main(void) {
-    vec3 distance = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
-    vec4 d = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(distance), 1);
-    // NOTE: c will be positive for camera facing surfaces
-    float c = dot(${V_WORLD_PLANE_NORMAL}.xyz, d.xyz);
+    vec3 ${L_CAMERA_DELTA} = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
+    vec4 ${L_SURFACE_CAMERA_DIRECTION} = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(${L_CAMERA_DELTA}), 1);
+    // NOTE: surface scaling will be positive for camera facing surfaces
+    float ${L_SURFACE_SCALING} = dot(${V_WORLD_PLANE_NORMAL}.xyz, ${L_SURFACE_CAMERA_DIRECTION}.xyz);
     float il = max(1. - pow(length(${U_FOCUS_POSITION} - ${V_WORLD_POSITION}.xyz)/4., 2.), 0.);
-    float maxDepth = -1.;
-    vec4 maxPixel;
-    vec4 maxColor;
+    float ${L_MAX_DEPTH} = -1.;
+    vec4 ${L_MAX_PIXEL};
+    vec4 ${L_MAX_COLOR};
     // TODO look up material based on adjusted position
     // TODO probably needs to be another matrix to do this
-    vec4 materialness = texture(
+    vec4 ${L_MATERIALNESS} = texture(
       ${U_MATERIAL_ATLAS},
       vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (${V_WORLD_POSITION} - ${U_WORLD_POSITION})).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.x)
     );
-    if (materialness.w < .5) {
+    if (${L_MATERIALNESS}.w < .5) {
       discard;
       return;
     }
-    vec4 baseColor = (
-      ${U_MATERIAL_COLORS}[0]*materialness.x
-        + ${U_MATERIAL_COLORS}[2]*materialness.y
-        + ${U_MATERIAL_COLORS}[4]*materialness.z
-    )/(materialness.x + materialness.y + materialness.z);
+    vec4 ${L_BASE_COLOR} = (
+      ${U_MATERIAL_COLORS}[0]*${L_MATERIALNESS}.x
+        + ${U_MATERIAL_COLORS}[2]*${L_MATERIALNESS}.y
+        + ${U_MATERIAL_COLORS}[4]*${L_MATERIALNESS}.z
+    )/(${L_MATERIALNESS}.x + ${L_MATERIALNESS}.y + ${L_MATERIALNESS}.z);
 
     for (
-      int textureIndex=0;
-      textureIndex < ${MAX_MATERIAL_TEXTURE_COUNT};
-      textureIndex++
+      int ${L_TEXTURE_INDEX}=0;
+      ${L_TEXTURE_INDEX} < ${MAX_MATERIAL_TEXTURE_COUNT};
+      ${L_TEXTURE_INDEX}++
     ) {
       // material
       vec4 tm;
-      float depthAdjust = ((
-        textureIndex > 0
-          ? textureIndex > 1
-            ? materialness.z
-            : materialness.y
-          : materialness.x
+      float ${L_DEPTH_ADJUST} = ((
+        ${L_TEXTURE_INDEX} > 0
+          ? ${L_TEXTURE_INDEX} > 1
+            ? ${L_MATERIALNESS}.z
+            : ${L_MATERIALNESS}.y
+          : ${L_MATERIALNESS}.x
         ) - 1.) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
-      float depth = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z*il/2.;
+      float ${L_DEPTH} = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z*il/2.;
 
       // distances
       vec4 p;
-      float maxCount = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z * il/${STEP};
-      for (float count = 0.; count <= maxCount; count++) {
-        depth -= ${STEP};
-        p = vec4(${V_WORLD_POSITION}.xyz + d.xyz * depth / c, 1);
+      float ${L_MAX_STEP_COUNT} = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z * il/${STEP};
+      for (float ${L_STEP_COUNT} = 0.; ${L_STEP_COUNT} <= ${L_MAX_STEP_COUNT}; ${L_STEP_COUNT}++) {
+        ${L_DEPTH} -= ${STEP};
+        p = vec4(${V_WORLD_POSITION}.xyz + ${L_SURFACE_CAMERA_DIRECTION}.xyz * ${L_DEPTH} / ${L_SURFACE_SCALING}, 1);
 
         vec4 tm1 = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (p - ${U_WORLD_POSITION})).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
+          vec3(
+            (${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (p - ${U_WORLD_POSITION})).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y,
+            ${L_TEXTURE_INDEX}
+          )
         );
   
-        float surfaceDepth = (tm1.z - .5) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
-        if (surfaceDepth > depth) {
-          float d0 = depth + ${STEP};
+        float ${L_SURFACE_DEPTH} = (tm1.z - .5) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
+        if (${L_SURFACE_DEPTH} > ${L_DEPTH}) {
+          float d0 = ${L_DEPTH} + ${STEP};
           float s0 = d0 - (tm.z - .5) * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z/2.;
-          float s1 = d0 - surfaceDepth;
-          float divisor = ${STEP} - s1 + s0;
+          float s1 = d0 - ${L_SURFACE_DEPTH};
+          float ${L_DIVISOR} = ${STEP} - s1 + s0;
           // make sure it's not almost parallel, if it is, defer until next iteration
-          if (abs(divisor) > .0) {  
-            float si = s0 * ${STEP}/divisor;
-            depth += ${STEP} - si;
-            p = vec4(${V_WORLD_POSITION}.xyz + d.xyz * (d0 - si) / c, 1);
-            count = maxCount;
+          if (abs(${L_DIVISOR}) > .0) {  
+            float si = s0 * ${STEP}/${L_DIVISOR};
+            ${L_DEPTH} += ${STEP} - si;
+            p = vec4(
+              ${V_WORLD_POSITION}.xyz + ${L_SURFACE_CAMERA_DIRECTION}.xyz * (d0 - si) / ${L_SURFACE_SCALING},
+              1
+            );
+            ${L_STEP_COUNT} = ${L_MAX_STEP_COUNT};
           }
         }
         tm = texture(
           ${U_MATERIAL_TEXTURE},
-          vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (p - ${U_WORLD_POSITION})).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y, textureIndex)
+          vec3(
+            (${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (p - ${U_WORLD_POSITION})).xy * ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.y,
+            ${L_TEXTURE_INDEX}
+          )
         );  
       }
 
       // TODO depth adjust should be applied before here
-      if (depth + depthAdjust > maxDepth) {
-        maxDepth = depth + depthAdjust;
-        maxPixel = tm;
-        maxColor = mix(
-          baseColor,
-          ${U_MATERIAL_COLORS}[textureIndex*2+1],
+      if (${L_DEPTH} + ${L_DEPTH_ADJUST} > ${L_MAX_DEPTH}) {
+        ${L_MAX_DEPTH} = ${L_DEPTH} + ${L_DEPTH_ADJUST};
+        ${L_MAX_PIXEL} = tm;
+        ${L_MAX_COLOR} = mix(
+          ${L_BASE_COLOR},
+          ${U_MATERIAL_COLORS}[${L_TEXTURE_INDEX}*2+1],
           tm.w * 2. - 1.
         );
       }
     }
 
-    vec2 n = maxPixel.xy * 2. - 1.;
+    vec2 n = ${L_MAX_PIXEL}.xy * 2. - 1.;
     vec3 m = normalize(
       ${U_WORLD_ROTATION_MATRIX}
         * ${V_MODEL_ROTATION_MATRIX}
@@ -193,7 +217,7 @@ const FRAGMENT_SHADER = `#version 300 es
           1
         )
       ).xyz;
-    vec4 color = maxColor * il + baseColor * (1. - il);
+    ${L_BASE_COLOR} = ${L_MAX_COLOR} * il + ${L_BASE_COLOR} * (1. - il);
 
     float fireiness = 0.;
     for (int i=0; i<${MAX_FIREBALLS}; i++) {
@@ -215,13 +239,9 @@ const FRAGMENT_SHADER = `#version 300 es
       );
     }
     
-    float lighting = max(
-      .3, 
-      1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * color.w
-    );
-
-    vec3 waterDistance = distance * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(distance.z + maxDepth, .1));
-    float wateriness = 1. - pow(1. - clamp(distance.z - waterDistance.z - maxDepth, 0., 1.), 9.);
+    vec3 ${L_WATER_DISTANCE} = ${L_CAMERA_DELTA}
+      * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
+    float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
 
     vec3 fc = mix(
       // fire
@@ -229,9 +249,12 @@ const FRAGMENT_SHADER = `#version 300 es
         // water
         mix(
           // lighting
-          color.xyz * lighting,
-          mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., wateriness), 2.)),
-          wateriness  
+          ${L_BASE_COLOR}.xyz * max(
+            .3, 
+            1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
+          ),
+          mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
+          ${L_WATERINESS}  
         ),
         mix(
           vec3(1,0,0),
@@ -242,49 +265,13 @@ const FRAGMENT_SHADER = `#version 300 es
       ),
       // fog
       vec3(${SKY_LOW.join()}),
-      pow(min(1., length(waterDistance)/${MAX_FOG_DEPTH}.), 1.) * wateriness
+      pow(min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.), 1.) * ${L_WATERINESS}
     );
     ${O_COLOR} = vec4(sqrt(fc), 1);
   }
 `;
 
 window.onload = async () => {
-
-  // cube
-  const cube: ConvexShape<PlaneMetadata> = [
-    toPlane(0, 0, 1, .2, defaultPlaneMetadata),
-    toPlane(0, 0, -1, .2, defaultPlaneMetadata),
-    toPlane(1, 0, 0, .2, defaultPlaneMetadata),
-    toPlane(-1, 0, 0, .2, defaultPlaneMetadata),
-    toPlane(0, 1, 0, .2, defaultPlaneMetadata),
-    toPlane(0, -1, 0, .2, defaultPlaneMetadata),
-  ];
-
-  const cubeSmall: ConvexShape<PlaneMetadata> = [
-    toPlane(0, 0, 1, .01, defaultPlaneMetadata),
-    toPlane(0, 0, -1, .01, defaultPlaneMetadata),
-    toPlane(1, 0, 0, .01, defaultPlaneMetadata),
-    toPlane(-1, 0, 0, .01, defaultPlaneMetadata),
-    toPlane(0, 1, 0, .01, defaultPlaneMetadata),
-    toPlane(0, -1, 0, .01, defaultPlaneMetadata),
-  ];
-
-  const cubeBig: ConvexShape<PlaneMetadata> = [
-    toPlane(0, 0, 1, .4, defaultPlaneMetadata),
-    toPlane(0, 0, -1, .4, defaultPlaneMetadata),
-    toPlane(1, 0, 0, .4, defaultPlaneMetadata),
-    toPlane(-1, 0, 0, .4, defaultPlaneMetadata),
-    toPlane(0, 1, 0, .4, defaultPlaneMetadata),
-    toPlane(0, -1, 0, .4, defaultPlaneMetadata),
-  ];
-
-  // const shapes: readonly Shape[] = ([
-  //   [shape5, [shape6]],
-  //   [shape1, [shape2, shape3, shape4, shape6]],
-  // ] as const);
-
-  //console.log(modelShapesFaces);
-
   const depths = create2DArray<number>(DEPTH_DIMENSION + 1, DEPTH_DIMENSION + 1, (x, y) => {
     // pin edges to below sea level
     const dx = DEPTH_DIMENSION/2 - x;
@@ -1099,26 +1086,7 @@ window.onload = async () => {
           });
         });
         return Promise.resolve([materialCanvas, dimension, frames.length]);
-      }).concat([
-        // SVG textures (if any)
-      ].map(svg => {
-        const image = new Image(MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
-        let blob = new Blob(
-          [
-            `<svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="-1 -1 99 99">${svg}</svg>`
-          ],
-          {type: 'image/svg+xml'},
-        );
-        let url = URL.createObjectURL(blob);
-        image.src = url;
-
-        return new Promise(resolve => {
-          image.onload = () => resolve([image]);
-        });
       }),
-    ),
   );
   let textureId = gl.TEXTURE0;
 
@@ -1704,7 +1672,6 @@ window.onload = async () => {
                           0, 1, 1,
                         )
                       );
-                      console.log('onGround', onGround, targetNormal);
                       entity.velocity = vectorNScaleThenAdd(
                         entity.velocity,
                         targetNormal,

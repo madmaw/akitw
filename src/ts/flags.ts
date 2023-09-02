@@ -1,15 +1,16 @@
-const FLAG_SHOW_GL_ERRORS = true;
-const FLAG_SHOW_FPS = true;
-const FLAG_DEBUG_SHORTENED_METHODS = false;
-const FLAG_QUICK_COLLISIONS = true;
-const FLAG_CHECK_STARTS_OVERLAPPING = true;
+const ENVIRONMENT: 'test' | 'small' | 'ultra' = 'test' as any;
+
+const FLAG_SHOW_GL_ERRORS = ENVIRONMENT == 'test';
+const FLAG_SHOW_FPS = ENVIRONMENT == 'test';
+const FLAG_DEBUG_SHORTENED_METHODS = ENVIRONMENT == 'test';
+const FLAG_QUICK_COLLISIONS = ENVIRONMENT != 'ultra';
+const FLAG_CHECK_STARTS_OVERLAPPING = ENVIRONMENT == 'test';
 const FLAG_LOW_POLY_TERRAIN = true;
 const FLAG_SAFE_UNROTATED_VELOCITY = true;
 const FLAG_SHRINK_FACES = false;
-const FLAG_DEBUG_PHYSICS = true;
-const FLAG_FAST_READ_CANVASES = true;
-const FLAG_STONEY_SLOPES = false;
-const FLAG_SAFE_STRING_TO_INT = false;
+const FLAG_DEBUG_PHYSICS = ENVIRONMENT == 'test';
+const FLAG_FAST_READ_CANVASES = ENVIRONMENT != 'ultra';
+const FLAG_STONEY_SLOPES = ENVIRONMENT != 'test';
 const FLAG_CLOUDS = true;
 const FLAG_ENFORCE_BOUNDARY = true;
-const FLAG_USE_CAMERA_POSITION_TO_MOVE = false;
+const FLAG_SHORT_GLSL_VARIABLE_NAMES = true;
