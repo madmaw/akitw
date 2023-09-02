@@ -32,40 +32,46 @@ function dedupePolygon(polygon: ConvexPolygon) {
 }
 
 function toFace<T>(
-  p1: ReadonlyVector3,
-  p2: ReadonlyVector3,
-  p3: ReadonlyVector3,
   t: T,
+  ...points: ReadonlyVector3[]
 ): Face<T> {
-  const d2 = vectorNNormalize(vectorNScaleThenAdd(p2, p1, -1));
-  const d3 = vectorNNormalize(vectorNScaleThenAdd(p3, p1, -1));
-  const normal = vectorNNormalize(vector3CrossProduct(d2, d3));
-  const [translateToModelCoordinates, rotateToModelCoordinates] = planeToTransforms([
-    normal, p1
-  ]);
-
-  const toModelCoordinates = matrix4Multiply(
-    rotateToModelCoordinates,
-    translateToModelCoordinates,
-  );
-
-  const toPlaneCoordinates = matrix4Invert(toModelCoordinates);
-  const polygon = [p1, p2, p3].map(p => vector3TransformMatrix4(toPlaneCoordinates, ...p));
-  const center = polygon.reduce((total, p) => vectorNScaleThenAdd(total, p, 1/3));
-  const adjustedPolygon = FLAG_SHRINK_FACES
-    ? polygon.map(p => {
-      const d = vectorNScaleThenAdd(p, center, -1);
-      return vectorNScaleThenAdd(center, d, 1 - EPSILON);
-    })
-    : polygon;
-
-
-  return {
-    //polygons: [polygon],
-    polygons: [adjustedPolygon],
-    toModelCoordinates,
-    rotateToModelCoordinates,
-    t,
+  for (let i=0; i<points.length; i++) {
+    const p1 = points[i];
+    const p2 = points[(i+1)%points.length];
+    const p3 = points[(i+2)%points.length];
+    const d2 = vectorNNormalize(vectorNScaleThenAdd(p2, p1, -1));
+    const d3 = vectorNNormalize(vectorNScaleThenAdd(p3, p1, -1));
+    const normal = vectorNNormalize(vector3CrossProduct(d2, d3));
+    const [translateToModelCoordinates, rotateToModelCoordinates] = planeToTransforms([
+      normal, p1
+    ]);
+  
+    const toModelCoordinates = matrix4Multiply(
+      rotateToModelCoordinates,
+      translateToModelCoordinates,
+    );
+  
+    const toPlaneCoordinates = matrix4Invert(toModelCoordinates);
+    if (toPlaneCoordinates) {
+      const polygon = [p1, p2, p3].map(p => vector3TransformMatrix4(toPlaneCoordinates, ...p));
+      const center = polygon.reduce((total, p) => vectorNScaleThenAdd(total, p, 1/3));
+      const adjustedPolygon = FLAG_SHRINK_FACES
+        ? polygon.map(p => {
+          const d = vectorNScaleThenAdd(p, center, -1);
+          return vectorNScaleThenAdd(center, d, 1 - EPSILON);
+        })
+        : polygon;
+    
+    
+      return {
+        //polygons: [polygon],
+        polygons: [adjustedPolygon],
+        toModelCoordinates,
+        rotateToModelCoordinates,
+        t,
+      }
+  
+    }  
   }
 }
 

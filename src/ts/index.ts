@@ -440,9 +440,9 @@ window.onload = async () => {
       }
       const groundFaces = workingArray.map((point, i) => {
         const nextPoint = points[(i+1)%points.length];
-        return toFace<PlaneMetadata>(axisPoint, point, nextPoint, {
+        return toFace<PlaneMetadata>({
           textureCoordinateTransform: matrix4Scale(1/WORLD_DIMENSION),
-        });
+        }, axisPoint, point, nextPoint);
       });
       const {
         faces,
