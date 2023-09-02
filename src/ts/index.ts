@@ -8,7 +8,6 @@ const U_MATERIAL_TEXTURE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'g' : 'uMaterialText
 const U_MATERIAL_COLORS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'h' : 'uMaterialColors';
 const U_TIME = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'i' : 'uTime';
 const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'j' : 'uAtlasTextureIndex';
-const U_FIREBALLS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'k' : 'uFireballs';
 
 const A_VERTEX_MODEL_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'z' : "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'y' : 'aVertexModelRotation';
@@ -65,7 +64,6 @@ const STEP = .01;
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
 const MAX_MATERIAL_TEXTURE_COUNT = 3;
-const MAX_FIREBALLS = 9;
 
 const L_MAX_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'A' : 'maxDepth';
 const L_CAMERA_DELTA = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'B' : 'cameraDistance';
@@ -105,7 +103,6 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
   uniform float ${U_TIME};
   uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
-  uniform mat4 ${U_FIREBALLS}[${MAX_FIREBALLS}];
 
   out vec4 ${O_COLOR};
 
@@ -219,49 +216,20 @@ const FRAGMENT_SHADER = `#version 300 es
       ).xyz;
     ${L_BASE_COLOR} = ${L_MAX_COLOR} * il + ${L_BASE_COLOR} * (1. - il);
 
-    float fireiness = 0.;
-    for (int i=0; i<${MAX_FIREBALLS}; i++) {
-      vec4 firePosition = ${U_FIREBALLS}[i] * ${V_WORLD_POSITION};
-      float fireDistance = length(firePosition.xy/firePosition.w);
-      
-      fireiness = max(
-        pow(
-          max(
-            0.,
-            (1.-fireDistance)
-          ) * max(
-            0.,
-            firePosition.z/firePosition.w + 1. - pow(fireDistance, 2.)
-          ),
-          3.
-        ),
-        fireiness
-      );
-    }
-    
     vec3 ${L_WATER_DISTANCE} = ${L_CAMERA_DELTA}
       * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
     float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
 
     vec3 fc = mix(
-      // fire
+      // water
       mix(
-        // water
-        mix(
-          // lighting
-          ${L_BASE_COLOR}.xyz * max(
-            .3, 
-            1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
-          ),
-          mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
-          ${L_WATERINESS}  
+        // lighting
+        ${L_BASE_COLOR}.xyz * max(
+          .3, 
+          1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
         ),
-        mix(
-          vec3(1,0,0),
-          vec3(1,1,0),
-          fireiness
-        ),
-        fireiness
+        mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
+        ${L_WATERINESS}  
       ),
       // fog
       vec3(${SKY_LOW.join()}),
@@ -534,21 +502,6 @@ window.onload = async () => {
   const gl = Z.getContext('webgl2');
 
   let projectionMatrix: ReadonlyMatrix4;
-  const fireProjectionMatrix = matrix4Multiply(
-    matrix4Perspective(
-      Math.PI/4,
-      1,
-      MIN_FOCAL_LENGTH,
-      HORIZON,
-    ),
-    matrix4Rotate(
-      -Math.PI/2,
-      1,
-      0,
-      0,
-    ),
-
-  );
   
   let cameraZoom = -2;
   let cameraZRotation = 0;
@@ -616,7 +569,6 @@ window.onload = async () => {
     uMaterialColors,
     uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
     uTime,
-    uFireballs,
   ] = [
     U_WORLD_POSITION,
     U_WORLD_ROTATION_MATRIX,
@@ -628,7 +580,6 @@ window.onload = async () => {
     U_MATERIAL_COLORS,
     U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH,
     U_TIME,
-    U_FIREBALLS,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
@@ -828,10 +779,12 @@ window.onload = async () => {
   const [
     skyCylinderModel,
     cubeModel,
+    sphereModel,
     billboardModel,
   ] = ([
     SKY_CYLINDER_FACES,
     CUBE_FACES_BODY,
+    SPHERE_FACES_BODY,
     BILLBOARD_FACES,
     DRAGON_FACES_BODY,
     DRAGON_FACES_NECK,
@@ -1349,6 +1302,10 @@ window.onload = async () => {
     // fire a ball 
     const ball: DynamicEntity = {
       entityType: ENTITY_TYPE_FIREBALL,
+      body: {
+        // TODO 
+        modelId: MODEL_ID_SPHERE,
+      },
       resolutions: [0, 1],
       bounds: rect3FromRadius(collisionRadius),
       id: nextEntityId++,
@@ -1360,8 +1317,7 @@ window.onload = async () => {
       renderGroupId: nextRenderGroupId++,
       inverseMass: 9,
       transient: 1,
-      //gravity: DEFAULT_GRAVITY,
-      fire: collisionRadius * 2,
+      modelVariant: VARIANT_FIRE,
     };
 
     addEntity(ball);
@@ -1545,7 +1501,6 @@ window.onload = async () => {
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
     // variantId -> modelId -> position, rotation, resolution, atlasIndex
     const toRender: Partial<Record<VariantId, Record<ModelId, [ReadonlyVector3, ReadonlyMatrix4, number, number][]>>> = {};
-    const fireballs: ReadonlyVector4[] = [];
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/WORLD_DIMENSION).slice(0, 2) as any;
@@ -2321,9 +2276,6 @@ window.onload = async () => {
                 xRotation && matrix4Rotate(xRotation, 1, 0, 0),
               ),              
             );
-            if (entity.fire) {
-              fireballs.push([...entity.position, entity.fire]);
-            }
           }
         }
       }
@@ -2345,10 +2297,6 @@ window.onload = async () => {
       projectionMatrix,
       matrix4Invert(cameraPositionAndRotationMatrix),
     );
-    const firePositionAndProjectionMatrix = matrix4Multiply(
-      fireProjectionMatrix,
-      matrix4Invert(cameraPositionAndRotationMatrix),
-    );
 
     const cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
 
@@ -2357,31 +2305,6 @@ window.onload = async () => {
     gl.uniform3fv(uCameraPosition, cameraPosition);
     gl.uniform3fv(uFocusPosition, player.position as any);
     gl.uniform1f(uTime, now);
-    const fireballMatrices = fireballs.slice(0, MAX_FIREBALLS).map(fireball => {
-      const fireballPosition = fireball.slice(0, 3) as Vector3;
-      const fireballRadius = fireball[3];
-      const distance = vectorNLength(vectorNScaleThenAdd(fireballPosition, cameraPosition, -1));
-
-      const fireballScreenPosition = vector3TransformMatrix4(
-        firePositionAndProjectionMatrix,
-        ...fireballPosition,
-      )
-  
-      return matrix4Multiply(
-        // TODO the z scaling here is not right
-        matrix4Scale(distance/fireballRadius),
-        matrix4Translate(...vectorNScale(fireballScreenPosition, -1)),
-        firePositionAndProjectionMatrix,
-      );
-    });
-    gl.uniformMatrix4fv(
-      uFireballs,
-      false,
-      [
-        ...fireballMatrices.flat(1),
-        ...new Array(16 * (MAX_FIREBALLS - fireballMatrices.length)).fill(0),
-      ],
-    );
 
     //
     // draw the sky cylinder

@@ -38,6 +38,9 @@ function handleCollision(
     case ENTITY_TYPE_FIREBALL:
       entity.dead = 1;
       addEntity({
+        body: {
+          modelId: MODEL_ID_SPHERE,
+        },
         bounds,
         collisionGroup: COLLISION_GROUP_PLAYER,
         collisionRadius: entity.collisionRadius,
@@ -49,16 +52,15 @@ function handleCollision(
         velocity: [0, 0, 0],
         anims: [createAttributeAnimation(
           300,
-          'fire',
+          'animationTransform',
           EASING_BACK_IN,
-          p => 1 - p,
+          createMatrixUpdate(matrix4Scale),
           e => e.dead = 1,
         )],
-        fire: entity.fire,
         transient: 1,
       });
       if (check) {
-        check.onFire = (check.onFire || 0) + entity.fire * 99;
+        check.onFire = (check.onFire || 0) + 1;
       }
       if (check && check.health) {
         check.health--;
@@ -66,12 +68,7 @@ function handleCollision(
           200 + 99 * Math.random(),
           'animationTransform',
           EASING_BOUNCE,
-          createMatrixUpdate(p => matrix4Multiply(
-            matrix4Translate(0, 0, -(check as DynamicEntity).collisionRadius),
-            //matrix4Rotate(-Math.PI*p/4, 0, 1, 0),
-            matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random())),
-            matrix4Translate(0, 0, (check as DynamicEntity).collisionRadius),
-          )),
+          createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
         )];
       }
       break;

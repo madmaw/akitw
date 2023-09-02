@@ -1,16 +1,18 @@
+const VARIANT_NULL = 0;
+const VARIANT_TERRAIN = 1;
+const VARIANT_SYMBOLS = 2;
+const VARIANT_SYMBOLS_BRIGHT = 3;
+const VARIANT_DRAGON_BODY = 4;
+const VARIANT_FIRE = 5;
+
 type VariantId = 
   | typeof VARIANT_NULL
   | typeof VARIANT_TERRAIN
   | typeof VARIANT_SYMBOLS
   | typeof VARIANT_SYMBOLS_BRIGHT
   | typeof VARIANT_DRAGON_BODY
+  | typeof VARIANT_FIRE
   ;
-
-const VARIANT_NULL = 0;
-const VARIANT_TERRAIN = 1;
-const VARIANT_SYMBOLS = 2;
-const VARIANT_SYMBOLS_BRIGHT = 3;
-const VARIANT_DRAGON_BODY = 4;
 
 const VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE = 0;
 
@@ -96,5 +98,15 @@ const VARIANTS: Record<VariantId, Variant> = {
       1, 0, 0, 1,
     ],
     materialTextureScale: 3,
+  },
+  [VARIANT_FIRE]: {
+    atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
+    // TODO fire texture
+    materialTextureId: TEXTURE_EMPTY_MATERIAL,
+    materialTextureColors: [
+      // yellow
+      1, .8, .2, 0,
+      1, .3, 0, 0,
+    ],
   }
 }
