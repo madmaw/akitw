@@ -148,8 +148,9 @@ type StaticEntity<PartId extends number = number> = {
   readonly renderTile?: Tile,
   velocity?: undefined,
   readonly inverseMass?: undefined,
-  zRotation?: undefined,
   xRotation?: undefined,
+  yRotation?: undefined,
+  zRotation?: undefined,
 } & BaseEntity<PartId>;
 
 type BaseDynamicEntity<PartId extends number = number> = {
@@ -175,15 +176,17 @@ type DynamicEntity<PartId extends number = number> = {
   | EntityTypeScenery
   | EntityTypeExplosion,
   xRotation?: undefined,
-
+  yRotation?: undefined,
 } & BaseDynamicEntity<PartId>;
 
 type ActiveEntity<PartId extends number = number> = {
   readonly entityType: 
     | EntityTypeDragon,
-  targetLateralPosition?: ReadonlyVector2 | ReadonlyVector3;
+  // lateral, so the z point can be ignored
+  targetLateralPosition?: ReadonlyVector3;
   maximumLateralVelocity: number,
   maximumLateralAcceleration: number,
   xRotation: number,
+  yRotation: number,
   zRotation: number,
 } & BaseDynamicEntity<PartId>;

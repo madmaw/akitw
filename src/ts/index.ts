@@ -1260,6 +1260,7 @@ window.onload = async () => {
     ],
     renderGroupId: nextRenderGroupId++,
     xRotation: 0,
+    yRotation: 0,
     zRotation: 0,
     velocity: [0, 0, 0],
     maximumLateralVelocity: .01,
@@ -1561,7 +1562,6 @@ window.onload = async () => {
               const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
               const gliding = hasJointAnimation(entity, ACTION_ID_GLIDE);
               const flapping = hasJointAnimation(entity, ACTION_ID_FLAP);
-              const entityZRotationNormal = matrix4Rotate(entity.zRotation, 0, 0, 1);
 
               if (entity == player) {
                 const playerFacingNormal = vector3TransformMatrix4(
@@ -1572,22 +1572,7 @@ window.onload = async () => {
                   ([input]) => someInputUnread(input) || readInput(input),
                 );
                 const running = readInput(INPUT_RUN);
-                const targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<ReadonlyVector2>((velocity, [input, vector, runMultiplier = 0]) => {
-                  const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
-                  return vectorNScaleThenAdd(
-                    velocity,
-                    vector,
-                    cappedDelta * entity.maximumLateralVelocity * multiplier,
-                  );
-                }, [0, 0]);
-                if (someLateralInputsWereUnreadOrNonZero) {
-                  // turn nicely
-                  const zDiff = mathAngleDiff(player.zRotation, cameraZRotation);
-                  player.zRotation += zDiff > 0
-                    ? Math.min(zDiff, cappedDelta * Z_TORQUE)
-                    : Math.max(zDiff, cappedDelta * -Z_TORQUE);
-                  
-                }
+                let targetUnrotatedLateralOffset: ReadonlyVector2;
                 let targetXRotation: number;
                 if (onGround) {
                   // set the xRotation to match the ground 
@@ -1597,11 +1582,37 @@ window.onload = async () => {
                   );
                   
                   targetXRotation = Math.acos(cosXRotation) - Math.PI/2;
+
+                  if (someLateralInputsWereUnreadOrNonZero) {
+                    // turn nicely
+                    const zDiff = mathAngleDiff(player.zRotation, cameraZRotation);
+                    player.zRotation += zDiff > 0
+                      ? Math.min(zDiff, cappedDelta * Z_TORQUE)
+                      : Math.max(zDiff, cappedDelta * -Z_TORQUE);
+                    
+                  }  
+                  targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<Vector2>((velocity, [input, vector, runMultiplier = 0]) => {
+                    const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
+                    return vectorNScaleThenAdd(
+                      velocity,
+                      vector,
+                      cappedDelta * entity.maximumLateralVelocity * multiplier,
+                    );
+                  }, [0, 0])
                 } else {
                   targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
                     ? cameraXRotation
                     : player.xRotation;
-                  
+                  player.zRotation = Math.atan2(player.velocity[1], player.velocity[0]) - Math.PI/2;
+                  if (readInput(INPUT_UP)) {
+                    targetUnrotatedLateralOffset = [0, 1];
+                  } else {
+                    // preemptively undo the rotation below so we continue on in the same direction
+                    targetUnrotatedLateralOffset = [
+                      Math.cos(player.zRotation - cameraZRotation + Math.PI/2),
+                      Math.sin(player.zRotation - cameraZRotation + Math.PI/2),
+                    ];
+                  }
                 }
                 const xDiff = mathAngleDiff(player.xRotation, targetXRotation);
                 player.xRotation += xDiff > 0
@@ -1609,7 +1620,7 @@ window.onload = async () => {
                   : Math.max(xDiff, cappedDelta * -X_TORQUE);
 
                 const targetLateralOffset = vector3TransformMatrix4(
-                  entityZRotationNormal,
+                  matrix4Rotate(cameraZRotation, 0, 0, 1),
                   ...targetUnrotatedLateralOffset,
                   0,
                 );
@@ -1679,8 +1690,9 @@ window.onload = async () => {
                 player.joints[DRAGON_PART_ID_NECK].rotation = rotation;
                 player.joints[DRAGON_PART_ID_HEAD].rotation = rotation;
               }
+              const targetLateralPosition = entity.targetLateralPosition || entity.position;
+              let targetYRotation = 0;
               if (entity.lastOnGroundTime + 99 > time) {
-                const targetLateralPosition = entity.targetLateralPosition || entity.position;
                 const targetLateralDelta = vectorNScaleThenAdd(
                   targetLateralPosition,
                   entity.position,
@@ -1722,15 +1734,18 @@ window.onload = async () => {
                 const gravity = entity.gravity;
                 if (gliding && gravity) {
                   const xRotation = entity.xRotation || 0;
-                  const zRotation = entity.zRotation || 0;
-                  const velocityLength = vectorNLength(entity.velocity);
+                  const targetLateralDirection = vectorNScaleThenAdd(targetLateralPosition, entity.position, -1);
+                  const targetLateralNormal = vectorNNormalize(
+                    vectorNLength(targetLateralDirection) > EPSILON
+                      ? targetLateralDirection
+                      : entity.velocity
+                  );
                   const velocityNormal = vectorNNormalize(entity.velocity);
+                  const targetLateralAngle = Math.atan2(targetLateralNormal[1], targetLateralNormal[0]) - Math.PI/2;
+                  // tilt up or down to match the x rotation
                   const targetVelocityNormal = vector3TransformMatrix4(
-                    matrix4Multiply(
-                      matrix4Rotate(zRotation, 0, 0, 1),
-                      matrix4Rotate(xRotation, 1, 0, 0),
-                    ),
-                    0, 1, 0,
+                    matrix4Rotate(xRotation, Math.cos(targetLateralAngle), Math.sin(targetLateralAngle), 0),
+                    ...targetLateralNormal,
                   );
                   let achievableVelocity = entity.velocity;
                   const cosa = vectorNDotProduct(velocityNormal, targetVelocityNormal);
@@ -1747,9 +1762,19 @@ window.onload = async () => {
                     achievableVelocity = vector3TransformMatrix4(
                       matrix4Rotate(achievableAngle, ...axis),
                       ...vectorNScale(achievableVelocity, 1),
-                    );
-                    
+                    );    
                   }
+                  const lateralVelocityNormal = vectorNNormalize<ReadonlyVector3>([...velocityNormal.slice(0, 2), 0] as Vector3);
+                  const bankCos = vectorNDotProduct<ReadonlyVector3>(
+                    lateralVelocityNormal,
+                    targetLateralNormal,
+                  );
+                  if (bankCos < 1 - EPSILON) {
+                    const bankAxis = vector3CrossProduct(lateralVelocityNormal, targetLateralNormal);
+                    const bankAngle = Math.acos(bankCos);
+                    targetYRotation = bankAxis[2] > 0 ? -bankAngle : bankAngle;
+                  }
+
                   // reverse the effects of gravity by the amount we are facing up
                   // achievableVelocity[2] = gravity * cappedDelta
                   //   * (1 + Math.sin(xRotation))
@@ -1757,6 +1782,11 @@ window.onload = async () => {
                   entity.velocity = achievableVelocity;
                 }
               }
+              // bank smoothly
+              const yDiff = mathAngleDiff(entity.yRotation, targetYRotation);
+              player.yRotation += yDiff > 0
+                ? Math.min(yDiff, cappedDelta * Z_TORQUE)
+                : Math.max(yDiff, cappedDelta * -Z_TORQUE);
             }
             
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
@@ -2207,8 +2237,9 @@ window.onload = async () => {
               modelVariant = VARIANT_NULL,
               modelAtlasIndex = 0,
               body,
-              zRotation,
               xRotation,
+              yRotation,
+              zRotation,
             } = entity;
 
             function appendRender(
@@ -2279,6 +2310,7 @@ window.onload = async () => {
                 entity.animationTransform,
                 zRotation && matrix4Rotate(zRotation, 0, 0, 1),
                 xRotation && matrix4Rotate(xRotation, 1, 0, 0),
+                yRotation && matrix4Rotate(yRotation, 0, 1, 0),
               ),              
             );
           }

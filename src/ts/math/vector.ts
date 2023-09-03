@@ -61,7 +61,7 @@ const vector3GetNormal = (x1: number, y1: number, z1: number, x2: number, y2: nu
     );
 }
 
-const vectorNDotProduct = <T extends readonly number[]>(v1: T, v2: T): number => {
+const vectorNDotProduct = <T extends readonly number[]>(v1: T, v2: readonly number[]): number => {
     return v1.reduce<number>((r, v, i) => r + v * v2[i], 0);
     //return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
 }

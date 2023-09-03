@@ -129,7 +129,7 @@ const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
   // left
   toPlane(-1, -.1, 0, .05, defaultPlaneMetadata),
   // front
-  toPlane(0, 1, 0, .2, defaultPlaneMetadata),  
+  toPlane(0, 1, 0, 0, defaultPlaneMetadata),  
 ];
 
 // , matrix4Multiply(
@@ -379,7 +379,7 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
     {
       id: DRAGON_PART_ID_TAIL,
       modelId: MODEL_ID_DRAGON_TAIL,
-      preRotationOffset: [0, -.3, .23],
+      preRotationOffset: [0, -.19, .22],
     },
     DRAGON_LEG_RIGHT,
     DRAGON_LEG_LEFT,
