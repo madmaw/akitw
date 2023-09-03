@@ -192,7 +192,7 @@ const DRAGON_FACES_HEAD = safeUnpackFaces(
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_HEAD, []]]),
 );
 const DRAGON_FACES_TAIL = safeUnpackFaces(
-  [...'1F:KH(KJ:KJUKFUKDUHLUHDUBLUB/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,'],
+  [...'1F:KH(KJ:KJHKFHKEHJKHJEHEKHE/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_TAIL, []]]),
 );
 const DRAGON_FACES_QUAD_RIGHT = safeUnpackFaces(
