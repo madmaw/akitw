@@ -3,7 +3,7 @@
 
 // avoid white space ' ' = 32 so we don't strip it later and \' so we don't have to escape it
 const UNPACK_STARTING_CHAR_CODE = 40;
-const UNPACK_ALLOWABLE_OVERFLOW = 50;
+const UNPACK_ALLOWABLE_OVERFLOW = 0;
 
 type Unpacker<T> = (c: string[] | undefined) => T;
 
@@ -137,7 +137,10 @@ const packArrayBuilder = <R extends readonly T[], T = any>(packer: Packer<T>, ar
 };
 
 const packNumberBuilder = (scale: number, offset: number): Packer<number> => {
-  return (value: number) => [String.fromCharCode(Math.round(UNPACK_STARTING_CHAR_CODE + (value - offset) * 64/scale))];
+  return (value: number) => {
+    const charCode = Math.round(UNPACK_STARTING_CHAR_CODE + (value - offset) * 64/scale);
+    return [String.fromCharCode(charCode)];
+  }
 };
 
 // -PI..PI
@@ -253,7 +256,11 @@ const safeUnpackerBuilder = <T>(unpacker: Unpacker<T>, packer?: Packer<T> | Fals
           const diff = repackedOriginal.map((v, i) => packedOriginal[i] == v ? [] : [v, packedOriginal[i], i]).filter(i => i.length > 0);
           throw new Error(diff.map(([c1, c2, i]) => `${i}: ${c1}/${c2}`).join(' '));
         }
-        const unprintable = packedOriginal.findIndex(c => c.charCodeAt(0) > UNPACK_STARTING_CHAR_CODE + 64 + UNPACK_ALLOWABLE_OVERFLOW) 
+        const unprintable = packedOriginal.findIndex(c => {
+          const charCode = c.charCodeAt(0);
+          return charCode > UNPACK_STARTING_CHAR_CODE + 64 + UNPACK_ALLOWABLE_OVERFLOW
+            || charCode < UNPACK_STARTING_CHAR_CODE;
+        });
         if (unprintable >= 0) {
           throw new Error(
               'unprintable character "'

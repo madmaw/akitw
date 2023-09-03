@@ -233,7 +233,8 @@ const FRAGMENT_SHADER = `#version 300 es
       ),
       // fog
       vec3(${SKY_LOW.join()}),
-      pow(min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.), 1.) * ${L_WATERINESS}
+      min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
+      // 
     );
     ${O_COLOR} = vec4(sqrt(fc), 1);
   }
@@ -528,7 +529,9 @@ window.onload = async () => {
   };
   window.onresize = onResize;
   onResize();
-  gl.clearColor(...SKY_LOW, 1);
+  if (FLAG_CLEAR_COLOR) {
+    gl.clearColor(...SKY_LOW, 1);
+  }
 
   const vertexShader = loadShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
   const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -934,8 +937,10 @@ window.onload = async () => {
           // ctx.fillStyle = gradient;
           // ctx.fillRect(0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
           const gradient = ctx.createLinearGradient(0, 0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
-          gradient.addColorStop(.9, '#0F0');
-          gradient.addColorStop(1, 'red');
+          gradient.addColorStop(1, 'red'); // horizon
+          gradient.addColorStop(.8, '#0F0');
+          gradient.addColorStop(.2, '#0F0');
+          gradient.addColorStop(0, 'red');
           ctx.fillStyle = gradient;
           ctx.fillRect(0, 0, MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION);
 
@@ -2313,7 +2318,6 @@ window.onload = async () => {
     gl.disable(gl.CULL_FACE);
     gl.uniform1i(uMaterialTexture, TEXTURE_EMPTY_MATERIAL_MIPMAP);
     gl.uniform1i(uMaterialAtlas, TEXTURE_SKYBOX_ATLAS_MIPMAP);
-    //gl.uniform1i(uMaterialAtlas, TEXTURE_WORLD_MAP_MIPMAP);
     gl.uniform3f(uAtlasTextureIndexAndMaterialTextureScaleAndDepth, 0, 1, 0);
     gl.uniform4fv(uMaterialColors, [
       // sky
@@ -2321,14 +2325,10 @@ window.onload = async () => {
       ...SKY_LOW, 0,
       ...SKY_HIGH, 0,
       ...SKY_HIGH, 0,
+      // clouds
       1, 1, 1, 0,
-      1, 1, 1, 0,
-      // 1, 0, 0, 0,
-      // 1, 0, 0, 0,
-      // 0, 1, 0, 0,
-      // 0, 1, 0, 0,
-      // 0, 0, 1, 0,
-      // 0, 0, 1, 0,
+      // unused
+      //1, 1, 1, 0,
     ]);
 
     gl.bindVertexArray(skyCylinderModel.vao);
@@ -2338,8 +2338,8 @@ window.onload = async () => {
       0,
       0,
     );
-    //gl.uniformMatrix4fv(uWorldPositionMatrix, false, matrix4Translate(WORLD_DIMENSION/2, 0, 0) as any);
-    gl.uniformMatrix4fv(uWorldRotationMatrix, false, MATRIX4_IDENTITY as any);
+
+    gl.uniformMatrix4fv(uWorldRotationMatrix, false, SKY_CYLINDER_SCALE as any);
     gl.drawElements(gl.TRIANGLES, skyCylinderModel.indexCount, gl.UNSIGNED_SHORT, 0);  
 
     gl.enable(gl.DEPTH_TEST);

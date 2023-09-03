@@ -115,7 +115,7 @@ const DRAGON_SHAPES_HEAD: ConvexShape<PlaneMetadata> = transformConvexShape([
   toPlane(-1, -.5, .2, .15, defaultPlaneMetadata),
 ], DRAGON_SHAPES_HEAD_TRANSFORM);
 
-const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = transformConvexShape([
+const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
   // top
   toPlane(0, 0, 1, .05, defaultPlaneMetadata),
   // top right
@@ -130,9 +130,11 @@ const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = transformConvexShape([
   toPlane(-1, -.1, 0, .05, defaultPlaneMetadata),
   // front
   toPlane(0, 1, 0, .2, defaultPlaneMetadata),  
-], matrix4Multiply(
-  matrix4Translate(0, -.15, 0),
-));
+];
+
+// , matrix4Multiply(
+//   matrix4Translate(0, -.15, 0),
+// ))
 
 const DRAGON_SHAPES_QUAD_RIGHT: ConvexShape<PlaneMetadata> = [
   // right
@@ -174,35 +176,43 @@ const DRAGON_SHAPES_SHIN_RIGHT: ConvexShape<PlaneMetadata> = [
   toPlane(0, -1, -1, .15, defaultPlaneMetadata),
 ];
 
-const DRAGON_SHAPES_QUAD_LEFT = transformConvexShape(DRAGON_SHAPES_QUAD_RIGHT, matrix4Scale(-1, 1));
-const DRAGON_SHAPES_SHIN_LEFT = transformConvexShape(DRAGON_SHAPES_SHIN_RIGHT, matrix4Scale(-1, 1));
+// const DRAGON_SHAPES_QUAD_LEFT = transformConvexShape(DRAGON_SHAPES_QUAD_RIGHT, matrix4Scale(-1, 1));
+// const DRAGON_SHAPES_SHIN_LEFT = transformConvexShape(DRAGON_SHAPES_SHIN_RIGHT, matrix4Scale(-1, 1));
 
 const DRAGON_FACES_BODY = safeUnpackFaces(
-  ['AKQ]HS^EQ]E9YK9YN:VQQX?QXB:V@QMEQHHHHB?QKQHPQMN?QFQHJQHFXOJXOQUS?USHXYBXSNXS8)-()*+,),,-.(),*/0+),1234),3567)-0437-)-28953),98:;)-76<.-)-/=140).)>?=/*).?:821=).(.<@>)).659;@<)-@;:?>),+0-,'],
+  [...'AKQ]HS^EQ]E9YK9YN:VQQX?QXB:V@QMEQHHHHB?QKQHPQMN?QFQHJQHFXOJXOQUS?USHXYBXSNXS8)-()*+,),,-.(),*/0+),1234),3567)-0437-)-28953),98:;)-76<.-)-/=140).)>?=/*).?:821=).(.<@>)).659;@<)-@;:?>),+0-,'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_BODY, []]]),
 );
 const DRAGON_FACES_NECK = safeUnpackFaces(
-  [':ECIKCIIRNGRNEUMBEFNEFKUMKI>EI>GUHIUHBHAEVKNHAKVKKVMEVM3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.)'],
+  [...':ECIKCIIRNGRNEUMBEFNEFKUMKI>EI>GUHIUHBHAEVKNHAKVKKVMEVM3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_NECK, []]]),
 );
 const DRAGON_FACES_HEAD = safeUnpackFaces(
-  ['7H^EDPNLPNLTFHQFDTFNMHKHIHGIEHIBMHMNMCNMEHKKHK2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154'],
+  [...'7H^EDPNLPNLTFHQFDTFNMHKHIHGIEHIBMHMNMCNMEHKKHK2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_HEAD, []]]),
 );
 const DRAGON_FACES_TAIL = safeUnpackFaces(
-  ['1F0KHKJ0KJKKFKKDKHLKHDKBLKB/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,'],
+  [...'1F:KH(KJ:KJUKFUKDUHLUHDUBLUB/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_TAIL, []]]),
 );
 const DRAGON_FACES_QUAD_RIGHT = safeUnpackFaces(
-  [':JNKJKNJENJBKJBDJMDJNEFNEFG>FD>FBAFBKFENFKNFNKHG>IBAHD>3)/()*+,-.)0/0123456),./6(),(65))--70/.)-+328,),*43+),)54*),1079),2198)-,897-'],
-  decompose([[DRAGON_SHAPES_QUAD_RIGHT, []]])
+  [...':JNKJKNJENJBKJBDJMDJNEFNEFG>FD>FBAFBKFENFKNFNKHG>IBAHD>3)/()*+,-.)0/0123456),./6(),(65))--70/.)-+328,),*43+),)54*),1079),2198)-,897-'],
+  FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_QUAD_RIGHT, []]])
 );
-const DRAGON_FACES_QUAD_LEFT = safeUnpackFaces(
-  [':FNEFMDFBDFBKFENFKNFNKJNKJKNJENJBKJBAJD>JG>JNEHG>GBAHD>3)/()*+,-.)0/0123456),./6(),-0/.)-(657))-*832+),+21,),,10-),5497),9438)-)798*'],
-  decompose([[DRAGON_SHAPES_QUAD_LEFT, []]])
+const DRAGON_FACES_SHIN_RIGHT = safeUnpackFaces(
+  [...'0HJHHEHHH:HJ9FJ9FH:FEHFJH.),()*+),,-./),+,/(),).-*),(/.)),*-,+'],
+  FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_SHIN_RIGHT, []]]),
 );
-const DRAGON_FACES_SHIN_RIGHT = decompose([[DRAGON_SHAPES_SHIN_RIGHT, []]]);
-const DRAGON_FACES_SHIN_LEFT = decompose([[DRAGON_SHAPES_SHIN_LEFT, []]]);
+
+const [
+  DRAGON_FACES_QUAD_LEFT,
+  DRAGON_FACES_SHIN_LEFT,
+] = [
+  DRAGON_FACES_QUAD_RIGHT,
+  DRAGON_FACES_SHIN_RIGHT,
+].map(faces => {
+  return faces.map(face => flipFace(face, [-1, 1, 1]));
+});
 
 // don't want to rotate as it will make the wing flap calculations difficult
 const DRAGON_FACE_WING_1_RIGHT: Face<PlaneMetadata> = {
@@ -369,7 +379,7 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
     {
       id: DRAGON_PART_ID_TAIL,
       modelId: MODEL_ID_DRAGON_TAIL,
-      preRotationOffset: [0, -.2, .23],
+      preRotationOffset: [0, -.3, .23],
     },
     DRAGON_LEG_RIGHT,
     DRAGON_LEG_LEFT,

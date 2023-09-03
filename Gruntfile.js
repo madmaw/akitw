@@ -214,10 +214,11 @@ module.exports = function (grunt) {
                 to:""
               }, 
               // GLSL /* */ comments
-              {
-                from: /\/\*(.|\\n)*\*\//g,
-                to:""
-              },
+              // interferes with packing, just don't use this comment style
+              // {
+              //   from: /\/\*(.|\\n)*\*\//g,
+              //   to:""
+              // },
               // `${"X"}` -> `X`
               {
                 from: /\$\{\"((\w|\d|\.)*)\"\}/g,
@@ -301,7 +302,6 @@ module.exports = function (grunt) {
                 from: "let[",
                 to: "var["
               },
-
             // }, {
             //   from: /([^a-zA-Z0-9$])\s(\w)/g,
             //   to: "$1$2"

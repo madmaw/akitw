@@ -64,14 +64,14 @@ const VARIANTS: Record<VariantId, Variant> = {
     materialTextureId: TEXTURE_EMPTY_MATERIAL,
     materialTextureColors: [
       // red
-      1, 0, 0, .7,
-      1, 0, 0, .7,
+      1, 0, 0, 1,
+      1, 0, 0, 1,
       // green
-      0, 1, 0, .7,
-      0, 1, 0, .7,
+      0, 1, 0, 1,
+      0, 1, 0, 1,
       // blue
-      0, 0, 1, .7,
-      0, 0, 1, .7,
+      0, 0, 1, 1,
+      0, 0, 1, 1,
     ],
   },
   [VARIANT_SYMBOLS_BRIGHT]: {

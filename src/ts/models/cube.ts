@@ -17,7 +17,7 @@ const CUBE_SHAPES_BODY: ConvexShape<PlaneMetadata> = [
 ];
 
 const CUBE_FACES_BODY = safeUnpackFaces(
-  ['0hhh(hh((hh(hh((((((h(hh(.),()*+),,-./),+,/(),).-*),(/.)),*-,+'],
+  [...'0hhh(hh((hh(hh((((((h(hh(.),()*+),,-./),+,/(),).-*),(/.)),*-,+'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[CUBE_SHAPES_BODY, []]])
 );
 
