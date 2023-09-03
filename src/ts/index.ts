@@ -84,6 +84,7 @@ const L_SURFACE_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'N' : 'surfaceDepth';
 const L_DIVISOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'O' : 'divisor';
 const L_WATERINESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'P' : 'wateriness';
 const L_WATER_DISTANCE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Q' : 'waterDistance';
+const L_LIGHTING = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'R' : 'lighting';
 
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
@@ -223,22 +224,26 @@ const FRAGMENT_SHADER = `#version 300 es
       * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
     float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
     // lighting
-    float lighting = max(
+    float ${L_LIGHTING} = max(
       .3, 
       // TODO pre normalise
       1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
     );
     for (int ii=0; ii<${MAX_SHADOWS}; ii++) {
-      vec3 delta = (${V_WORLD_POSITION} - ${U_SHADOWS}[ii]).xyz;
-      lighting = min(
-        lighting,
-        max(0., 1. - (clamp(-delta.z/${U_SHADOWS}[ii].w, 0., 1.) - pow(length(delta.xy)/${U_SHADOWS}[ii].w, 2.)))
+      vec3 ${L_CAMERA_DELTA} = (${V_WORLD_POSITION} - ${U_SHADOWS}[ii]).xyz;
+      ${L_LIGHTING} = min(
+        ${L_LIGHTING},
+        max(
+          0.,
+          1. - (clamp(-${L_CAMERA_DELTA}.z/${U_SHADOWS}[ii].w, 0., 1.)
+            - pow(length(${L_CAMERA_DELTA}.xy)/${U_SHADOWS}[ii].w, 2.))
+        )
       );
     }
     vec3 fc = mix(
       // water
       mix(
-        ${L_BASE_COLOR}.xyz * lighting,
+        ${L_BASE_COLOR}.xyz * ${L_LIGHTING},
         mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
         ${L_WATERINESS}  
       ),
@@ -518,6 +523,7 @@ window.onload = async () => {
   let cameraZoom = -2;
   let cameraZRotation = 0;
   let cameraXRotation = 0;
+  let cameraPosition = VECTOR3_EMPTY;
 
   const onResize = () => {
     Z.width = Z.clientWidth;
@@ -2219,10 +2225,10 @@ window.onload = async () => {
               break;
             case ENTITY_TYPE_SCENERY:
             case ENTITY_TYPE_PARTICLE:
-              // rotate to look at camera (player, close enough)
+              // rotate to look at camera
               entity.zRotation = Math.atan2(
-                player.position[1] - entity.position[1],
-                player.position[0] - entity.position[0],
+                cameraPosition[1] - entity.position[1],
+                cameraPosition[0] - entity.position[0],
               );
               break;
           }
@@ -2392,11 +2398,11 @@ window.onload = async () => {
       matrix4Invert(cameraPositionAndRotationMatrix),
     );
 
-    const cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
+    cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
-    gl.uniform3fv(uCameraPosition, cameraPosition);
+    gl.uniform3fv(uCameraPosition, cameraPosition as any);
     gl.uniform3fv(uFocusPosition, player.position as any);
     gl.uniform4fv(
       uShadows,
