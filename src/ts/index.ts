@@ -8,6 +8,7 @@ const U_MATERIAL_TEXTURE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'g' : 'uMaterialText
 const U_MATERIAL_COLORS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'h' : 'uMaterialColors';
 const U_TIME = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'i' : 'uTime';
 const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'j' : 'uAtlasTextureIndex';
+const U_SHADOWS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'k' : 'uShadows';
 
 const A_VERTEX_MODEL_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'z' : "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'y' : 'aVertexModelRotation';
@@ -64,6 +65,7 @@ const STEP = .01;
 //const MATERIAL_DEPTH_SCALE = (1/MATERIAL_DEPTH_RANGE).toFixed(1);
 //const MATERIAL_DEPTH_SCALE = (MATERIAL_DEPTH_RANGE/2).toFixed(1);
 const MAX_MATERIAL_TEXTURE_COUNT = 3;
+const MAX_SHADOWS = 9;
 
 const L_MAX_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'A' : 'maxDepth';
 const L_CAMERA_DELTA = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'B' : 'cameraDistance';
@@ -103,6 +105,7 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
   uniform float ${U_TIME};
   uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
+  uniform vec4 ${U_SHADOWS}[${MAX_SHADOWS}];
 
   out vec4 ${O_COLOR};
 
@@ -219,15 +222,23 @@ const FRAGMENT_SHADER = `#version 300 es
     vec3 ${L_WATER_DISTANCE} = ${L_CAMERA_DELTA}
       * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
     float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
-
+    // lighting
+    float lighting = max(
+      .3, 
+      // TODO pre normalise
+      1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
+    );
+    for (int ii=0; ii<${MAX_SHADOWS}; ii++) {
+      vec3 delta = (${V_WORLD_POSITION} - ${U_SHADOWS}[ii]).xyz;
+      lighting = min(
+        lighting,
+        max(0., 1. - (clamp(-delta.z/${U_SHADOWS}[ii].w, 0., 1.) - pow(length(delta.xy)/${U_SHADOWS}[ii].w, 2.)))
+      );
+    }
     vec3 fc = mix(
       // water
       mix(
-        // lighting
-        ${L_BASE_COLOR}.xyz * max(
-          .3, 
-          1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
-        ),
+        ${L_BASE_COLOR}.xyz * lighting,
         mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
         ${L_WATERINESS}  
       ),
@@ -572,6 +583,7 @@ window.onload = async () => {
     uMaterialColors,
     uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
     uTime,
+    uShadows,
   ] = [
     U_WORLD_POSITION,
     U_WORLD_ROTATION_MATRIX,
@@ -583,6 +595,7 @@ window.onload = async () => {
     U_MATERIAL_COLORS,
     U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH,
     U_TIME,
+    U_SHADOWS,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
   );
@@ -1540,6 +1553,7 @@ window.onload = async () => {
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
     // variantId -> modelId -> position, rotation, resolution, atlasIndex
     const toRender: Partial<Record<VariantId, Record<ModelId, [ReadonlyVector3, ReadonlyMatrix4, number, number][]>>> = {};
+    const shadows: ReadonlyVector4[] = [];
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const playerWorldPosition: Vector2 = vectorNScale(player.position, 1/WORLD_DIMENSION).slice(0, 2) as any;
@@ -2193,6 +2207,9 @@ window.onload = async () => {
               addEntity(entity);
             }
           }
+          if(!entity.face) {
+            shadows.push([...entity.position, (entity as BaseDynamicEntity).collisionRadius]);
+          }
           // update any passive behaviours
           switch (entity.entityType) {
             case ENTITY_TYPE_FIREBALL:
@@ -2351,6 +2368,13 @@ window.onload = async () => {
       }
     });
 
+    const orderedShadows = shadows.sort((a, b) => {
+      const [da, db] = [a, b].map(
+        v => vectorNLength(vectorNScaleThenAdd(player.position, v, -1))
+      );
+      return da - db;
+    }).slice(0, MAX_SHADOWS);
+
     //
     // render
     //
@@ -2374,6 +2398,13 @@ window.onload = async () => {
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, cameraPosition);
     gl.uniform3fv(uFocusPosition, player.position as any);
+    gl.uniform4fv(
+      uShadows,
+      [
+        ...orderedShadows.flat(1),
+        ...new Array((MAX_SHADOWS - orderedShadows.length)*4).fill(0),
+      ],
+    );
     gl.uniform1f(uTime, now);
 
     //
