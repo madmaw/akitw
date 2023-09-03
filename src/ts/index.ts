@@ -1601,7 +1601,7 @@ window.onload = async () => {
                   }, [0, 0])
                 } else {
                   targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
-                    ? cameraXRotation
+                    ? cameraXRotation + Math.PI*.1
                     : player.xRotation;
                   player.zRotation = Math.atan2(player.velocity[1], player.velocity[0]) - Math.PI/2;
                   if (readInput(INPUT_UP)) {
@@ -1646,7 +1646,7 @@ window.onload = async () => {
                       entity.velocity = vectorNScaleThenAdd(
                         entity.velocity,
                         targetNormal,
-                        .002,
+                        .005,
                       );
                       entity.lastOnGroundTime = 0;
                       setJointAnimations(entity, DRAGON_ANIMATION_FLAP);    
@@ -1660,12 +1660,12 @@ window.onload = async () => {
                 // animate behaviour
                 setJointAnimations(
                   entity,
-                  someLateralInputsWereUnreadOrNonZero
-                    ? targetUnrotatedLateralOffset[1] > 0 && onGround
-                      ? running
+                  (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > EPSILON) && onGround
+                    ? targetUnrotatedLateralOffset[1] < 0
+                      ? DRAGON_ANIMATION_WALK_BACKWARD
+                      : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
                         ? DRAGON_ANIMATION_RUN
                         : DRAGON_ANIMATION_WALK
-                      : DRAGON_ANIMATION_WALK_BACKWARD
                     : DRAGON_ANIMATION_IDLE,
                 );
 
