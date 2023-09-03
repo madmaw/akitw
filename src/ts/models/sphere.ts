@@ -26,7 +26,7 @@ type SpherePartId =
   ]);
 
 const SPHERE_FACES_BODY = safeUnpackFaces(
-  [...'Pc=4RD(RL(cS4j:HjVHcS\\c=\\RLhRDhLR(Sc4VjHSc\\LRhDR(=c4:jH=c\\DRh>L(-S4&VH-S\\>Lh>D(-=4&:H-=\\>DhD>(=-4:&H=-\\D>hL>(S-4V&HS-\\L>hJ),()*+),,(+-),-./,),.01/),+*23),-+34),45.-),560.),7832),3894),49:5),:;65),87<=),98=>),>?:9),?@;:),=<AB),>=BC),>CD?),DE@?),BAFG),CBGH),IDCH),JEDI),GFKL),GLMH),HMNI),NOJI),LK)(),(,ML),,/NM),1ON/)0)KFA<72*)06;@EJO10'],
+  [...'Pc=4RD(RL(cS4j:HjVHcS\\c=\\RLhRDhLR(Sc4VjHSc\\LRhDR(=c4:jH=c\\DRh>L(-S4&VH-S\\>Lh>D(-=4&:H-=\\>DhD>(=-4:&H=-\\D>hL>(S-4V&HS-\\L>hJ),()*+),,(+-),-./,),.01/),+*23),-+34),45.-),560.),7832),3894),49:5),:;65),87<=),98=>),>?:9),?@;:),=<AB),>=BC),>CD?),DE@?),BAFG),CBGH),IDCH),JEDI),GFKL),GLMH),HMNI),NOJI),LK)(),(,ML),,/NM),1ON/)0)KFA<72*)06;@EJO10)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[SPHERE_SHAPES_BODY, []]]),
 );
 

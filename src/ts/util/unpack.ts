@@ -87,6 +87,8 @@ const unpackPolygons = unpackArrayBuilder(unpackPolygon);
 const unpackFaces: Unpacker<readonly Face<PlaneMetadata>[]> = (c: string[]) => {
   const points = unpackVector3Points(c);
   const indices = unpackUnsignedIntegerArray3(c);
+  const smoothingFlags = c.length && unpackUnsignedInteger(c);
+
   return indices.map(indices => {
     const modelPolygons = indices.map(indices => {
       return indices.map(index => {
@@ -105,13 +107,16 @@ const unpackFaces: Unpacker<readonly Face<PlaneMetadata>[]> = (c: string[]) => {
       return modelPolygon.map(point => {
         return vector3TransformMatrix4(toPlaneCoordinates, ...point);
       })
-    })
+    });
     return {
       polygons,
       rotateToModelCoordinates,
       toModelCoordinates,
       // TODO how do we transfer this?
-      t: {},
+      t: {
+        // assume everything has the same smoothing flag
+        smoothingFlags,
+      },
     }
   });
 
@@ -205,6 +210,11 @@ const packFaces: Packer<readonly Face<PlaneMetadata>[]> = (faces: Face<PlaneMeta
     }
     return index;
   }
+  const {
+    t: {
+      smoothingFlags,
+    }
+  } = faces[0];
   faces.forEach(({
     polygons,
     toModelCoordinates,
@@ -231,6 +241,7 @@ const packFaces: Packer<readonly Face<PlaneMetadata>[]> = (faces: Face<PlaneMeta
   return [
     ...packVector3Points(uniquePoints),
     ...packUnsignedIntegerArray3(indices),
+    ...(smoothingFlags ? packUnsignedInteger(smoothingFlags) : []),
   ];
 };
 

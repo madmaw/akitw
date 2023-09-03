@@ -184,27 +184,27 @@ const DRAGON_SHAPES_SHIN_RIGHT: ConvexShape<PlaneMetadata> = [
 // const DRAGON_SHAPES_SHIN_LEFT = transformConvexShape(DRAGON_SHAPES_SHIN_RIGHT, matrix4Scale(-1, 1));
 
 const DRAGON_FACES_BODY = safeUnpackFaces(
-  [...'AKQ]HS^EQ]E9YK9YN:VQQX?QXB:V@QMEQHHHHB?QKQHPQMN?QFQHJQHFXOJXOQUS?USHXYBXSNXS8)-()*+,),,-.(),*/0+),1234),3567)-0437-)-28953),98:;)-76<.-)-/=140).)>?=/*).?:821=).(.<@>)).659;@<)-@;:?>),+0-,'],
+  [...'AKQ]HS^EQ]E9YK9YN:VQQX?QXB:V@QMEQHHHHB?QKQHPQMN?QFQHJQHFXOJXOQUS?USHXYBXSNXS8)-()*+,),,-.(),*/0+),1234),3567)-0437-)-28953),98:;)-76<.-)-/=140).)>?=/*).?:821=).(.<@>)).659;@<)-@;:?>),+0-,)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_BODY, []]]),
 );
 const DRAGON_FACES_NECK = safeUnpackFaces(
-  [...':ECIKCIIRNGRNEUMBEFNEFKUMKI>EI>GUHIUHBHAEVKNHAKVKKVMEVM3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.)'],
+  [...':ECIKCIIRNGRNEUMBEFNEFKUMKI>EI>GUHIUHBHAEVKNHAKVKKVMEVM3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.))'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_NECK, []]]),
 );
 const DRAGON_FACES_HEAD = safeUnpackFaces(
-  [...'7H^EDPNLPNLTFHQFDTFNMHKHIHGIEHIBMHMNMCNMEHKKHK2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154'],
+  [...'7H^EDPNLPNLTFHQFDTFNMHKHIHGIEHIBMHMNMCNMEHKKHK2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_HEAD, []]]),
 );
 const DRAGON_FACES_TAIL = safeUnpackFaces(
-  [...'1F:KH(KJ:KJHKFHKEHJKHJEHEKHE/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,'],
+  [...'1F:KH(KJ:KJHKFHKEHJKHJEHEKHE/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_TAIL, []]]),
 );
 const DRAGON_FACES_QUAD_RIGHT = safeUnpackFaces(
-  [...':JNKJKNJENJBKJBDJMDJNEFNEFG>FD>FBAFBKFENFKNFNKHG>IBAHD>3)/()*+,-.)0/0123456),./6(),(65))--70/.)-+328,),*43+),)54*),1079),2198)-,897-'],
+  [...':JNKJKNJENJBKJBDJMDJNEFNEFG>FD>FBAFBKFENFKNFNKHG>IBAHD>3)/()*+,-.)0/0123456),./6(),(65))--70/.)-+328,),*43+),)54*),1079),2198)-,897-)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_QUAD_RIGHT, []]])
 );
 const DRAGON_FACES_SHIN_RIGHT = safeUnpackFaces(
-  [...'0HJHHEHHH:HJ9FJ9FH:FEHFJH.),()*+),,-./),+,/(),).-*),(/.)),*-,+'],
+  [...'0HJHHEHHH:HJ9FJ9FH:FEHFJH.),()*+),,-./),+,/(),).-*),(/.)),*-,+)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_SHIN_RIGHT, []]]),
 );
 

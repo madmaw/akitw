@@ -17,12 +17,11 @@ const SKY_CYLINDER_SHAPE: ConvexShape<PlaneMetadata> = new Array(SKY_CYLINDER_SE
   const a = Math.PI * 2 * i / SKY_CYLINDER_SEGMENTS;
   const sin = Math.sin(a);
   const cos = Math.cos(a);
-  return toPlane<PlaneMetadata>(cos, sin, 0, .5, {
-    smoothingFlags: 1
-  });
+  // don't smooth as this is always rendered at maximum lighting anyway
+  return toPlane<PlaneMetadata>(cos, sin, 0, .5, {});
 }).concat([
-  toPlane<PlaneMetadata>(0, 0, 1, .5, { smoothingFlags: 0 }),
-  toPlane<PlaneMetadata>(0, 0, -1, .5, { smoothingFlags: 0 }),
+  toPlane<PlaneMetadata>(0, 0, 1, .5, {}),
+  toPlane<PlaneMetadata>(0, 0, -1, .5, {}),
 ]);
 
 const SKY_CYLINDER_DIAMETER = HORIZON * 1.2;
@@ -54,7 +53,6 @@ const SKY_CYLINDER_FACES: Face<PlaneMetadata>[] = SKY_CYLINDER_FACES_UNTEXTURED.
   return {
     ...face,
     t: {
-      ...face.t,
       textureCoordinateTransform,
     },
   };
