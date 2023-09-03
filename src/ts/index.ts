@@ -590,8 +590,8 @@ window.onload = async () => {
   const models: Model[] = [];
   function appendModel(
     faces: readonly Face<PlaneMetadata>[],
-    toModelPoint: (v: ReadonlyVector3, transform: ReadonlyMatrix4) => ReadonlyVector3,
-    toSurfaceNormal: (face: Face<PlaneMetadata>, point: ReadonlyVector3) => ReadonlyVector3,
+    toModelPoint: (planePoint: ReadonlyVector3, transform: ReadonlyMatrix4) => ReadonlyVector3,
+    toSurfaceNormal: (face: Face<PlaneMetadata>, modelPoint: ReadonlyVector3) => ReadonlyVector3,
     explicitCenter?: ReadonlyVector3,
   ): Model & { id: number } {
     const groupPointsToFaces = new Map<ReadonlyVector3, Set<Face<PlaneMetadata>>>();
@@ -804,25 +804,58 @@ window.onload = async () => {
     DRAGON_FACES_WING_3_RIGHT,
     DRAGON_FACES_WING_3_LEFT,
   ]).map<Model>((faces) => {
-    const modelPointCache: ReadonlyVector3[] = [];
+    //const modelPointCache: ReadonlyVector3[] = [];
+    const modelPointCache: Map<ReadonlyVector3, Set<Face<PlaneMetadata>>> = new Map()
+    const getCachedTransformedPoint = (point: ReadonlyVector3, toModelCoordinates: ReadonlyMatrix4) => {
+      const modelPoint = vector3TransformMatrix4(toModelCoordinates, ...point);
+      const cachedModelPoint = [...modelPointCache.keys()].find(cachedPoint => {
+        const d = vectorNLength(vectorNScaleThenAdd(cachedPoint, modelPoint, -1));
+        // TODO * 9 seems arbitrary
+        return d < EPSILON * 9;
+      });
+      return cachedModelPoint;
+    };
+    // populate cache
+    faces.forEach(face => {
+      const {
+        polygons,
+        toModelCoordinates,
+      } = face;
+      polygons.forEach(polygon => {
+        polygon.forEach(point => {
+          let cachedTransformedPoint = getCachedTransformedPoint(point, toModelCoordinates);
+          if (cachedTransformedPoint == null) {
+            cachedTransformedPoint = vector3TransformMatrix4(toModelCoordinates, ...point);
+            modelPointCache.set(cachedTransformedPoint, new Set());
+          }
+          modelPointCache.get(cachedTransformedPoint).add(face);
+        });
+      });
+    });
+
     return appendModel(
       faces,
-      (point, toModelCoordinates) => {
-        const modelPoint = vector3TransformMatrix4(toModelCoordinates, ...point);
-        const cachedModelPoint = modelPointCache.find(cachedPoint => {
-          const d = vectorNLength(vectorNScaleThenAdd(cachedPoint, modelPoint, -1));
-          // TODO * 9 seems arbitrary
-          return d < EPSILON * 9;
+      getCachedTransformedPoint, 
+      (face, modelPoint) => {
+        const {
+          t: {
+            smoothingFlags,
+          }
+        } = face;
+        const smoothedFaces = [...modelPointCache.get(modelPoint)].filter(test => {
+          return (test.t.smoothingFlags & smoothingFlags) || test == face;
         });
-        if (cachedModelPoint != null) {
-          return cachedModelPoint;
-        }
-        modelPointCache.push(modelPoint);
-        return modelPoint;
-      }, 
-      face => {
-        // TODO put in facility to smooth some models
-        return vector3TransformMatrix4(face.rotateToModelCoordinates, 0, 0, 1);
+        return vectorNNormalize(
+          smoothedFaces.reduce<ReadonlyVector3>(
+            (acc, { rotateToModelCoordinates }) => {
+              return vectorNScaleThenAdd(
+                acc,
+                vector3TransformMatrix4(rotateToModelCoordinates, ...NORMAL_Z),
+              )
+            },
+            VECTOR3_EMPTY,
+          )
+        );
       },
     );
   });

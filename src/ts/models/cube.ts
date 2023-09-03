@@ -8,12 +8,12 @@ type CubePartId =
   ;
 
 const CUBE_SHAPES_BODY: ConvexShape<PlaneMetadata> = [
-  toPlane(0, 0, 1, .5, defaultPlaneMetadata),
-  toPlane(0, 0, -1, .5, defaultPlaneMetadata),
-  toPlane(1, 0, 0,  .5, defaultPlaneMetadata),
-  toPlane(-1, 0, 0, .5, defaultPlaneMetadata),
-  toPlane(0, 1, 0, .5, defaultPlaneMetadata),
-  toPlane(0, -1, 0, .5, defaultPlaneMetadata),
+  toPlane(0, 0, 1, .5, {}),
+  toPlane(0, 0, -1, .5, {}),
+  toPlane(1, 0, 0,  .5, {}),
+  toPlane(-1, 0, 0, .5, {}),
+  toPlane(0, 1, 0, .5, {}),
+  toPlane(0, -1, 0, .5, {}),
 ];
 
 const CUBE_FACES_BODY = safeUnpackFaces(

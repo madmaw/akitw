@@ -1,5 +1,3 @@
-const defaultPlaneMetadata: PlaneMetadata = {};
-
 const MODEL_ID_SKY_CYLINDER = 0;
 const MODEL_ID_CUBE = 1;
 const MODEL_ID_SPHERE = 2;

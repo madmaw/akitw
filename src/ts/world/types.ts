@@ -136,6 +136,8 @@ type BaseEntity<PartId extends number = number> = {
 
 type PlaneMetadata = {
   readonly textureCoordinateTransform?: ReadonlyMatrix4,
+  // if the orring the flags is non-zero, two planes will attempt to be smoothed. undefined = smoothing with nothing
+  readonly smoothingFlags?: number,
 };
 
 type StaticEntity<PartId extends number = number> = {

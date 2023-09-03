@@ -17,10 +17,12 @@ const SKY_CYLINDER_SHAPE: ConvexShape<PlaneMetadata> = new Array(SKY_CYLINDER_SE
   const a = Math.PI * 2 * i / SKY_CYLINDER_SEGMENTS;
   const sin = Math.sin(a);
   const cos = Math.cos(a);
-  return toPlane<PlaneMetadata>(cos, sin, 0, .5, {});
+  return toPlane<PlaneMetadata>(cos, sin, 0, .5, {
+    smoothingFlags: 1
+  });
 }).concat([
-  toPlane<PlaneMetadata>(0, 0, 1, .5, {}),
-  toPlane<PlaneMetadata>(0, 0, -1, .5, {}),
+  toPlane<PlaneMetadata>(0, 0, 1, .5, { smoothingFlags: 0 }),
+  toPlane<PlaneMetadata>(0, 0, -1, .5, { smoothingFlags: 0 }),
 ]);
 
 const SKY_CYLINDER_DIAMETER = HORIZON * 1.2;
@@ -32,7 +34,7 @@ const SKY_CYLINDER_FACES_UNTEXTURED = safeUnpackFaces(
 );
 
 // add the textures after decomposition so we can pack/unpack without losing data
-const SKY_CYLINDER_FACES = SKY_CYLINDER_FACES_UNTEXTURED.map((face, i) => {
+const SKY_CYLINDER_FACES: Face<PlaneMetadata>[] = SKY_CYLINDER_FACES_UNTEXTURED.map((face, i) => {
   let textureCoordinateTransform: ReadonlyMatrix4 | undefined;
   if (i < SKY_CYLINDER_SEGMENTS) {
     const a = Math.PI * 2 * i / SKY_CYLINDER_SEGMENTS;
@@ -52,6 +54,7 @@ const SKY_CYLINDER_FACES = SKY_CYLINDER_FACES_UNTEXTURED.map((face, i) => {
   return {
     ...face,
     t: {
+      ...face.t,
       textureCoordinateTransform,
     },
   };

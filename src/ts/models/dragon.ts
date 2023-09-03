@@ -28,35 +28,39 @@ type DragonPartIds =
   | typeof DRAGON_PART_ID_WING_3_RIGHT
   ;
 
+const DRAGON_BODY_SMOOTH_METADATA: PlaneMetadata = {
+  smoothingFlags: 1,
+}
+
 const DRAGON_SHAPES_BODY: ConvexShape<PlaneMetadata> = [
   // upper back
-  toPlane(0, -.2, 1, .3, defaultPlaneMetadata),
+  toPlane(0, -.2, 1, .3, DRAGON_BODY_SMOOTH_METADATA),
   // side back right
-  toPlane(1, -.2, 1, .25, defaultPlaneMetadata),
+  toPlane(1, -.2, 1, .25, DRAGON_BODY_SMOOTH_METADATA),
   // side back left
-  toPlane(-1, -.2, 1, .25, defaultPlaneMetadata),
+  toPlane(-1, -.2, 1, .25, DRAGON_BODY_SMOOTH_METADATA),
   // undercarridge
-  toPlane(-1, -.3, -1, 0, defaultPlaneMetadata),
-  toPlane(1, -.3, -1, 0, defaultPlaneMetadata),
+  toPlane(-1, -.3, -1, 0, DRAGON_BODY_SMOOTH_METADATA),
+  toPlane(1, -.3, -1, 0, DRAGON_BODY_SMOOTH_METADATA),
   // chest (below)
-  toPlane(0, -1, -1, 0, defaultPlaneMetadata),
-  toPlane(0, 0, -1, 0, defaultPlaneMetadata),
+  toPlane(0, -1, -1, 0, DRAGON_BODY_SMOOTH_METADATA),
+  toPlane(0, 0, -1, 0, DRAGON_BODY_SMOOTH_METADATA),
   // chect (forward)
-  toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+  toPlane(0, 1, -1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // right side
-  toPlane(1, -.1, -.1, .1, defaultPlaneMetadata),
+  toPlane(1, -.1, -.1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // left side
-  toPlane(-1, -.1, -.1, .1, defaultPlaneMetadata),
+  toPlane(-1, -.1, -.1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // front (left)
-  toPlane(-1, 1, 1, .3, defaultPlaneMetadata),
-  toPlane(-1, 1, -1, .1, defaultPlaneMetadata),
+  toPlane(-1, 1, 1, .3, DRAGON_BODY_SMOOTH_METADATA),
+  toPlane(-1, 1, -1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // front (right)
-  toPlane(1, 1, 1, .3, defaultPlaneMetadata),
-  toPlane(1, 1, -1, .1, defaultPlaneMetadata),
+  toPlane(1, 1, 1, .3, DRAGON_BODY_SMOOTH_METADATA),
+  toPlane(1, 1, -1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // front
-  toPlane(0, 1, 0, .25, defaultPlaneMetadata),
+  toPlane(0, 1, 0, .25, DRAGON_BODY_SMOOTH_METADATA),
   // rear
-  toPlane(0, -1, -.1, .2, defaultPlaneMetadata),    
+  toPlane(0, -1, -.1, .2, DRAGON_BODY_SMOOTH_METADATA),    
 ];
 
 const DRAGON_SHAPES_NECK_TRANSFORM = matrix4Multiply(
@@ -65,26 +69,26 @@ const DRAGON_SHAPES_NECK_TRANSFORM = matrix4Multiply(
 );
 const DRAGON_SHAPES_NECK: ConvexShape<PlaneMetadata> = transformConvexShape([
   // top
-  toPlane(0, .2, 1, .07, defaultPlaneMetadata),
+  toPlane(0, .2, 1, .07, DRAGON_BODY_SMOOTH_METADATA),
   // top left
-  toPlane(-1, .3, 1, .07, defaultPlaneMetadata),
+  toPlane(-1, .3, 1, .07, DRAGON_BODY_SMOOTH_METADATA),
   // top right
-  toPlane(1, .3, 1, .07, defaultPlaneMetadata),
+  toPlane(1, .3, 1, .07, DRAGON_BODY_SMOOTH_METADATA),
   // bottom
-  toPlane(0, .2, -1, .07, defaultPlaneMetadata),
+  toPlane(0, .2, -1, .07, DRAGON_BODY_SMOOTH_METADATA),
   // bottom left
-  toPlane(-1, .3, -1, .07, defaultPlaneMetadata),
+  toPlane(-1, .3, -1, .07, DRAGON_BODY_SMOOTH_METADATA),
   // bottom right
-  toPlane(1, .3, -1, .07, defaultPlaneMetadata),      
+  toPlane(1, .3, -1, .07, DRAGON_BODY_SMOOTH_METADATA),      
   // right
-  toPlane(1, .2, 0, .07, defaultPlaneMetadata),
+  toPlane(1, .2, 0, .07, DRAGON_BODY_SMOOTH_METADATA),
   // left
-  toPlane(-1, .2, 0, .07, defaultPlaneMetadata),
+  toPlane(-1, .2, 0, .07, DRAGON_BODY_SMOOTH_METADATA),
   // front
-  toPlane(0, 1, 1, .1, defaultPlaneMetadata),
-  toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+  toPlane(0, 1, 1, .1, DRAGON_BODY_SMOOTH_METADATA),
+  toPlane(0, 1, -1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // rear
-  toPlane(0, -1, 0, .15, defaultPlaneMetadata),
+  toPlane(0, -1, 0, .15, DRAGON_BODY_SMOOTH_METADATA),
 ], DRAGON_SHAPES_NECK_TRANSFORM);
 
 const DRAGON_SHAPES_HEAD_TRANSFORM = matrix4Multiply(
@@ -94,42 +98,42 @@ const DRAGON_SHAPES_HEAD_TRANSFORM = matrix4Multiply(
 );
 const DRAGON_SHAPES_HEAD: ConvexShape<PlaneMetadata> = transformConvexShape([
   // top
-  toPlane(0, .3, 1, .05, defaultPlaneMetadata),
+  toPlane(0, .3, 1, .05, DRAGON_BODY_SMOOTH_METADATA),
   // bottom
-  toPlane(0, .2, -1, 0, defaultPlaneMetadata),
+  toPlane(0, .2, -1, 0, DRAGON_BODY_SMOOTH_METADATA),
   // jaw
-  toPlane(.2, 0, -1, .02, defaultPlaneMetadata),
-  toPlane(-.2, 0, -1, .02, defaultPlaneMetadata),
+  toPlane(.2, 0, -1, .02, DRAGON_BODY_SMOOTH_METADATA),
+  toPlane(-.2, 0, -1, .02, DRAGON_BODY_SMOOTH_METADATA),
 
   // right
-  toPlane(1, .3, .3, .04, defaultPlaneMetadata),
+  toPlane(1, .3, .3, .04, DRAGON_BODY_SMOOTH_METADATA),
   // left
-  toPlane(-1, .3, .3, .04, defaultPlaneMetadata),
+  toPlane(-1, .3, .3, .04, DRAGON_BODY_SMOOTH_METADATA),
   // rear top
-  toPlane(0, -.6, 1, .15, defaultPlaneMetadata),
+  toPlane(0, -.6, 1, .15, DRAGON_BODY_SMOOTH_METADATA),
   // rear back
-  toPlane(0, -1, 0, .25, defaultPlaneMetadata),
+  toPlane(0, -1, 0, .25, DRAGON_BODY_SMOOTH_METADATA),
   // rear right
-  toPlane(1, -.5, .2, .15, defaultPlaneMetadata),
+  toPlane(1, -.5, .2, .15, DRAGON_BODY_SMOOTH_METADATA),
   // read left
-  toPlane(-1, -.5, .2, .15, defaultPlaneMetadata),
+  toPlane(-1, -.5, .2, .15, DRAGON_BODY_SMOOTH_METADATA),
 ], DRAGON_SHAPES_HEAD_TRANSFORM);
 
 const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
   // top
-  toPlane(0, 0, 1, .05, defaultPlaneMetadata),
+  toPlane(0, 0, 1, .05, DRAGON_BODY_SMOOTH_METADATA),
   // top right
-  toPlane(-1, 0, 1, .055, defaultPlaneMetadata),
+  toPlane(-1, 0, 1, .055, DRAGON_BODY_SMOOTH_METADATA),
   // top left
-  toPlane(1, 0, 1, .055, defaultPlaneMetadata),
+  toPlane(1, 0, 1, .055, DRAGON_BODY_SMOOTH_METADATA),
   // bottom
-  toPlane(0, -.2, -1, .05, defaultPlaneMetadata),
+  toPlane(0, -.2, -1, .05, DRAGON_BODY_SMOOTH_METADATA),
   // right
-  toPlane(1, -.1, 0, .05, defaultPlaneMetadata),
+  toPlane(1, -.1, 0, .05, DRAGON_BODY_SMOOTH_METADATA),
   // left
-  toPlane(-1, -.1, 0, .05, defaultPlaneMetadata),
+  toPlane(-1, -.1, 0, .05, DRAGON_BODY_SMOOTH_METADATA),
   // front
-  toPlane(0, 1, 0, 0, defaultPlaneMetadata),  
+  toPlane(0, 1, 0, 0, DRAGON_BODY_SMOOTH_METADATA),  
 ];
 
 // , matrix4Multiply(
@@ -138,42 +142,42 @@ const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
 
 const DRAGON_SHAPES_QUAD_RIGHT: ConvexShape<PlaneMetadata> = [
   // right
-  toPlane(1, 0, 0, .03, defaultPlaneMetadata),
+  toPlane(1, 0, 0, .03, DRAGON_BODY_SMOOTH_METADATA),
   // left
-  toPlane(-1, 0, 0, .03, defaultPlaneMetadata),
+  toPlane(-1, 0, 0, .03, DRAGON_BODY_SMOOTH_METADATA),
   // front
-  toPlane(0, 1, 0, .1, defaultPlaneMetadata),
+  toPlane(0, 1, 0, .1, DRAGON_BODY_SMOOTH_METADATA),
   // front/top smoothing
-  toPlane(0, 1, 1, .1, defaultPlaneMetadata),
+  toPlane(0, 1, 1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // front/bottom smoothing
-  toPlane(0, 1, -1, .1, defaultPlaneMetadata),
+  toPlane(0, 1, -1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // rear
-  toPlane(0, -1, 0, .1, defaultPlaneMetadata),
+  toPlane(0, -1, 0, .1, DRAGON_BODY_SMOOTH_METADATA),
   // rear/top smoothing
-  toPlane(0, -1, 1, .1, defaultPlaneMetadata),
+  toPlane(0, -1, 1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // top
-  toPlane(0, 0, 1, .1, defaultPlaneMetadata),
+  toPlane(0, 0, 1, .1, DRAGON_BODY_SMOOTH_METADATA),
   // bottom
-  toPlane(0, 0, -1, .15, defaultPlaneMetadata),
+  toPlane(0, 0, -1, .15, DRAGON_BODY_SMOOTH_METADATA),
   // knee smoothing
-  toPlane(0, -1, -1, .15, defaultPlaneMetadata),
+  toPlane(0, -1, -1, .15, DRAGON_BODY_SMOOTH_METADATA),
   // outer knee smoothing
-  toPlane(3, 0, -1, .05, defaultPlaneMetadata),
+  toPlane(3, 0, -1, .05, DRAGON_BODY_SMOOTH_METADATA),
 ];
 
 const DRAGON_SHAPES_SHIN_RIGHT: ConvexShape<PlaneMetadata> = [
   // right
-  toPlane(1, 0, 0, 0, defaultPlaneMetadata),
+  toPlane(1, 0, 0, 0, DRAGON_BODY_SMOOTH_METADATA),
   // left
-  toPlane(-1, 0, 0, .03, defaultPlaneMetadata),
+  toPlane(-1, 0, 0, .03, DRAGON_BODY_SMOOTH_METADATA),
   // front
-  toPlane(0, 1, 0, .03, defaultPlaneMetadata),
+  toPlane(0, 1, 0, .03, DRAGON_BODY_SMOOTH_METADATA),
   // rear
-  toPlane(0, -1, -.2, .04, defaultPlaneMetadata),
+  toPlane(0, -1, -.2, .04, DRAGON_BODY_SMOOTH_METADATA),
   // knee
-  toPlane(0, 0, 1, 0, defaultPlaneMetadata),
+  toPlane(0, 0, 1, 0, DRAGON_BODY_SMOOTH_METADATA),
   // foot
-  toPlane(0, -1, -1, .15, defaultPlaneMetadata),
+  toPlane(0, -1, -1, .15, DRAGON_BODY_SMOOTH_METADATA),
 ];
 
 // const DRAGON_SHAPES_QUAD_LEFT = transformConvexShape(DRAGON_SHAPES_QUAD_RIGHT, matrix4Scale(-1, 1));
@@ -307,7 +311,8 @@ const [
   DRAGON_FACE_WING_3_RIGHT,
 ].map<[Face<PlaneMetadata>[], Face<PlaneMetadata>[]]>(
   face => {
-    const right = [face, flipFace(face, [1, 1, -1])];
+    const rightFlippedY = flipFace(face, [1, 1, -1]);
+    const right = [face, rightFlippedY];
     const left = right.map(face => flipFace(face, [-1, 1, 1]));
     return [right, left];
   },

@@ -18,11 +18,11 @@ type SpherePartId =
       const ay = Math.PI * (j + 1) / (SPHERE_SEGMENTS_Y + 1) - Math.PI/2;
       const cosy = Math.cos(ay);
       const siny = Math.sin(ay);
-      return toPlane(cosz * cosy, sinz * cosy, siny, SPHERE_RADIUS, {});
+      return toPlane(cosz * cosy, sinz * cosy, siny, SPHERE_RADIUS, { smoothingFlags: 1 });
     });
   }).flat(1).concat([
-    toPlane(0, 0, -1, SPHERE_RADIUS, {}),
-    toPlane(0, 0, 1, SPHERE_RADIUS, {}),
+    toPlane(0, 0, -1, SPHERE_RADIUS, { smoothingFlags: 1 }),
+    toPlane(0, 0, 1, SPHERE_RADIUS, { smoothingFlags: 1 }),
   ]);
 
 const SPHERE_FACES_BODY = safeUnpackFaces(
