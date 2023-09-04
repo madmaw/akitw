@@ -55,7 +55,7 @@ function handleCollision(
         velocity: [0, 0, 0],
         anims: [createAttributeAnimation(
           200,
-          'animationTransform',
+          'at',
           EASING_QUAD_OUT,
           createMatrixUpdate(matrix4Scale),
           e => {
@@ -72,6 +72,7 @@ function handleCollision(
         )],
         transient: 1,
         inverseFriction: 0,
+        modelVariant: VARIANT_FIRE,
         health: 9,
       });
       checkDamaged = 1;
@@ -90,7 +91,7 @@ function handleCollision(
     check.health--;
     check.anims = [...(check.anims || []), createAttributeAnimation(
       200 + 99 * Math.random(),
-      'animationTransform',
+      'at',
       EASING_BOUNCE,
       createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
     )];

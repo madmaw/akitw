@@ -290,18 +290,18 @@ module.exports = function (grunt) {
                 to:"#version 300 es\n"
               },
               // turn lets to vars, black hat, look here if you get weird behaviour
-              {
-                from: "let ",
-                to: "var "
-              },
-              {
-                from: "let{",
-                to: "var{"
-              },
-              {
-                from: "let[",
-                to: "var["
-              },
+              // {
+              //   from: "let ",
+              //   to: "var "
+              // },
+              // {
+              //   from: "let{",
+              //   to: "var{"
+              // },
+              // {
+              //   from: "let[",
+              //   to: "var["
+              // },
             // }, {
             //   from: /([^a-zA-Z0-9$])\s(\w)/g,
             //   to: "$1$2"

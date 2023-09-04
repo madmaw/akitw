@@ -360,7 +360,7 @@ const DRAGON_LEG_RIGHT: BodyPart<DragonPartIds> = {
   children: [{
     id: DRAGON_PART_ID_SHIN_RIGHT,
     modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
-    preRotationOffset: [0, -.05, -.11],
+    preRotationOffset: [.01, -.05, -.11],
     preRotation: [Math.PI/3, 0, 0],
   }],
 };
@@ -369,7 +369,7 @@ const DRAGON_LEG_LEFT = synthesizeOppositeBodyPart(DRAGON_LEG_RIGHT);
 const DRAGON_PART: BodyPart<DragonPartIds> = {
   id: DRAGON_PART_ID_BODY,
   modelId: MODEL_ID_DRAGON_BODY,
-  preRotationOffset: [0, 0, -.15],
+  preRotationOffset: [0, 0, -.17],
   children: [
     {
       id: DRAGON_PART_ID_NECK,

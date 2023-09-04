@@ -48,9 +48,9 @@ function setJointAnimations<PartId extends number>(
     e.joints[jointId] = joint;
     if (!joint.anim || joint.animAction < actionId) {
       joint.anim = createCompositeAnimation(...rotations.map(rotation => {
-        return createAttributeAnimation<Joint, 'rotation'>(
+        return createAttributeAnimation<Joint, 'r'>(
           duration,
-          'rotation',
+          'r',
           easing,
           createVectorLerpUpdate(rotation, 1),
         );

@@ -96,7 +96,8 @@ type BodyPart<PartId extends number = number> = {
 };
 
 type Joint = {
-  rotation?: ReadonlyVector3,
+  // rotation
+  ['r']?: ReadonlyVector3,
   anim?: JointAnimation | Falsey,
   animAction?: ActionId | 0,
 }
@@ -131,7 +132,8 @@ type BaseEntity<PartId extends number = number> = {
   // persistent transform applied to the body
   transform?: ReadonlyMatrix4;
   // temporary attribute used to pass info between animations
-  animationTransform?: ReadonlyMatrix4,
+  // animation transform
+  ['at']?: ReadonlyMatrix4,
   anims?: EntityAnimation[],
 };
 

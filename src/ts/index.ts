@@ -1587,8 +1587,8 @@ window.onload = async () => {
                 // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
                 // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
                 const rotation: ReadonlyVector3 = [cameraXRotation/2 + Math.PI*.01, 0, deltaZRotation/2];
-                player.joints[DRAGON_PART_ID_NECK].rotation = rotation;
-                player.joints[DRAGON_PART_ID_HEAD].rotation = rotation;
+                player.joints[DRAGON_PART_ID_NECK]['r'] = rotation;
+                player.joints[DRAGON_PART_ID_HEAD]['r'] = rotation;
 
                 player.fireReservior = Math.min((player.fireReservior || 0) + cappedDelta, 9999);
 
@@ -1608,7 +1608,7 @@ window.onload = async () => {
                       // pre/post rotatoin happen not to be populated on head/neck/body
                       //part.preRotation && matrix4RotateZXY(...part.preRotation),
                       part.preRotationOffset && matrix4Translate(...part.preRotationOffset),
-                      joint.rotation && matrix4RotateZXY(...joint.rotation),
+                      joint['r'] && matrix4RotateZXY(...joint['r']),
                       //part.postRotation && matrix4RotateZXY(...part.postRotation),
                     ]
                   }).flat(1);
@@ -1674,7 +1674,7 @@ window.onload = async () => {
                     anims: [
                       createAttributeAnimation(
                         999 * (Math.random()+player.fireReservior/9999),
-                        'animationTransform',
+                        'at',
                         EASING_QUAD_IN,
                         createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
                         e => e.dead = 1,
@@ -2199,7 +2199,7 @@ window.onload = async () => {
                   anims: [
                     createAttributeAnimation(
                       999 + Math.random() * 999,
-                      'animationTransform',
+                      'at',
                       EASING_QUAD_IN,
                       createMatrixUpdate(p => matrix4Scale(1 - p)),
                       e => e.dead = 1,
@@ -2207,7 +2207,7 @@ window.onload = async () => {
                     // TODO this is gold plating really
                     createAttributeAnimation(
                       -400,
-                      'animationTransform',
+                      'at',
                       EASING_SINUSOIDAL,
                       createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
                     )
@@ -2249,7 +2249,7 @@ window.onload = async () => {
           }
 
           // update any animations
-          entity.animationTransform = entity.transform;
+          entity['at'] = entity.transform;
           entity.anims = entity.anims?.filter(anim => !anim(entity, cappedDelta));
 
           if (entity.dead) {
@@ -2289,7 +2289,7 @@ window.onload = async () => {
               // as the sky cylinder consumes the first model id, and is drawn explicitly above,
               // model id should always be > 0
               if (modelId || children) {
-                const jointRotation = joint?.rotation;
+                const jointRotation = joint?.['r'];
                 const rotation = matrix4Multiply(
                   transform,
                   postRotation && matrix4RotateZXY(...postRotation),
@@ -2335,7 +2335,7 @@ window.onload = async () => {
                 // zRotation && matrix4Rotate(zRotation, 0, 0, 1),
                 // xRotation && matrix4Rotate(xRotation, 1, 0, 0),
                 // yRotation && matrix4Rotate(yRotation, 0, 1, 0),
-                entity.animationTransform,
+                entity['at'],
               ),              
             );
           }
