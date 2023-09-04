@@ -6,21 +6,21 @@ const ENTITY_TYPE_SCENERY = 2;
 const ENTITY_TYPE_FIREBALL = 3;
 const ENTITY_TYPE_PARTICLE = 4;
 const ENTITY_TYPE_TERRAIN = 5;
-const ENTITY_TYPE_EXPLOSION = 6;
+const ENTITY_TYPE_FIRE = 7;
 
 type EntityTypeDragon = typeof ENTITY_TYPE_ACTIVE;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
 type EntityTypeFireball = typeof ENTITY_TYPE_FIREBALL;
 type EntityTypeParticle = typeof ENTITY_TYPE_PARTICLE;
 type EntityTypeTerrain = typeof ENTITY_TYPE_TERRAIN;
-type EntityTypeExplosion = typeof ENTITY_TYPE_EXPLOSION;
+type EntityTypeFire = typeof ENTITY_TYPE_FIRE;
 
 type EntityType =
   | EntityTypeDragon
   | EntityTypeScenery
   | EntityTypeFireball
   | EntityTypeParticle
-  | EntityTypeExplosion
+  | EntityTypeFire
   ;
 
 // nothing collides with this
@@ -29,6 +29,7 @@ const COLLISION_GROUP_PLAYER = 1;
 const COLLISION_GROUP_ENEMY = 2;
 const COLLISION_GROUP_ITEMS = 4;
 const COLLISION_GROUP_TERRAIN = 8;
+const COLLISION_GROUP_SCENERY = 16;
 
 type CollisionGroup =
   | typeof COLLISION_GROUP_NONE
@@ -36,6 +37,7 @@ type CollisionGroup =
   | typeof COLLISION_GROUP_ENEMY
   | typeof COLLISION_GROUP_ITEMS
   | typeof COLLISION_GROUP_TERRAIN
+  | typeof COLLISION_GROUP_SCENERY
   ;
 
 // action ids are also masks
@@ -76,7 +78,8 @@ type EntityId = number;
 type Entity<PartId extends number = number> = 
   | StaticEntity<PartId>
   | DynamicEntity<PartId>
-  | ActiveEntity<PartId>
+  | DragonEntity<PartId>
+  | FireEntity<PartId>
   ;
 
 // return true when done
@@ -109,11 +112,9 @@ type BaseEntity<PartId extends number = number> = {
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
   logs?: any[][];
-  // by how much this entity is on fire (0/undefined = not on fire)
-  onFire?: number,
 
   readonly joints?: Record<PartId, Joint>,
-  readonly body?: BodyPart<PartId>,
+  body?: BodyPart<PartId> | Falsey,
   // reference to textures/colours/etc...
   modelVariant?: VariantId;
   // the index of the atlas to use
@@ -153,6 +154,7 @@ type StaticEntity<PartId extends number = number> = {
   xRotation?: undefined,
   yRotation?: undefined,
   zRotation?: undefined,
+  shadows?: Falsey,
 } & BaseEntity<PartId>;
 
 type BaseDynamicEntity<PartId extends number = number> = {
@@ -169,21 +171,20 @@ type BaseDynamicEntity<PartId extends number = number> = {
   lastOnGroundTime?: number,
   // the angle at which we last made contact with the ground
   lastOnGroundNormal?: Vector3,
+  shadows?: Booleanish,
 } & BaseEntity<PartId>;
 
 type DynamicEntity<PartId extends number = number> = {
   readonly entityType:
-  | EntityTypeFireball
-  | EntityTypeParticle
-  | EntityTypeScenery
-  | EntityTypeExplosion,
+    | EntityTypeFireball
+    | EntityTypeParticle
+    | EntityTypeScenery
+  ,
   xRotation?: undefined,
   yRotation?: undefined,
 } & BaseDynamicEntity<PartId>;
 
 type ActiveEntity<PartId extends number = number> = {
-  readonly entityType: 
-    | EntityTypeDragon,
   // lateral, so the z point can be ignored
   targetLateralPosition?: ReadonlyVector3;
   maximumLateralVelocity: number,
@@ -191,4 +192,19 @@ type ActiveEntity<PartId extends number = number> = {
   xRotation: number,
   yRotation: number,
   zRotation: number,
+} & BaseDynamicEntity<PartId>;
+
+type DragonEntity<PartId extends number = number> = {
+  readonly entityType: 
+    | EntityTypeDragon,
+  fireReservior?: number,
+  lastFired?: number,
+} & ActiveEntity<PartId>;
+
+type FireEntity<PartId extends number = number> = {
+  readonly entityType: 
+    | EntityTypeFire,
+  lastSpawnedParticle?: number,
+  xRotation?: undefined,
+  yRotation?: undefined,
 } & BaseDynamicEntity<PartId>;

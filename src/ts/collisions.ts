@@ -34,6 +34,8 @@ function handleCollision(
     );
   }
 
+  let checkDamaged: Booleanish;
+
   switch (entity.entityType) {
     case ENTITY_TYPE_FIREBALL:
       entity.dead = 1;
@@ -43,34 +45,54 @@ function handleCollision(
         },
         bounds,
         collisionGroup: COLLISION_GROUP_PLAYER,
-        collisionRadius: entity.collisionRadius,
-        entityType: ENTITY_TYPE_EXPLOSION,
+        collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_SCENERY,
+        collisionRadius: .3,
+        entityType: ENTITY_TYPE_FIRE,
         id: nextEntityId++,
         position: entity.position,
         renderGroupId: nextRenderGroupId++,
-        resolutions: [0, 1],
+        resolutions: [0, 1, 2, 3, 4],
         velocity: [0, 0, 0],
         anims: [createAttributeAnimation(
-          300,
+          200,
           'animationTransform',
-          EASING_BACK_IN,
+          EASING_QUAD_OUT,
           createMatrixUpdate(matrix4Scale),
-          e => e.dead = 1,
+          e => {
+            // turn it into a flame so we can see fires at distance
+            e.body = {
+              modelId: MODEL_ID_BILLBOARD,
+            };
+            // TODO feel like setting all these should be one operation
+            // model id has variant and symbol baked in?
+            e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
+            e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
+          },
         )],
         transient: 1,
+        inverseMass: 1,
+        inverseFriction: 0,
+        health: 99,
       });
-      if (check) {
-        check.onFire = (check.onFire || 0) + 1;
-      }
+      checkDamaged = 1;
+      break;
+    case ENTITY_TYPE_FIRE:
+      // TODO only allow damage if previous damage animation has completed
       if (check && check.health) {
-        check.health--;
-        check.anims = [...(check.anims || []), createAttributeAnimation(
-          200 + 99 * Math.random(),
-          'animationTransform',
-          EASING_BOUNCE,
-          createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
-        )];
+        // do damage to thing
+        checkDamaged = 1;
+        // gain some health
+        entity.health++;
       }
       break;
+  }
+  if (checkDamaged && check && check.health) {
+    check.health--;
+    check.anims = [...(check.anims || []), createAttributeAnimation(
+      200 + 99 * Math.random(),
+      'animationTransform',
+      EASING_BOUNCE,
+      createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
+    )];
   }
 }

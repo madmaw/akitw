@@ -14,7 +14,6 @@
   },
   "homepage": "https://github.com/madmaw/js13ktemplate2023",
   "devDependencies": {
-    "gh-pages": "^5.0.0",
     "grunt": "^1.6.1",
     "grunt-closure-compiler": "0.0.21",
     "grunt-contrib-clean": "^2.0.1",
@@ -25,6 +24,7 @@
     "grunt-contrib-watch": "^1.1.0",
     "grunt-dev-update": "^2.3.0",
     "grunt-exec": "^3.0.0",
+    "grunt-gh-pages": "^4.0.0",
     "grunt-inline": "^0.3.7",
     "grunt-text-replace": "^0.4.0",
     "grunt-ts": "^6.0.0-beta.19",

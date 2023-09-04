@@ -373,9 +373,6 @@ module.exports = function (grunt) {
         roadroller: {
           cmd: 'npx roadroller dist/out.min.js -o dist/out.min.rr.js'
         },
-        deploy: {
-          cmd: 'npx gh-pages -d dist'
-        },
         zip: {
           cmd: 'advzip -4 -a index.zip dist/index.html'
         },
@@ -383,7 +380,13 @@ module.exports = function (grunt) {
           //cmd: 'stat -c "%N %s" index.zip'
           cmd: 'dir index.zip'
         }
-      }     
+      },
+      'gh-pages': {
+        options: {
+          base: 'dist',
+        },
+        src: ['index.html']
+      }
   });
 
   // clean
@@ -412,6 +415,8 @@ module.exports = function (grunt) {
   grunt.loadNpmTasks('grunt-contrib-htmlmin');
   // run command line
   grunt.loadNpmTasks('grunt-exec');
+  // run command line
+  grunt.loadNpmTasks('grunt-gh-pages');
 
   // Default task(s).
   grunt.registerTask('reset', ['clean:all']);
@@ -436,6 +441,6 @@ module.exports = function (grunt) {
     'exec:dir',
   ]);
   grunt.registerTask('default', ['prod', 'connect', 'watch']);
-  grunt.registerTask('deploy', ['exec:deploy']);
+  grunt.registerTask('deploy', ['dist', 'gh-pages']);
 
 };

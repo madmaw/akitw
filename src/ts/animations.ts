@@ -3,8 +3,10 @@ type Easing = (t: number) => number;
 const EASING_BOUNCE: Easing = t => Math.sin(Math.pow(t, 2) * Math.PI*2) * (1 - Math.pow(t, 2));
 const EASING_BACK_IN: Easing = t => t * t * (9 * t - 8);
 const EASING_QUAD_IN: Easing = t => t * t;
+const EASING_QUAD_OUT: Easing = t => 1 - Math.pow(1 - t, 2);
 const EASING_QUAD_IN_OUT: Easing = t => t <= .5 ? t * t * 2 : 1 - Math.pow(t-1, 2) * 2;
 const EASING_LINEAR: Easing = t => t;
+const EASING_SINUSOIDAL: Easing = t => Math.sin(t*Math.PI);
 
 type Anim<T> = (e: T, delta: number) => Booleanish;
 
@@ -18,11 +20,12 @@ function createAttributeAnimation<E, K extends keyof E>(
   let total = 0;
   return (e: E, delta: number): Booleanish => {
     total += delta;
-    const progress = easing(Math.min(1, total/duration));
+    const t = duration > 0 ? Math.min(1, total/duration) : (total/-duration) % 1;
+    const progress = easing(t);
     const oldValue = e[attribute];
     const value = update(progress, oldValue);
     e[attribute] = value;
-    const result = total >= duration;
+    const result = total > duration && duration > 0;
     if (result) {
       onComplete?.(e);
     }

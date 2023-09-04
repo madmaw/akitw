@@ -393,7 +393,7 @@ window.onload = async () => {
     }
   }
   
-  function addEntity(entity: Entity) {
+  function addEntity(entity: Entity) {    
     iterateEntityBounds(entity, tile => {
       tile.entities[entity.id] = entity;
     });
@@ -1274,8 +1274,9 @@ window.onload = async () => {
         modelVariant: VARIANT_SYMBOLS,
         modelAtlasIndex: atlasIndex,
         velocity: [0, 0, 0],
-        collisionGroup: COLLISION_GROUP_TERRAIN,
+        collisionGroup: COLLISION_GROUP_SCENERY,
         health: (adjustedScale+1) * 9,
+        shadows: 1,
       };
       addEntity(entity);
     }
@@ -1283,7 +1284,7 @@ window.onload = async () => {
 
   const playerRadius = .3;
   // add in a "player"
-  const player: ActiveEntity<DragonPartIds> = {
+  const player: DragonEntity<DragonPartIds> = {
     entityType: ENTITY_TYPE_ACTIVE,
     resolutions: [0],
     body: DRAGON_PART,
@@ -1319,14 +1320,23 @@ window.onload = async () => {
     maximumLateralAcceleration: .00002,
     gravity: DEFAULT_GRAVITY,
     collisionGroup: COLLISION_GROUP_PLAYER,
-    collisionMask: COLLISION_GROUP_TERRAIN | COLLISION_GROUP_ENEMY | COLLISION_GROUP_ITEMS,
+    collisionMask: COLLISION_GROUP_TERRAIN
+      | COLLISION_GROUP_SCENERY
+      | COLLISION_GROUP_ENEMY
+      | COLLISION_GROUP_ITEMS,
     inverseMass: 1,
+    shadows: 1,
     modelVariant: VARIANT_DRAGON_BODY,
-    //inverseFriction: 1,
   };
   addEntity(player);
 
-  window.onmousedown = () => Z.requestPointerLock();
+  window.onmousedown = () => {
+    setKeyState(INPUT_FIRE, 1);
+    Z.requestPointerLock();
+  };
+  window.onmouseup = () => {
+    setKeyState(INPUT_FIRE, 0);
+  };
   window.onmousemove = (e: MouseEvent) => {
     const movement: ReadonlyVector2 = [e.movementX, e.movementY];
     const rotation = vectorNLength(movement)/399;
@@ -1340,175 +1350,6 @@ window.onload = async () => {
         ),
       );
     }
-  };
-  window.onclick = () => {
-    // TODO use exact player transform chain
-    const playerTransform = matrix4Multiply(
-      matrix4Rotate(cameraZRotation, 0, 0, 1),
-      matrix4Rotate(cameraXRotation + Math.PI/20, 1, 0, 0),
-    );
-    const velocity: Vector3 = vectorNScaleThenAdd(
-      player.velocity,
-      vector3TransformMatrix4(
-        playerTransform,
-        0, .01, 0,
-      ),
-    );
-
-    const collisionRadius = .1;
-
-    // fire a ball 
-    const ball: DynamicEntity = {
-      entityType: ENTITY_TYPE_FIREBALL,
-      body: {
-        // TODO 
-        modelId: MODEL_ID_SPHERE,
-      },
-      resolutions: [0, 1],
-      bounds: rect3FromRadius(collisionRadius),
-      id: nextEntityId++,
-      collisionRadius,
-      collisionGroup: COLLISION_GROUP_PLAYER,
-      collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_TERRAIN,
-      position: vectorNScaleThenAdd(player.position, [0, 0, player.collisionRadius]),
-      velocity,
-      renderGroupId: nextRenderGroupId++,
-      inverseMass: 9,
-      transient: 1,
-      modelVariant: VARIANT_FIRE,
-    };
-
-    addEntity(ball);
-
-    // lasers
-    // const cameraRelativeTargetPosition = vector3TransformMatrix4(
-    //   matrix4Invert(cameraPositionAndRotationMatrix),
-    //   ...targetPosition,
-    // );
-
-    // const screenPosition = vector3TransformMatrix4(
-    //   cameraPositionAndProjectionMatrix,
-    //   ...targetPosition,
-    // );
-
-    // const unscreenPosition = vector3TransformMatrix4(
-    //   matrix4Invert(projectionMatrix),
-    //   ...screenPosition,
-    // )
-
-    // const screenClickWorldPosition = vector3TransformMatrix4(
-    //   matrix4Invert(cameraPositionAndProjectionMatrix),
-    //   ...screenClickPosition,
-    // );
-
-    //previousLaserSources[0] = screenCoordinateDistanceMatrix;
-
-    // console.log(
-      // 'targetPosition', targetPosition,
-      // 'targetScreenCoordinateDistance', targetScreenCoordinateDistance,
-      // 'offsetTargetScreenCoordinateDistance', offsetTargetScreenCoordinateDistance,
-      // 'cameraRelativeTargetPosition', cameraRelativeTargetPosition, 
-      // 'screenPosition', screenPosition,
-      // 'unscreenPosition', unscreenPosition,
-      // 'screenClickWorldPosition', screenClickWorldPosition,
-    // );
-
-    // const toCameraSpace = matrix4Invert(matrix4Multiply(
-    //   matrix4Translate(...cameraPosition),
-    //   player.partTransforms[MODEL_KNIGHT_BODY],
-    //   matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
-    //   matrix4Translate(0, cameraZoom, 0),
-    // ));
-
-    // const sourceCameraPosition = vector3TransformMatrix4(
-    //   toCameraSpace,
-    //   ...sourcePosition,
-    // );
-    // const targetCameraPosition = vector3TransformMatrix4(
-    //   toCameraSpace,
-    //   ...targetPosition,
-    // );
-    // const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, sourceCameraPosition, -1);
-
-    // //console.log(sourceCameraPosition, targetCameraPosition);
-
-    // const cosa = vectorNDotProduct(deltaCameraPosition, NORMAL_X);
-    // const a = Math.acos(cosa);
-    // const axis = a > EPSILON
-    //     ? vectorNNormalize(vector3CrossProduct(deltaCameraPosition, NORMAL_X))
-    //     : NORMAL_Y;
-    
-    // const transform = matrix4Multiply(
-    //   matrix4Scale(1/length, 9, 1),
-    //   matrix4Rotate(a, ...axis),
-    //   toCameraSpace,
-    // );
-
-    // const sourceCameraPosition2 = vector3TransformMatrix4(
-    //   transform,
-    //   ...sourcePosition,
-    // );
-    // const targetCameraPosition2 = vector3TransformMatrix4(
-    //   transform,
-    //   ...targetPosition,
-    // );
-    // console.log(sourceCameraPosition2, targetCameraPosition2);
-
-    // previousLasers[0] = transform;
-    
-    // const cameraPositionAndRotationMatrix = matrix4Multiply(
-    //   matrix4Translate(...cameraPosition),
-    //   player.partTransforms[MODEL_KNIGHT_BODY],
-    //   matrix4Invert(player.partTransforms[MODEL_KNIGHT_HEAD]),
-    //   matrix4Translate(0, cameraZoom, 0),
-    // );
-    // const cameraPositionAndProjectionMatrix = matrix4Multiply(
-    //   fireProjectionMatrix,
-    //   matrix4Invert(cameraPositionAndRotationMatrix),
-    // );
-
-    // const sourceScreenPosition = vector3TransformMatrix4(
-    //   cameraPositionAndProjectionMatrix,
-    //   ...sourcePosition,
-    // );
-    // const targetScreenPosition = vector3TransformMatrix4(
-    //   cameraPositionAndProjectionMatrix,
-    //   ...targetPosition,
-    // );
-    
-    // // rotate the matrix so it is horizontal
-    // const deltaScreenPosition = vectorNScaleThenAdd(targetScreenPosition, sourceScreenPosition, -1);
-    // const angle = Math.atan2(deltaScreenPosition[1], deltaScreenPosition[0]);
-    // const x = vectorNLength(deltaScreenPosition.slice(0, 2));
-
-    // const screenCoordinateDistanceMatrix = matrix4Multiply(
-    //   matrix4Scale(1/x, 9, 1),
-    //   matrix4Rotate(-angle, 0, 0, 1),
-    //   matrix4Translate(...vectorNScale(sourceScreenPosition, -1)),
-    //   cameraPositionAndProjectionMatrix,
-    // );
-
-    // const rotatedTargetScreenPosition = vector3TransformMatrix4(
-    //   screenCoordinateDistanceMatrix,
-    //   ...targetPosition,
-    // );
-    // const rotatedSourceScreenPosition = vector3TransformMatrix4(
-    //   screenCoordinateDistanceMatrix,
-    //   ...sourcePosition,
-    // );
-
-    // console.log(
-    //   'source', sourcePosition,
-    //   'target', targetPosition, 
-    //   'source screen', sourceScreenPosition,
-    //   'target screen', targetScreenPosition,
-    //   'delta screen', deltaScreenPosition,
-    //   'screen angle', angle,
-    //   'rotatedSourceScreenPosition', rotatedSourceScreenPosition,
-    //   'rotatedTargetScreenPosition', rotatedTargetScreenPosition,
-    // );
-    // previousLasers[0] = screenCoordinateDistanceMatrix;
-    // previousLaserSources[0] = sourcePosition;
   };
   window.onwheel = (e: WheelEvent) => {
     const v = e.deltaY/999;
@@ -1725,8 +1566,8 @@ window.onload = async () => {
                 // align the neck/head with the camera rotation
                 let deltaZRotation = mathAngleDiff(entity.zRotation || 0, cameraZRotation);
                 deltaZRotation = deltaZRotation > 0
-                  ? Math.min(deltaZRotation, Math.PI/3)
-                  : Math.max(deltaZRotation, -Math.PI/3);
+                  ? Math.min(deltaZRotation, Math.PI/2)
+                  : Math.max(deltaZRotation, -Math.PI/2);
                 // const neckAndHeadTransform = matrix4Multiply(
                 //   matrix4Rotate(deltaZRotation/2, 0, 0, 1),
                 //   matrix4Rotate(cameraXRotation/2, 1, 0, 0),
@@ -1739,9 +1580,104 @@ window.onload = async () => {
                 // );
                 // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
                 // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
-                const rotation: ReadonlyVector3 = [cameraXRotation/2, 0, deltaZRotation/2];
+                const rotation: ReadonlyVector3 = [cameraXRotation/2 + Math.PI*.01, 0, deltaZRotation/2];
                 player.joints[DRAGON_PART_ID_NECK].rotation = rotation;
                 player.joints[DRAGON_PART_ID_HEAD].rotation = rotation;
+
+                player.fireReservior = Math.min((player.fireReservior || 0) + cappedDelta, 9999);
+
+                if (
+                  (player.lastFired || 0) + 50 - Math.sqrt(player.fireReservior) < time
+                    && readInput(INPUT_FIRE)
+                ) {
+                  player.lastFired = time;
+                  player.fireReservior -= 99;
+                  // use exact player transform chain
+                  const body = player.body as BodyPart<DragonPartIds>;
+                  const neck = body.children[0];
+                  const head = neck.children[0];
+                  const headPositionTransforms = [body, neck, head].map(part => {
+                    const joint = player.joints[part.id];
+                    return [
+                      // pre/post rotatoin happen not to be populated on head/neck/body
+                      //part.preRotation && matrix4RotateZXY(...part.preRotation),
+                      part.preRotationOffset && matrix4Translate(...part.preRotationOffset),
+                      joint.rotation && matrix4RotateZXY(...joint.rotation),
+                      //part.postRotation && matrix4RotateZXY(...part.postRotation),
+                    ]
+                  }).flat(1);
+                  const headPositionTransform = matrix4Multiply(
+                    matrix4Translate(...player.position),
+                    matrix4RotateZXY(
+                      player.xRotation + Math.random()*.2-.1,
+                      player.yRotation,
+                      player.zRotation + Math.random()*.2-.1,
+                    ),
+                    // matrix4Rotate(player.zRotation, 0, 0, 1),
+                    // matrix4Rotate(player.xRotation, 1, 0, 0),
+                    // matrix4Rotate(player.yRotation, 0, 1, 0),
+                    ...headPositionTransforms,
+                  );
+                  const headPosition = vector3TransformMatrix4(
+                    headPositionTransform,
+                    0, 0, 0,
+                  );
+                  const headDirection = vectorNNormalize(
+                    vectorNScaleThenAdd(
+                      vector3TransformMatrix4(
+                        headPositionTransform,
+                        0, 1, 0,
+                      ),
+                      headPosition,
+                      -1,
+                    )
+                  );
+
+                  // const playerTransform = matrix4Multiply(
+                  //   matrix4Rotate(cameraZRotation + Math.random()*.2-.1, 0, 0, 1),
+                  //   matrix4Rotate(cameraXRotation + Math.PI/20 + Math.random()*.2-.1, 1, 0, 0),
+                  // );
+                  const velocity: Vector3 = vectorNScaleThenAdd(
+                    player.velocity,
+                    headDirection,
+                    .01,
+                  );
+
+                  const collisionRadius = .1;
+
+                  // fire a ball 
+                  const ball: DynamicEntity = {
+                    entityType: ENTITY_TYPE_FIREBALL,
+                    body: {
+                      modelId: MODEL_ID_SPHERE,
+                    },
+                    resolutions: [0, 1],
+                    bounds: rect3FromRadius(collisionRadius),
+                    id: nextEntityId++,
+                    collisionRadius,
+                    collisionGroup: COLLISION_GROUP_PLAYER,
+                    collisionMask: COLLISION_GROUP_ENEMY
+                      | COLLISION_GROUP_SCENERY
+                      | COLLISION_GROUP_TERRAIN,
+                    position: headPosition,
+                    velocity,
+                    renderGroupId: nextRenderGroupId++,
+                    inverseMass: 9,
+                    transient: 1,
+                    modelVariant: VARIANT_FIRE,
+                    anims: [
+                      createAttributeAnimation(
+                        999 * (Math.random()+player.fireReservior/9999),
+                        'animationTransform',
+                        EASING_QUAD_IN,
+                        createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
+                        e => e.dead = 1,
+                      )
+                    ]
+                  };
+
+                  addEntity(ball);
+                }
               }
               const targetLateralPosition = entity.targetLateralPosition || entity.position;
               let targetYRotation = 0;
@@ -2213,62 +2149,80 @@ window.onload = async () => {
               addEntity(entity);
             }
           }
-          if(!entity.face) {
+          if(entity.shadows) {
             shadows.push([...entity.position, (entity as BaseDynamicEntity).collisionRadius]);
           }
           // update any passive behaviours
+          let lookAtCamera: Booleanish;
           switch (entity.entityType) {
             case ENTITY_TYPE_FIREBALL:
               if (entity.position[2] < 0) {
                 handleCollision(entity, addEntity);
               }
               break;
-            case ENTITY_TYPE_SCENERY:
+            case ENTITY_TYPE_FIRE:
+              // burn
+              if ((entity.lastSpawnedParticle || 0) + 99 < time) {
+                addEntity({
+                  body: BILLBOARD_PART,
+                  transform: matrix4Scale(.4),
+                  modelVariant: VARIANT_SYMBOLS_BRIGHT,
+                  modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
+                  bounds: rect3FromRadius(.2),
+                  collisionGroup: COLLISION_GROUP_NONE,
+                  collisionRadius: .2,
+                  entityType: ENTITY_TYPE_PARTICLE,
+                  id: nextEntityId++,
+                  position: vectorNScaleThenAdd(
+                    entity.position,
+                    new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
+                    entity.collisionRadius,
+                  ),
+                  velocity: [0, 0, .001],
+                  renderGroupId: nextRenderGroupId++,
+                  resolutions: [0, 1],
+                  transient: 1,
+                  anims: [
+                    createAttributeAnimation(
+                      999 + Math.random() * 999,
+                      'animationTransform',
+                      EASING_QUAD_IN,
+                      createMatrixUpdate(p => matrix4Scale(1 - p)),
+                      e => e.dead = 1,
+                    ),
+                    // TODO this is gold plating really
+                    createAttributeAnimation(
+                      -400,
+                      'animationTransform',
+                      EASING_SINUSOIDAL,
+                      createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
+                    )
+                  ],
+                });
+                entity.health--;
+                entity.lastSpawnedParticle = time;
+              }
+              lookAtCamera = 1;
+              break;
             case ENTITY_TYPE_PARTICLE:
-              // rotate to look at camera
-              entity.zRotation = Math.atan2(
-                cameraPosition[1] - entity.position[1],
-                cameraPosition[0] - entity.position[0],
+              entity.position = vectorNScaleThenAdd(
+                entity.position,
+                entity.velocity,
+                cappedDelta,
               );
+              // fall through
+            case ENTITY_TYPE_SCENERY:
+              lookAtCamera = 1;
               break;
           }
-
-          // NOTE that if health is undefined, this check fails
-          if (entity.onFire > 0) {
-            entity.onFire--;
-            if (entity.health) {
-              entity.health--;
-            }
-            const radius = .1;
-            addEntity({
-              body: BILLBOARD_PART,
-              transform: matrix4Scale(radius*2),
-              modelVariant: VARIANT_SYMBOLS_BRIGHT,
-              modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
-              //modelAtlasIndex: 7,
-              bounds: rect3FromRadius(radius),
-              collisionGroup: COLLISION_GROUP_NONE,
-              collisionRadius: radius,
-              entityType: ENTITY_TYPE_PARTICLE,
-              id: nextEntityId++,
-              position: vectorNScaleThenAdd(
-                entity.position,
-                new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
-                (entity as DynamicEntity).collisionRadius,
-              ),
-              velocity: [0, 0, 0],
-              renderGroupId: nextRenderGroupId++,
-              resolutions: [0, 1],
-              transient: 1,
-              anims: [createAttributeAnimation(
-                300 + Math.random() * 300,
-                'animationTransform',
-                EASING_QUAD_IN,
-                createMatrixUpdate(p => matrix4Scale(1 - p)),
-                e => e.dead = 1,
-              )],
-            });
+          if( lookAtCamera) {
+            // rotate to look at camera
+            entity.zRotation = Math.atan2(
+              cameraPosition[1] - entity.position[1],
+              cameraPosition[0] - entity.position[0],
+            );
           }
+
           if (entity.health <= 0) {
             entity.dead = 1;
           }
@@ -2363,10 +2317,11 @@ window.onload = async () => {
               body,
               entity.position,
               matrix4Multiply(
+                matrix4RotateZXY(xRotation, yRotation, zRotation),
+                // zRotation && matrix4Rotate(zRotation, 0, 0, 1),
+                // xRotation && matrix4Rotate(xRotation, 1, 0, 0),
+                // yRotation && matrix4Rotate(yRotation, 0, 1, 0),
                 entity.animationTransform,
-                zRotation && matrix4Rotate(zRotation, 0, 0, 1),
-                xRotation && matrix4Rotate(xRotation, 1, 0, 0),
-                yRotation && matrix4Rotate(yRotation, 0, 1, 0),
               ),              
             );
           }

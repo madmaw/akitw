@@ -23,6 +23,7 @@ const KEY_Y = 89;
 const KEY_Z = 90;
 const KEY_LESS_THAN = 188;
 const KEY_GREATER_THAN = 190;
+const KEY_SYNTHETIC_LEFT_MOUSE_BUTTON = 1;
 
 type KeyCode =
     | typeof KEY_SHIFT
@@ -50,6 +51,7 @@ type KeyCode =
     | typeof KEY_Z
     | typeof KEY_LESS_THAN
     | typeof KEY_GREATER_THAN
+    | typeof KEY_SYNTHETIC_LEFT_MOUSE_BUTTON
     ;
 
 const INPUT_LEFT = KEY_A;
@@ -58,6 +60,7 @@ const INPUT_UP = KEY_W;
 const INPUT_DOWN = KEY_S;
 const INPUT_RUN = KEY_SHIFT;
 const INPUT_JUMP = KEY_SPACE;
+const INPUT_FIRE = KEY_SYNTHETIC_LEFT_MOUSE_BUTTON;
 
 type Input = 
     | typeof INPUT_LEFT
@@ -66,6 +69,7 @@ type Input =
     | typeof INPUT_DOWN
     | typeof INPUT_RUN
     | typeof INPUT_JUMP
+    | typeof INPUT_FIRE
     ;
 
 const CARDINAL_INPUT_VECTORS: readonly [Input, ReadonlyVector2, number?][] = [
