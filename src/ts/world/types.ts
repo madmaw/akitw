@@ -48,6 +48,7 @@ const ACTION_ID_WALK_BACKWARD = 4;
 const ACTION_ID_RUN = 8;
 const ACTION_ID_GLIDE = 16;
 const ACTION_ID_FLAP = 32;
+const ACTION_ID_SHOOT = 64;
 const ACTION_ID_CANCEL = 512;
 const ACTION_ID_TAKE_DAMAGE = 1024;
 
@@ -56,8 +57,9 @@ type ActionId =
     | typeof ACTION_ID_WALK
     | typeof ACTION_ID_WALK_BACKWARD
     | typeof ACTION_ID_RUN
-    | typeof ACTION_ID_FLAP
     | typeof ACTION_ID_GLIDE
+    | typeof ACTION_ID_FLAP
+    | typeof ACTION_ID_SHOOT
     | typeof ACTION_ID_CANCEL
     | typeof ACTION_ID_TAKE_DAMAGE
     ;

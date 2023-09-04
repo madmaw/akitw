@@ -20,7 +20,9 @@ function createAttributeAnimation<E, K extends keyof E>(
   let total = 0;
   return (e: E, delta: number): Booleanish => {
     total += delta;
-    const t = duration > 0 ? Math.min(1, total/duration) : (total/-duration) % 1;
+    const t = duration > 0
+      ? Math.min(1, total/duration)
+      : Math.abs(((total/-duration) % 2) - 1);
     const progress = easing(t);
     const oldValue = e[attribute];
     const value = update(progress, oldValue);

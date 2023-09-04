@@ -11,19 +11,19 @@ type ActionJointAnimationSequences<PartId extends number> = readonly [
   ...JointAnimationSequences<PartId>,
 ];
 
-function setJointAnimation<PartId extends number>(
-  e: Entity<PartId>,
-  jointId: PartId,
-  actionId: ActionId,
-  animFactory: () => Anim<Joint>,
-) {
-  const joint = e.joints[jointId] || {};
-  e.joints[jointId] = joint;
-  if (!joint.anim || joint.animAction < actionId) {
-    joint.anim = animFactory();
-    joint.animAction = actionId;
-  }
-}
+// function setJointAnimation<PartId extends number>(
+//   e: Entity<PartId>,
+//   jointId: PartId,
+//   actionId: ActionId,
+//   animFactory: () => Anim<Joint>,
+// ) {
+//   const joint = e.joints[jointId] || {};
+//   e.joints[jointId] = joint;
+//   if (!joint.anim || joint.animAction < actionId) {
+//     joint.anim = animFactory();
+//     joint.animAction = actionId;
+//   }
+// }
 
 function hasJointAnimation<PartId extends number>(
   e: Entity<PartId>,

@@ -667,7 +667,7 @@ const DRAGON_ANIMATION_WALK_BACKWARD: ActionJointAnimationSequences<DragonPartId
   ),
 ];
 
-const DRAGON_ANIMATION_IDLE_FRAME_DURATION = 300;
+const DRAGON_ANIMATION_IDLE_FRAME_DURATION = 999;
 const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_IDLE,
   ...synthesizeFromOppositeJointAnimationSequences(
@@ -676,8 +676,9 @@ const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
       [
         DRAGON_PART_ID_QUAD_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN,
+        EASING_QUAD_IN_OUT,
         [0, 0, 0],
+        [Math.PI*.01, 0, 0],
       ],
       [
         DRAGON_PART_ID_SHIN_RIGHT,
@@ -690,6 +691,7 @@ const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
         [0, 0, 0],
+        [-Math.PI*.01, 0, 0],
       ],
       [
         DRAGON_PART_ID_TAIL,
@@ -701,8 +703,8 @@ const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
         DRAGON_PART_ID_WING_1_RIGHT,
         DRAGON_ANIMATION_IDLE_FRAME_DURATION,
         EASING_QUAD_IN_OUT,
-        [-Math.PI*.1, Math.PI*.3, 0],
-        // [0, 0, 0],
+        [-Math.PI*.01, Math.PI*.3, 0],
+        [0, Math.PI*.29, 0],
       ],
       [
         DRAGON_PART_ID_WING_2_RIGHT,
@@ -723,3 +725,66 @@ const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
   )
 ];
   
+const DRAGON_ANIMATION_FALL_FRAME_DURATION = 999;
+const DRAGON_ANIMATION_FALL: ActionJointAnimationSequences<DragonPartIds> = [
+  ACTION_ID_IDLE,
+  ...synthesizeFromOppositeJointAnimationSequences(
+    DRAGON_PART,
+    [
+      [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_FALL_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_TAIL,
+        DRAGON_ANIMATION_FALL_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [-Math.PI * .3, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_WING_1_RIGHT,
+        DRAGON_ANIMATION_FALL_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, -Math.PI*.3, 0],
+      ],
+      [
+        DRAGON_PART_ID_WING_2_RIGHT,
+        DRAGON_ANIMATION_FALL_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, -Math.PI*.1, 0],
+      ],
+      [
+        DRAGON_PART_ID_WING_3_RIGHT,
+        DRAGON_ANIMATION_FALL_FRAME_DURATION,
+        EASING_QUAD_IN_OUT,
+        [0, -Math.PI*.1, 0],
+      ],
+
+    ]
+  )
+];
+
+const DRAGON_ANIMATION_SHOOT_FRAME_DURATION = 200;
+const DRAGON_ANIMATION_SHOOT: ActionJointAnimationSequences<DragonPartIds> = [
+  ACTION_ID_SHOOT,
+  ...synthesizeFromOppositeJointAnimationSequences(
+    DRAGON_PART,
+    [
+      [
+        DRAGON_PART_ID_BODY,
+        DRAGON_ANIMATION_SHOOT_FRAME_DURATION,
+        EASING_QUAD_IN,
+        [-Math.PI*.1, 0, 0],
+      ],
+      [
+        DRAGON_PART_ID_TAIL,
+        DRAGON_ANIMATION_SHOOT_FRAME_DURATION,
+        EASING_QUAD_IN,
+        [-Math.PI * .1, 0, 0],
+      ],
+    ],
+    1,
+  ),
+];

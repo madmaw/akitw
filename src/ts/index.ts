@@ -1581,16 +1581,16 @@ window.onload = async () => {
                   }
                 }
                 // animate behaviour
-                setJointAnimations(
-                  entity,
-                  (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > .001) && onGround
-                    ? targetUnrotatedLateralOffset[1] < 0
-                      ? DRAGON_ANIMATION_WALK_BACKWARD
-                      : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
-                        ? DRAGON_ANIMATION_RUN
-                        : DRAGON_ANIMATION_WALK
-                    : DRAGON_ANIMATION_IDLE,
-                );
+                const jointAnimation = (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > .001) && onGround
+                  ? targetUnrotatedLateralOffset[1] < 0
+                    ? DRAGON_ANIMATION_WALK_BACKWARD
+                    : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
+                      ? DRAGON_ANIMATION_RUN
+                      : DRAGON_ANIMATION_WALK
+                  : onGround
+                    ? DRAGON_ANIMATION_IDLE
+                    : DRAGON_ANIMATION_FALL;
+                setJointAnimations(entity, jointAnimation);
 
                 // align the neck/head with the camera rotation
                 let deltaZRotation = mathAngleDiff(entity.zRotation || 0, cameraZRotation);
@@ -1619,6 +1619,7 @@ window.onload = async () => {
                   (player.lastFired || 0) + 50 - Math.sqrt(player.fireReservior) < time
                     && readInput(INPUT_FIRE)
                 ) {
+                  setJointAnimations(player, DRAGON_ANIMATION_SHOOT);
                   player.lastFired = time;
                   player.fireReservior -= 99;
                   // use exact player transform chain
@@ -2234,7 +2235,7 @@ window.onload = async () => {
                       createAttributeAnimation(
                         -400,
                         'at',
-                        EASING_SINUSOIDAL,
+                        EASING_QUAD_IN_OUT,
                         createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
                       )
                     ]

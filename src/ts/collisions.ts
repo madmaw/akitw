@@ -34,6 +34,7 @@ function handleCollision(
     );
   }
 
+  let checkInvincible = check && check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE);
   let checkDamaged: Booleanish;
 
   switch (entity.entityType) {
@@ -53,23 +54,35 @@ function handleCollision(
         renderGroupId: nextRenderGroupId++,
         resolutions: [0, 1, 2, 3, 4],
         velocity: [0, 0, 0],
-        anims: [[createAttributeAnimation(
-          200,
-          'at',
-          EASING_QUAD_OUT,
-          createMatrixUpdate(matrix4Scale),
-          e => {
-            // turn it into a flame so we can see fires at distance
-            e.body = {
-              modelId: MODEL_ID_BILLBOARD,
-            };
-            // TODO feel like setting all these should be one operation
-            // model id has variant and symbol baked in?
-            e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
-            e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
-            (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
-          },
-        )]],
+        anims: [
+          [
+            createAttributeAnimation(
+              200,
+              'at',
+              EASING_QUAD_OUT,
+              createMatrixUpdate(matrix4Scale),
+              e => {
+                // turn it into a flame so we can see fires at distance
+                e.body = {
+                  modelId: MODEL_ID_BILLBOARD,
+                };
+                // TODO feel like setting all these should be one operation
+                // model id has variant and symbol baked in?
+                e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
+                e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
+                (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
+              },
+            ),
+          ],
+          [
+            createAttributeAnimation(
+              -999,
+              'at',
+              EASING_QUAD_IN_OUT,
+              createMatrixUpdate(p => matrix4Scale(p/5 + .9))
+            ),
+          ]
+        ],
         transient: 1,
         inverseFriction: 0,
         modelVariant: VARIANT_FIRE,
@@ -82,7 +95,7 @@ function handleCollision(
       if (
         check
           && check.health
-          && !check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE)
+          && !checkInvincible
       ) {
         // do damage to thing
         checkDamaged = 1;
@@ -91,7 +104,7 @@ function handleCollision(
       }
       break;
   }
-  if (checkDamaged && check && check.health) {
+  if (checkDamaged && check && check.health && !checkInvincible) {
     check.health--;
     check.anims = [
       ...(check.anims || []),
@@ -100,7 +113,7 @@ function handleCollision(
           300 + 99 * Math.random(),
           'at',
           EASING_BOUNCE,
-          createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
+          createMatrixUpdate(p => matrix4Scale(1 - p/2, 1 - p/2, 1 + p/3)),
         ),
         ACTION_ID_TAKE_DAMAGE
       ],
