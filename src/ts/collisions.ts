@@ -21,7 +21,7 @@ function handleCollision(
       + (check as DynamicEntity).collisionRadius
       - entityDistance;
 
-    const divisor = 999*(inverseMass + (check.inverseMass || 0));
+    const divisor = 1999*(inverseMass + (check.inverseMass || 0));
     entity.velocity = entity.velocity && vectorNScaleThenAdd(
       entity.velocity,
       entityDelta,
@@ -30,7 +30,7 @@ function handleCollision(
     check.velocity = check.velocity && vectorNScaleThenAdd(
       check.velocity,
       entityDelta,
-      -entityOverlap*check.inverseMass/divisor,
+      -entityOverlap*(check.inverseMass || 0)/divisor,
     );
   }
 
@@ -43,9 +43,9 @@ function handleCollision(
         body: {
           modelId: MODEL_ID_SPHERE,
         },
-        bounds,
+        bounds: rect3FromRadius(.3),
         collisionGroup: COLLISION_GROUP_PLAYER,
-        collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_SCENERY,
+        collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_SCENERY | COLLISION_GROUP_TERRAIN,
         collisionRadius: .3,
         entityType: ENTITY_TYPE_FIRE,
         id: nextEntityId++,
@@ -67,12 +67,12 @@ function handleCollision(
             // model id has variant and symbol baked in?
             e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
             e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
+            (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
           },
         )],
         transient: 1,
-        inverseMass: 1,
         inverseFriction: 0,
-        health: 99,
+        health: 9,
       });
       checkDamaged = 1;
       break;
@@ -82,7 +82,7 @@ function handleCollision(
         // do damage to thing
         checkDamaged = 1;
         // gain some health
-        entity.health++;
+        entity.health += 9;
       }
       break;
   }

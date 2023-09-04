@@ -243,7 +243,7 @@ const FRAGMENT_SHADER = `#version 300 es
     vec3 fc = mix(
       // water
       mix(
-        ${L_BASE_COLOR}.xyz * ${L_LIGHTING},
+        ${L_BASE_COLOR}.xyz * max(${L_LIGHTING}, 1. - ${L_BASE_COLOR}.w),
         mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
         ${L_WATERINESS}  
       ),
@@ -367,9 +367,10 @@ window.onload = async () => {
       position,
       bounds: [[minx, miny], [maxx, maxy]],
      }: Pick<Entity, 'position' | 'bounds' | 'resolutions'>,
-    f: (tile: Tile, x: number, y: number) => void,
+    f?: (tile: Tile, x: number, y: number) => void,
     populate?: Booleanish,
   ) {
+    let tiles: Tile[] = [];
     for (let resolution of resolutions) {
       const divisor = Math.pow(2, resolution);
       const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
@@ -387,16 +388,21 @@ window.onload = async () => {
           const tile = populate
             ? getAndMaybePopulateTile(x, y, resolution)
             : world[resolution][x][y];
-          f(tile, x, y);
+          f?.(tile, x, y);
+          tiles.push(tile);
         }
       }  
     }
+    return tiles;
   }
   
-  function addEntity(entity: Entity) {    
-    iterateEntityBounds(entity, tile => {
-      tile.entities[entity.id] = entity;
-    });
+  function addEntity(entity: Entity, activeTiles?: Set<Tile>) {
+    const tiles = iterateEntityBounds(entity);
+    if (!entity.transient || !activeTiles || tiles.some(tile => activeTiles.has(tile))) {
+      tiles.forEach(tile => {
+        tile.entities[entity.id] = entity;
+      });
+    }
   }
   
   function removeEntity(entity: Entity) {
@@ -1434,7 +1440,7 @@ window.onload = async () => {
     // const grid = world[0];
     // const tiles = grid.map((gridX, x) => gridX.map((_, y) => getOrCreateGridTile(x, y, 0))).flat(1);    
 
-    // NOTE: we convert all forEaches to maps, so although set does support forEach, obfuscation will break
+    // NOTE: we could convert all forEaches to maps, but set doesn't support map
     tiles.forEach((tile) => {
       for (let entityId in tile.entities) {
         const entity: Entity = tile.entities[entityId];
@@ -1448,7 +1454,7 @@ window.onload = async () => {
             face,
           } = entity;
 
-          if (!face && entity.inverseMass) {
+          if (!face) {
             if (entityType == ENTITY_TYPE_ACTIVE) {
               const onGround = entity.lastOnGroundTime + 99 > time && entity.lastOnGroundNormal;
               // do AI stuff
@@ -1554,7 +1560,7 @@ window.onload = async () => {
                 // animate behaviour
                 setJointAnimations(
                   entity,
-                  (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > EPSILON) && onGround
+                  (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > .001) && onGround
                     ? targetUnrotatedLateralOffset[1] < 0
                       ? DRAGON_ANIMATION_WALK_BACKWARD
                       : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
@@ -1779,8 +1785,12 @@ window.onload = async () => {
             }
             
             (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
-            entity.logs = entity.logs?.slice(-30) || [];
+            if (FLAG_DEBUG_PHYSICS) {
+              entity.logs = entity.logs?.slice(-30) || [];
+            }
             removeEntity(entity);
+            const collisionEntities = new Set<Entity>();
+
             const collidedEntities: Record<EntityId, Truthy> = {};
             let duplicateCollisionCount = 1;
             // TODO enforce max speed
@@ -1835,7 +1845,9 @@ window.onload = async () => {
                       } = check as StaticEntity;
 
                       
-                      if (rectNOverlaps(targetPosition, targetUnionBounds, checkPosition, checkBounds)) {
+                      if (
+                        rectNOverlaps(targetPosition, targetUnionBounds, checkPosition, checkBounds)
+                      ) {
                         // only check static collisions
                         const planeVelocity = vector3TransformMatrix4(
                           rotateToPlaneCoordinates,
@@ -2027,25 +2039,24 @@ window.onload = async () => {
                       );
                       const entityDistance = vectorNLength(entityDelta);
                       const entityOverlap = collisionRadiusFromCenter + (check as DynamicEntity).collisionRadius - entityDistance;
-                      // push both away
                       if (entityOverlap > 0) {
-                        // TODO move collision handling out of here as it will alter the velocity
-                        handleCollision(entity, addEntity, check);
+                        collisionEntities.add(check);
                       }
                     }
                   }
                 }
               }, 1);
               if (minCollisionNormal) {
-                const minCollisionEntityId = (minCollisionEntity as Entity).id;
-                if (collidedEntities[minCollisionEntityId]) {
-                  duplicateCollisionCount++;
-                }
-                collidedEntities[minCollisionEntityId] = 1;
 
                 const boundedCollisionTime = Math.max(0, minCollisionTime - EPSILON);
 
                 if (FLAG_DEBUG_PHYSICS) {
+                  const minCollisionEntityId = (minCollisionEntity as Entity).id;
+                  if (collidedEntities[minCollisionEntityId]) {
+                    duplicateCollisionCount++;
+                  }
+                  collidedEntities[minCollisionEntityId] = 1;
+  
                   entity.logs.push([
                     'collision',
                     collisionCount,
@@ -2127,7 +2138,7 @@ window.onload = async () => {
 
                 (entity as DynamicEntity).lastOnGroundNormal = minCollisionNormal;
                 (entity as DynamicEntity).lastOnGroundTime = time;
-                handleCollision(entity, addEntity, minCollisionEntity);
+                collisionEntities.add(minCollisionEntity as Entity);
                 
                 remainingCollisionTime -= boundedCollisionTime;
               } else {
@@ -2145,9 +2156,12 @@ window.onload = async () => {
                 entity.logs = [];
               }  
             }
-            if (!entity.dead) {
-              addEntity(entity);
-            }
+            
+            collisionEntities.forEach(collisionEntity => {
+              // TODO can inline handleCollision here
+              handleCollision(entity, addEntity, collisionEntity);
+            });
+            addEntity(entity, tiles);
           }
           if(entity.shadows) {
             shadows.push([...entity.position, (entity as BaseDynamicEntity).collisionRadius]);
@@ -2198,7 +2212,7 @@ window.onload = async () => {
                       createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
                     )
                   ],
-                });
+                }, tiles);
                 entity.health--;
                 entity.lastSpawnedParticle = time;
               }

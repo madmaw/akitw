@@ -26,11 +26,11 @@ type Variant = {
 
 const TERRAIN_COLORS: readonly number[] = [
   // sand
-  .8, .7, .5, 1,
+  .8, .7, .3, 1,
   .8, .8, .7, 1,
   // grass
-  .3, .7, .2, 1,
-  .2, .6, .4, .2,
+  .3, .7, 0, 1,
+  .2, .8, .1, .8,
   // stone
   .1, .1, .1, 1,
   .2, .1, .1, 1,
@@ -93,9 +93,8 @@ const VARIANTS: Record<VariantId, Variant> = {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
     materialTextureId: TEXTURE_TERRAIN_MATERIAL,
     materialTextureColors: [
-      // red
-      .5, 0, 0, 1,
-      1, 0, 0, 1,
+      .8, 0, 0, 1,
+      1, .1, 0, 1,
     ],
     materialTextureScale: 3,
   },
