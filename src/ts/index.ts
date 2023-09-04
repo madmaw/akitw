@@ -2392,7 +2392,7 @@ window.onload = async () => {
       cameraPositionMatrix,
       cameraZRotationMatrix,
       matrix4Rotate(cameraXRotation, 1, 0, 0),
-      FLAG_ALLOW_ZOOM ? matrix4Translate(0, cameraZoom, 0) : undefined,
+      matrix4Translate(0, cameraZoom, 0),
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
       projectionMatrix,
