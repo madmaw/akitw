@@ -551,7 +551,7 @@ const DRAGON_ANIMATION_RUN: ActionJointAnimationSequences<DragonPartIds> = [
       ],
       [
         DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+        DRAGON_ANIMATION_RUN_FRAME_DURATION * .8,
         EASING_QUAD_IN_OUT,
         [0, 0, Math.PI*.05],
         [0, 0, -Math.PI*.05],

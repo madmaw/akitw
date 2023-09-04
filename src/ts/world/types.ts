@@ -134,7 +134,10 @@ type BaseEntity<PartId extends number = number> = {
   // temporary attribute used to pass info between animations
   // animation transform
   ['at']?: ReadonlyMatrix4,
-  anims?: EntityAnimation[],
+  anims?: [EntityAnimation, ActionId?][],
+    // the tick that this entity was last updated
+  // used to cull zombie transient entities
+  lastUpdated?: number,
 };
 
 type PlaneMetadata = {

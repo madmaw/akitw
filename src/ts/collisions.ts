@@ -53,7 +53,7 @@ function handleCollision(
         renderGroupId: nextRenderGroupId++,
         resolutions: [0, 1, 2, 3, 4],
         velocity: [0, 0, 0],
-        anims: [createAttributeAnimation(
+        anims: [[createAttributeAnimation(
           200,
           'at',
           EASING_QUAD_OUT,
@@ -69,7 +69,7 @@ function handleCollision(
             e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
             (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
           },
-        )],
+        )]],
         transient: 1,
         inverseFriction: 0,
         modelVariant: VARIANT_FIRE,
@@ -79,7 +79,11 @@ function handleCollision(
       break;
     case ENTITY_TYPE_FIRE:
       // TODO only allow damage if previous damage animation has completed
-      if (check && check.health) {
+      if (
+        check
+          && check.health
+          && !check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE)
+      ) {
         // do damage to thing
         checkDamaged = 1;
         // gain some health
@@ -89,11 +93,17 @@ function handleCollision(
   }
   if (checkDamaged && check && check.health) {
     check.health--;
-    check.anims = [...(check.anims || []), createAttributeAnimation(
-      200 + 99 * Math.random(),
-      'at',
-      EASING_BOUNCE,
-      createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
-    )];
+    check.anims = [
+      ...(check.anims || []),
+      [
+        createAttributeAnimation(
+          300 + 99 * Math.random(),
+          'at',
+          EASING_BOUNCE,
+          createMatrixUpdate(p => matrix4Scale(1, 1 + p/(2 + Math.random()), 1 - p/(3 + Math.random()))),
+        ),
+        ACTION_ID_TAKE_DAMAGE
+      ],
+    ];
   }
 }

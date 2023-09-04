@@ -91,12 +91,11 @@ const VARIANTS: Record<VariantId, Variant> = {
   },
   [VARIANT_DRAGON_BODY]: {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
-    materialTextureId: TEXTURE_TERRAIN_MATERIAL,
+    materialTextureId: TEXTURE_DRAGON_BODY_MATERIAL,
     materialTextureColors: [
       .8, 0, 0, 1,
       1, .1, 0, 1,
     ],
-    materialTextureScale: 3,
   },
   [VARIANT_FIRE]: {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,

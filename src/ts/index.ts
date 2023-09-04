@@ -1036,15 +1036,15 @@ window.onload = async () => {
         flatMaterial,
         featureMaterial(
           staticFeature,
-          8,
-          9999,
-          randomDistributionFactory(0, 1),
+          16,
+          999,
+          randomDistributionFactory(.5, 2),
         ),  
         featureMaterial(
           riverStonesFeatureFactory(.6),
           64,
-          999,
-          randomDistributionFactory(2, 2),
+          99,
+          randomDistributionFactory(.5, 2),
         ),  
       ],
       // grass
@@ -1053,9 +1053,9 @@ window.onload = async () => {
         featureMaterial(
           spikeFeatureFactory(4, 4),
           24,
-          29999,
+          4096,
           randomDistributionFactory(
-            2,
+            .5,
             2,
           ),
         ),  
@@ -1066,8 +1066,8 @@ window.onload = async () => {
         featureMaterial(
           staticFeature,
           16,
-          9999,
-          randomDistributionFactory(3, 2),
+          999,
+          randomDistributionFactory(1, 2),
         ),  
         featureMaterial(
           riverStonesFeatureFactory(1),
@@ -1077,6 +1077,19 @@ window.onload = async () => {
         ),  
       ],
     ],
+    // TEXTURE_DRAGON_BODY_MATERIAL
+    [
+      MATERIAL_TERRAIN_TEXTURE_DIMENSION,
+      [
+        flatMaterial,
+        featureMaterial(
+          riverStonesFeatureFactory(.8),
+          16,
+          9999,
+          randomDistributionFactory(0, 0),
+        ),  
+      ],
+    ]
   ];
 
   // make some textures
@@ -1357,32 +1370,42 @@ window.onload = async () => {
       );
     }
   };
-  window.onwheel = (e: WheelEvent) => {
-    const v = e.deltaY/999;
-    // TODO 
-    if (Math.abs(cameraZoom) < 1 || true) {
-      cameraZoom -= v;
-    } else {
-      if (v < 0 && cameraZoom > 0 || v > 0 && cameraZoom < 0) {
-        cameraZoom /= Math.abs(v);
+  if (FLAG_ALLOW_ZOOM) {
+    window.onwheel = (e: WheelEvent) => {
+      const v = e.deltaY/999;
+      // TODO 
+      if (Math.abs(cameraZoom) < 1 || true) {
+        cameraZoom -= v;
       } else {
-        cameraZoom *= Math.abs(v);
-      }  
-    }
-  };
+        if (v < 0 && cameraZoom > 0 || v > 0 && cameraZoom < 0) {
+          cameraZoom /= Math.abs(v);
+        } else {
+          cameraZoom *= Math.abs(v);
+        }  
+      }
+    };  
+  }
   window.onkeydown = (e: KeyboardEvent) => {
     setKeyState(e.keyCode as KeyCode, 1);
+    if (FLAG_PREVENT_DEFAULT) {
+      e.preventDefault();
+    }
   };
   window.onkeyup = (e: KeyboardEvent) => {
     setKeyState(e.keyCode as KeyCode, 0);
+    if (FLAG_PREVENT_DEFAULT) {
+      e.preventDefault();
+    }
   };
 
   const lastFrameTimes: number[] = [];
   let then = 0;
   let time = 99;
+  let tick = 0;
   function animate(now: number) {
     const delta = now - then;
     then = now;
+    tick++;
     //const cappedDelta = 16;
     const cappedDelta = Math.min(delta, 40);
     time += cappedDelta;
@@ -1671,7 +1694,7 @@ window.onload = async () => {
                     inverseMass: 9,
                     transient: 1,
                     modelVariant: VARIANT_FIRE,
-                    anims: [
+                    anims: [[
                       createAttributeAnimation(
                         999 * (Math.random()+player.fireReservior/9999),
                         'at',
@@ -1679,7 +1702,7 @@ window.onload = async () => {
                         createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
                         e => e.dead = 1,
                       )
-                    ]
+                    ]]
                   };
 
                   addEntity(ball);
@@ -2197,20 +2220,24 @@ window.onload = async () => {
                   resolutions: [0, 1],
                   transient: 1,
                   anims: [
-                    createAttributeAnimation(
-                      999 + Math.random() * 999,
-                      'at',
-                      EASING_QUAD_IN,
-                      createMatrixUpdate(p => matrix4Scale(1 - p)),
-                      e => e.dead = 1,
-                    ),
+                    [
+                      createAttributeAnimation(
+                        999 + Math.random() * 999,
+                        'at',
+                        EASING_QUAD_IN,
+                        createMatrixUpdate(p => matrix4Scale(1 - p)),
+                        e => e.dead = 1,
+                      )
+                    ],
                     // TODO this is gold plating really
-                    createAttributeAnimation(
-                      -400,
-                      'at',
-                      EASING_SINUSOIDAL,
-                      createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
-                    )
+                    [
+                      createAttributeAnimation(
+                        -400,
+                        'at',
+                        EASING_SINUSOIDAL,
+                        createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
+                      )
+                    ]
                   ],
                 }, tiles);
                 entity.health--;
@@ -2250,7 +2277,11 @@ window.onload = async () => {
 
           // update any animations
           entity['at'] = entity.transform;
-          entity.anims = entity.anims?.filter(anim => !anim(entity, cappedDelta));
+          entity.anims = entity.anims?.filter(([anim]) => !anim(entity, cappedDelta));
+          if (entity.transient && entity.lastUpdated < tick - 1) {
+            entity.dead = 1;
+          }
+          entity.lastUpdated = tick;
 
           if (entity.dead) {
             removeEntity(entity);
@@ -2360,7 +2391,7 @@ window.onload = async () => {
       cameraPositionMatrix,
       cameraZRotationMatrix,
       matrix4Rotate(cameraXRotation, 1, 0, 0),
-      matrix4Translate(0, cameraZoom, 0),
+      FLAG_ALLOW_ZOOM ? matrix4Translate(0, cameraZoom, 0) : undefined,
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
       projectionMatrix,
