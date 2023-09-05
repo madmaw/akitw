@@ -1,19 +1,21 @@
 let nextEntityId = 1;
 let nextRenderGroupId = 1;
 
-const ENTITY_TYPE_ACTIVE = 1;
+const ENTITY_TYPE_PLAYER_CONTROLLED = 1;
 const ENTITY_TYPE_SCENERY = 2;
 const ENTITY_TYPE_FIREBALL = 3;
 const ENTITY_TYPE_PARTICLE = 4;
 const ENTITY_TYPE_TERRAIN = 5;
 const ENTITY_TYPE_FIRE = 7;
+const ENTITY_TYPE_INTELLIGENT = 8;
 
-type EntityTypeDragon = typeof ENTITY_TYPE_ACTIVE;
+type EntityTypeDragon = typeof ENTITY_TYPE_PLAYER_CONTROLLED;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
 type EntityTypeFireball = typeof ENTITY_TYPE_FIREBALL;
 type EntityTypeParticle = typeof ENTITY_TYPE_PARTICLE;
 type EntityTypeTerrain = typeof ENTITY_TYPE_TERRAIN;
 type EntityTypeFire = typeof ENTITY_TYPE_FIRE;
+type EntityTypeIntelligent = typeof ENTITY_TYPE_INTELLIGENT;
 
 type EntityType =
   | EntityTypeDragon
@@ -82,6 +84,7 @@ type Entity<PartId extends number = number> =
   | DynamicEntity<PartId>
   | DragonEntity<PartId>
   | FireEntity<PartId>
+  | IntelligentEntity<PartId>
   ;
 
 // return true when done
@@ -162,6 +165,7 @@ type StaticEntity<PartId extends number = number> = {
   yRotation?: undefined,
   zRotation?: undefined,
   shadows?: Falsey,
+  gravity?: undefined,
 } & BaseEntity<PartId>;
 
 type BaseDynamicEntity<PartId extends number = number> = {
@@ -212,6 +216,13 @@ type FireEntity<PartId extends number = number> = {
   readonly entityType: 
     | EntityTypeFire,
   lastSpawnedParticle?: number,
+  lastCollisionTick?: number,
   xRotation?: undefined,
   yRotation?: undefined,
 } & BaseDynamicEntity<PartId>;
+
+type IntelligentEntity<PartId extends number = number> = {
+  readonly entityType:
+    | EntityTypeIntelligent,
+  home?: ReadonlyVector3,
+} & ActiveEntity<PartId>;

@@ -316,6 +316,7 @@ window.onload = async () => {
   }
 
   const terrain = weightedAverageTerrainFactory(depths);
+
   function terrainNormal(scaledWorldPoint: ReadonlyVector3 | ReadonlyVector2) {
     const offsets: ReadonlyVector2[] = [
       [-1/WORLD_DIMENSION, 0],
@@ -346,6 +347,208 @@ window.onload = async () => {
     );  
   }
 
+  const zones = create2DArray(MATERIAL_TERRAIN_TEXTURE_DIMENSION, MATERIAL_TERRAIN_TEXTURE_DIMENSION, (x, y) => {
+    let result =  new Array(9).fill(0) as ZoneTile;
+    // set the mountain, road, desert, beach, grassland values based on x and y and normal
+    const worldPoint: ReadonlyVector2 = [x/MATERIAL_TERRAIN_TEXTURE_DIMENSION, y/MATERIAL_TERRAIN_TEXTURE_DIMENSION];
+    const depth = terrain(...worldPoint);
+    const dx = x - MATERIAL_TERRAIN_TEXTURE_DIMENSION/2;
+    const dy = y - MATERIAL_TERRAIN_TEXTURE_DIMENSION/2;
+    const dc = Math.sqrt(dx *dx + dy * dy);
+    const slopeNormal = vectorNDotProduct(
+      terrainNormal(worldPoint),
+      NORMAL_Z,
+    );
+    result[BIOME_ROAD] = 1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2;
+    result[BIOME_BEACH] = Math.pow(Math.random(), Math.max(0, depth - .2) * 50);
+    result[BIOME_DESERT] = Math.pow(slopeNormal, 9) - Math.pow(Math.random(), Math.max(0, depth - 9)/2);
+    result[BIOME_MOUNTAINS] = Math.max(
+      // steeper gets rockier
+      (1 - Math.pow(slopeNormal, 2)) * Math.pow(Math.random(), .1),
+      // as it gets higher, more rocky
+      1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2),
+    );
+    
+    result = result.map(v => Math.max(0, v, Math.min(1, v))) as ZoneTile;
+    result[BIOME_GRASSLAND] = Math.max(
+      // any other boime up until this point reduces grassiness
+      Math.pow(1 - Math.max(...result), .5),
+      // random patches of grass are ok
+      // NOTE: slope normal should never be 0 (vertical)
+      Math.pow(Math.random(), 99/slopeNormal),
+    );
+    return result;
+  });
+  // populate the zones with active biomes
+  ([
+    [
+      BIOME_TROPICAL,
+      9999,
+      clusteredDistributionFactory(
+        3,
+        3,
+        3,
+        2,
+        .3,
+        2,
+      ),
+      (zx, zy, z) => {
+        const v = 1 - Math.min(1, Math.abs(z - 1)/.5);
+        return Math.pow(zones[zx][zy][BIOME_GRASSLAND] * v, .1);
+      }
+    ],
+    [
+      BIOME_BROADLEAF_FOREST,
+      9999,
+      clusteredDistributionFactory(
+        9,
+        9,
+        4,
+        2,
+        .1,
+        3,
+      ),
+      (zx, zy, z) => {
+        const v = 1 - Math.min(1, Math.abs(z - 4)/3);
+        return Math.pow(zones[zx][zy][BIOME_GRASSLAND] * v, .1);
+      }
+    ],
+    [
+      BIOME_CONIFEROUS_FOREST,
+      9999,
+      clusteredDistributionFactory(
+        6,
+        6,
+        2,
+        2,
+        .1,
+        4,
+      ),
+      (zx, zy, z) => {
+        const v = 1 - Math.min(1, Math.abs(z - 6)/3);
+        return Math.pow((1 - zones[zx][zy][BIOME_MOUNTAINS]) * v, .1);
+      }
+    ],
+    [
+      BIOME_CIVILISATION,
+      999,
+      clusteredDistributionFactory(
+        9,
+        9,
+        2,
+        2,
+        .1,
+        4,
+      ),
+      (zx, zy, z) => {
+        const v = 1 - Math.min(1, Math.abs(z - 3)/2);
+        return Math.pow((zones[zx][zy][BIOME_GRASSLAND]) * v, .1);
+      }
+    ],
+
+  ] as [Biome, number, Distribution, (x: number, y: number, z: number) => number][]).map(
+    ([biome, quantity, distribution, filter]) => {
+      new Array(quantity).fill(0).map(() => {
+        const [x, y, distributionScale] = distribution(MATERIAL_TERRAIN_TEXTURE_DIMENSION);
+        const zx = Math.abs(x | 0)%MATERIAL_TERRAIN_TEXTURE_DIMENSION;
+        const zy = Math.abs(y | 0)%MATERIAL_TERRAIN_TEXTURE_DIMENSION;
+        const z = terrain(
+          zx/MATERIAL_TERRAIN_TEXTURE_DIMENSION,
+          zy/MATERIAL_TERRAIN_TEXTURE_DIMENSION,
+        );  
+        const filterScale = filter(zx, zy, z);
+        const scale = filterScale * distributionScale;
+        if (scale > 0) {
+          zones[zx][zy][biome] = Math.min(1, scale + zones[zx][zy][biome]);
+        }
+      });
+    }
+  );
+  
+  
+  function populate([[minx, miny], [maxx, maxy]]: ReadonlyRect2, destructiblesOnly?: Booleanish) {
+    for (let tx=minx; tx<maxx; tx++) {
+      for (let ty=miny; ty<maxy; ty++) {
+        const x = tx + Math.random();
+        const y = ty + Math.random();
+        const zx = x * MATERIAL_TERRAIN_TEXTURE_DIMENSION/WORLD_DIMENSION | 0;
+        const zy = y * MATERIAL_TERRAIN_TEXTURE_DIMENSION/WORLD_DIMENSION | 0
+        const biomes = zones[zx][zy];
+        const totalBiomeValues = biomes.reduce((acc, v) => acc + v, 0);
+        let targetBiomeValue = totalBiomeValues * Math.random();
+        let biome = -1;
+        while (targetBiomeValue > 0) {
+          biome++;
+          targetBiomeValue -= biomes[biome];
+        }
+        const choices = BIOME_LOOKUP_TABLE[biome];
+        if (choices.length) {
+          const totalChoiceValues = choices.reduce((acc, [v]) => acc + v, 0);
+          let targetChoiceValue = totalChoiceValues * Math.random();
+          let choiceIndex = -1;
+          while (targetChoiceValue > 0) {
+            choiceIndex++;
+            targetChoiceValue -= choices[choiceIndex][0];
+          }
+          const [
+            _,
+            entityPrototype,
+            choiceScale,
+          ] = choices[choiceIndex];
+          if (choiceScale) {
+            const biomeScale = biomes[biome];
+            const scale = choiceScale * biomeScale;
+
+            const radius = scale/2;
+            const resolutions = new Array(Math.min(Math.sqrt(scale * 2) + 2 | 0, RESOLUTIONS - 2))
+              .fill(0)
+              .map((_, i) => i);
+
+            const bounds = rect3FromRadius(radius);
+            const z = terrain(x / WORLD_DIMENSION, y/WORLD_DIMENSION);
+            const position: Vector3 = [x, y, z + radius * .8];
+            const entity: DynamicEntity = {
+              ...entityPrototype as any,
+              bounds,
+              collisionRadius: radius,
+              id: nextEntityId++,
+              position,
+              renderGroupId: nextRenderGroupId++,
+              resolutions,
+              velocity: [0, 0, 0],
+              modelVariant: VARIANT_SYMBOLS,
+              body: {
+                modelId: MODEL_ID_BILLBOARD,
+              },
+              transform: matrix4Scale(scale),
+              gravity: entityPrototype.inverseMass ? DEFAULT_GRAVITY : 0,
+              xRotation: 0,
+              yRotation: 0,
+              zRotation: 0,
+              maximumLateralVelocity: .01,
+              maximumLateralAcceleration: .00002,
+              inverseFriction: 0,              
+            };
+            // don't overlap with anything
+            if (
+              (entity.health || !destructiblesOnly)
+                && biomeScale > .4
+                && !iterateEntityBounds(entity).some(t => {
+                  for(let entityId in t.entities) {
+                    const e = t.entities[entityId];
+                    if(!e.face && rectNOverlaps(e.position, e.bounds, position, bounds)) {
+                      return 1;
+                    }
+                  }
+                })
+            ) {
+              addEntity(entity);  
+            }
+          }
+        }
+      }
+    }
+  }
   
   const world: World = new Array(RESOLUTIONS).fill(0).map((_, resolution) => {
     const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
@@ -905,6 +1108,7 @@ window.onload = async () => {
           for (let x=0; x<MATERIAL_TERRAIN_TEXTURE_DIMENSION; x++) {
             for (let y=0; y<MATERIAL_TERRAIN_TEXTURE_DIMENSION; y++) {
               //const depth = terrain((x + .5)/MATERIAL_TEXTURE_DIMENSION, (y + .5)/MATERIAL_TEXTURE_DIMENSION);
+              /*
               const depth = terrain(x/MATERIAL_TERRAIN_TEXTURE_DIMENSION, y/MATERIAL_TERRAIN_TEXTURE_DIMENSION);
               const dx = x - MATERIAL_TERRAIN_TEXTURE_DIMENSION/2;
               const dy = y - MATERIAL_TERRAIN_TEXTURE_DIMENSION/2;
@@ -939,6 +1143,22 @@ window.onload = async () => {
                 Math.pow(Math.random(), 99/slopeNormal),
                 //Math.pow(slopeNormal * Math.random(), 9),
               )
+              */
+             const biomes = zones[x][y];
+             const grassiness = biomes[BIOME_GRASSLAND] * Math.pow(Math.random(), .1);
+             const sandiness = Math.min(
+                1,
+                biomes[BIOME_BEACH]
+                  + biomes[BIOME_DESERT] * Math.random()
+                  + biomes[BIOME_CIVILISATION]
+                  + biomes[BIOME_ROAD]
+              );
+              const stoniness = Math.min(
+                1,
+                biomes[BIOME_CIVILISATION] * Math.random()
+                  + biomes[BIOME_DESERT] * Math.pow(Math.random(), 9)
+                  + biomes[BIOME_MOUNTAINS]
+              );
 
               imageData.data.set([
                 // sandiness
@@ -958,7 +1178,8 @@ window.onload = async () => {
     ],
     ...[
       // TEXTURE_SYMBOL_MAP
-      '🌴🌳🌲🌵🌿🌼🌻🍖',
+      //0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5
+      '🌴🌳🌲🌵🌿🌼🌻🍖🐐🐄🛖🏠⛪🕌🏦🏰',
       // TEXTURE_SYMBOL_BRIGHT_MAP
       '🔥',
     ].map<[number, ...Material[][]]>(s => {
@@ -1072,8 +1293,8 @@ window.onload = async () => {
         featureMaterial(
           riverStonesFeatureFactory(1),
           48,
-          4999,
-          clusteredDistributionFactory(9, 9, 2, 2, .7, 3),
+          999,
+          clusteredDistributionFactory(9, 24, 2, 1, .5, 2),
         ),  
       ],
     ],
@@ -1156,41 +1377,6 @@ window.onload = async () => {
     });
   });  
 
-  // add in the cube
-  new Array(2).fill(0).forEach((_, i) => {
-    const {
-      faces,
-      bounds,
-      maximalExternalRadius,
-    } = cubeModel;
-    const renderGroupId = nextRenderGroupId++;
-    const cx = WORLD_DIMENSION/2 + i * 2;
-    const cy = WORLD_DIMENSION/2;
-    const position: Vector3 = [cx, cy, terrain(cx/WORLD_DIMENSION, cy/WORLD_DIMENSION)];
-
-    faces.forEach(face => {
-      const worldToPlaneCoordinates = matrix4Multiply(
-        matrix4Invert(face.toModelCoordinates),
-        matrix4Translate(...vectorNScale(position, -1)),
-      );
-      const rotateToPlaneCoordinates = matrix4Invert(face.rotateToModelCoordinates);
-      const entity: StaticEntity = {
-        entityType: ENTITY_TYPE_TERRAIN,
-        resolutions: [0, 1, 2],
-        face,
-        position,
-        id: nextEntityId++,
-        bounds,
-        renderGroupId,
-        body: CUBE_PART,
-        rotateToPlaneCoordinates,
-        worldToPlaneCoordinates,
-        collisionGroup: COLLISION_GROUP_TERRAIN,
-      };
-      addEntity(entity);
-    });
-  });
-
   if (FLAG_ENFORCE_BOUNDARY) {
     // add in the walls
     new Array(4).fill(0).forEach((_, i) => {
@@ -1246,65 +1432,66 @@ window.onload = async () => {
   }
 
   // add in some trees
-  const treeDistribution = clusteredDistributionFactory(
-    1/WORLD_DIMENSION,
-    5/WORLD_DIMENSION,
-    2,
-    2,
-    .3,
-    3,
-  );
-  new Array(WORLD_DIMENSION*4).fill(0).forEach(() => {
+  populate([[0, 0], [WORLD_DIMENSION, WORLD_DIMENSION]]);
+  // const treeDistribution = clusteredDistributionFactory(
+  //   1/WORLD_DIMENSION,
+  //   5/WORLD_DIMENSION,
+  //   2,
+  //   2,
+  //   .3,
+  //   3,
+  // );
+  // new Array(WORLD_DIMENSION*4).fill(0).forEach(() => {
 
-    const [x, y, scale] = treeDistribution(1);
+  //   const [x, y, scale] = treeDistribution(1);
 
-    const scaledCoordinates: Vector2 = [x, y];
-    const z = terrain(...scaledCoordinates);
-    const terrainNormalZ = terrainNormal(scaledCoordinates)[2];
-    if (z > .5 && terrainNormalZ > .9) {
-      const atlasIndex = (z + 7 + Math.random())/9 | 0;
+  //   const scaledCoordinates: Vector2 = [x, y];
+  //   const z = terrain(...scaledCoordinates);
+  //   const terrainNormalZ = terrainNormal(scaledCoordinates)[2];
+  //   if (z > .5 && terrainNormalZ > .9) {
+  //     const atlasIndex = (z + 7 + Math.random())/9 | 0;
       
-      const adjustedScale = Math.pow((terrainNormalZ - .9) * 9, 2) * scale;
-      const {
-        maximalInternalRadius: minimalInternalRadius,
-        bounds,
-      } = billboardModel;
+  //     const adjustedScale = Math.pow((terrainNormalZ - .9) * 9, 2) * scale;
+  //     const {
+  //       maximalInternalRadius: minimalInternalRadius,
+  //       bounds,
+  //     } = billboardModel;
 
-      const modelScale = (adjustedScale + .5) * MAX_TREE_HEIGHT;
-      const collisionRadius = minimalInternalRadius * modelScale;
+  //     const modelScale = (adjustedScale + .5) * MAX_TREE_HEIGHT;
+  //     const collisionRadius = minimalInternalRadius * modelScale;
   
-      const renderGroupId = nextRenderGroupId++;
-      const position: Vector3 = [
-        ...vectorNScale(scaledCoordinates, WORLD_DIMENSION),
-        z + collisionRadius*.8,
-      ] as Vector3;
+  //     const renderGroupId = nextRenderGroupId++;
+  //     const position: Vector3 = [
+  //       ...vectorNScale(scaledCoordinates, WORLD_DIMENSION),
+  //       z + collisionRadius*.8,
+  //     ] as Vector3;
   
-      const entity: DynamicEntity<BillboardPartIds> = {
-        entityType: ENTITY_TYPE_SCENERY,
-        resolutions: new Array(adjustedScale * 4 + 3 + 2 * Math.random() | 0).fill(0).map((_, i) => i),
-        position,
-        id: nextEntityId++,
-        bounds,
-        renderGroupId,
-        gravity: 0,
-        collisionRadius: collisionRadius,
-        body: BILLBOARD_PART,
-        transform: matrix4Scale(modelScale),
-        modelVariant: VARIANT_SYMBOLS,
-        modelAtlasIndex: atlasIndex,
-        velocity: [0, 0, 0],
-        collisionGroup: COLLISION_GROUP_SCENERY,
-        health: (adjustedScale+1) * 9,
-        shadows: 1,
-      };
-      addEntity(entity);
-    }
-  });
+  //     const entity: DynamicEntity<BillboardPartIds> = {
+  //       entityType: ENTITY_TYPE_SCENERY,
+  //       resolutions: new Array(adjustedScale * 4 + 3 + 2 * Math.random() | 0).fill(0).map((_, i) => i),
+  //       position,
+  //       id: nextEntityId++,
+  //       bounds,
+  //       renderGroupId,
+  //       gravity: 0,
+  //       collisionRadius: collisionRadius,
+  //       body: BILLBOARD_PART,
+  //       transform: matrix4Scale(modelScale),
+  //       modelVariant: VARIANT_SYMBOLS,
+  //       modelAtlasIndex: atlasIndex,
+  //       velocity: [0, 0, 0],
+  //       collisionGroup: COLLISION_GROUP_SCENERY,
+  //       health: (adjustedScale+1) * 9,
+  //       shadows: 1,
+  //     };
+  //     addEntity(entity);
+  //   }
+  // });
 
   const playerRadius = .3;
   // add in a "player"
   const player: DragonEntity<DragonPartIds> = {
-    entityType: ENTITY_TYPE_ACTIVE,
+    entityType: ENTITY_TYPE_PLAYER_CONTROLLED,
     resolutions: [0],
     body: DRAGON_PART,
     joints: {
@@ -1438,7 +1625,6 @@ window.onload = async () => {
       const scale = 1/Math.pow(2, reverseResolution + 1);
       const resolution = reversedWorld.length - reverseResolution - 1;
       // add in all the tiles within the bounds, but not in the view area
-      //const gridScale = Math.pow(2, resolution);
       let nextCellsToCheck: ReadonlyVector2[] = [];
       cellsToCheck.forEach((cell) => {
         const [gridX, gridY] = cell;
@@ -1455,6 +1641,21 @@ window.onload = async () => {
           );
         } else {
           tiles.add(getAndMaybePopulateTile(gridX | 0, gridY | 0, resolution));
+          if (FLAG_REPOPULATE) {
+            // secretly refresh this tile
+            if (resolution == 4 && Math.random() < .0001) {
+              const gridScale = Math.pow(2, resolution);
+              populate(
+                [
+                  [gridX * gridScale, gridY * gridScale],
+                  [(gridX+1)*gridScale, (gridY+1)*gridScale],
+                ],
+                // only populate things that can be killed, otherwise the world
+                // fills up with rubbish
+                1,
+              );
+            }
+          }  
         }
       });
       return [tiles, nextCellsToCheck];
@@ -1478,7 +1679,7 @@ window.onload = async () => {
           } = entity;
 
           if (!face) {
-            if (entityType == ENTITY_TYPE_ACTIVE) {
+            if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED || entityType == ENTITY_TYPE_INTELLIGENT) {
               const onGround = entity.lastOnGroundTime + 99 > time && entity.lastOnGroundNormal;
               // do AI stuff
               const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
@@ -1486,9 +1687,9 @@ window.onload = async () => {
               const gliding = hasJointAnimation(entity, ACTION_ID_GLIDE);
               const flapping = hasJointAnimation(entity, ACTION_ID_FLAP);
 
-              if (entity == player) {
-                const playerFacingNormal = vector3TransformMatrix4(
-                  matrix4Rotate(player.zRotation, 0, 0, 1),
+              if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED) {
+                const entityFacingNormal = vector3TransformMatrix4(
+                  matrix4Rotate(entity.zRotation, 0, 0, 1),
                   0, 1, 0,
                 );
                 const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(
@@ -1500,16 +1701,16 @@ window.onload = async () => {
                 if (onGround) {
                   // set the xRotation to match the ground 
                   const cosXRotation = vectorNDotProduct(
-                    playerFacingNormal,
-                    player.lastOnGroundNormal,
+                    entityFacingNormal,
+                    entity.lastOnGroundNormal,
                   );
                   
                   targetXRotation = Math.acos(cosXRotation) - Math.PI/2;
 
                   if (someLateralInputsWereUnreadOrNonZero) {
                     // turn nicely
-                    const zDiff = mathAngleDiff(player.zRotation, cameraZRotation);
-                    player.zRotation += zDiff > 0
+                    const zDiff = mathAngleDiff(entity.zRotation, cameraZRotation);
+                    entity.zRotation += zDiff > 0
                       ? Math.min(zDiff, cappedDelta * Z_TORQUE)
                       : Math.max(zDiff, cappedDelta * -Z_TORQUE);
                     
@@ -1525,20 +1726,20 @@ window.onload = async () => {
                 } else {
                   targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
                     ? cameraXRotation + Math.PI*.1
-                    : player.xRotation;
-                  player.zRotation = Math.atan2(player.velocity[1], player.velocity[0]) - Math.PI/2;
+                    : entity.xRotation;
+                  entity.zRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - Math.PI/2;
                   if (readInput(INPUT_UP)) {
                     targetUnrotatedLateralOffset = [0, 1];
                   } else {
                     // preemptively undo the rotation below so we continue on in the same direction
                     targetUnrotatedLateralOffset = [
-                      Math.cos(player.zRotation - cameraZRotation + Math.PI/2),
-                      Math.sin(player.zRotation - cameraZRotation + Math.PI/2),
+                      Math.cos(entity.zRotation - cameraZRotation + Math.PI/2),
+                      Math.sin(entity.zRotation - cameraZRotation + Math.PI/2),
                     ];
                   }
                 }
-                const xDiff = mathAngleDiff(player.xRotation, targetXRotation);
-                player.xRotation += xDiff > 0
+                const xDiff = mathAngleDiff(entity.xRotation, targetXRotation);
+                entity.xRotation += xDiff > 0
                   ? Math.min(xDiff, cappedDelta * X_TORQUE)
                   : Math.max(xDiff, cappedDelta * -X_TORQUE);
 
@@ -1560,8 +1761,8 @@ window.onload = async () => {
                       const targetNormal = vectorNNormalize(
                         vector3TransformMatrix4(
                           matrix4Multiply(
-                            matrix4Rotate(player.zRotation, 0, 0, 1),
-                            matrix4Rotate(player.xRotation, 1, 0, 0),
+                            matrix4Rotate(entity.zRotation, 0, 0, 1),
+                            matrix4Rotate(entity.xRotation, 1, 0, 0),
                           ),
                           0, 1, 1,
                         )
@@ -1610,24 +1811,24 @@ window.onload = async () => {
                 // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
                 // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
                 const rotation: ReadonlyVector3 = [cameraXRotation/2 + Math.PI*.01, 0, deltaZRotation/2];
-                player.joints[DRAGON_PART_ID_NECK]['r'] = rotation;
-                player.joints[DRAGON_PART_ID_HEAD]['r'] = rotation;
+                entity.joints[DRAGON_PART_ID_NECK]['r'] = rotation;
+                entity.joints[DRAGON_PART_ID_HEAD]['r'] = rotation;
 
-                player.fireReservior = Math.min((player.fireReservior || 0) + cappedDelta, 9999);
+                entity.fireReservior = Math.min((entity.fireReservior || 0) + cappedDelta, 9999);
 
                 if (
-                  (player.lastFired || 0) + 50 - Math.sqrt(player.fireReservior) < time
+                  (entity.lastFired || 0) + 50 - Math.sqrt(entity.fireReservior) < time
                     && readInput(INPUT_FIRE)
                 ) {
-                  setJointAnimations(player, DRAGON_ANIMATION_SHOOT);
-                  player.lastFired = time;
-                  player.fireReservior -= 99;
+                  setJointAnimations(entity, DRAGON_ANIMATION_SHOOT);
+                  entity.lastFired = time;
+                  entity.fireReservior -= 99;
                   // use exact player transform chain
-                  const body = player.body as BodyPart<DragonPartIds>;
+                  const body = entity.body as BodyPart<DragonPartIds>;
                   const neck = body.children[0];
                   const head = neck.children[0];
                   const headPositionTransforms = [body, neck, head].map(part => {
-                    const joint = player.joints[part.id];
+                    const joint = entity.joints[part.id];
                     return [
                       // pre/post rotatoin happen not to be populated on head/neck/body
                       //part.preRotation && matrix4RotateZXY(...part.preRotation),
@@ -1637,11 +1838,11 @@ window.onload = async () => {
                     ]
                   }).flat(1);
                   const headPositionTransform = matrix4Multiply(
-                    matrix4Translate(...player.position),
+                    matrix4Translate(...entity.position),
                     matrix4RotateZXY(
-                      player.xRotation + Math.random()*.2-.1,
-                      player.yRotation,
-                      player.zRotation + Math.random()*.2-.1,
+                      entity.xRotation + Math.random()*.2-.1,
+                      entity.yRotation,
+                      entity.zRotation + Math.random()*.2-.1,
                     ),
                     // matrix4Rotate(player.zRotation, 0, 0, 1),
                     // matrix4Rotate(player.xRotation, 1, 0, 0),
@@ -1668,7 +1869,7 @@ window.onload = async () => {
                   //   matrix4Rotate(cameraXRotation + Math.PI/20 + Math.random()*.2-.1, 1, 0, 0),
                   // );
                   const velocity: Vector3 = vectorNScaleThenAdd(
-                    player.velocity,
+                    entity.velocity,
                     headDirection,
                     .01,
                   );
@@ -1697,7 +1898,7 @@ window.onload = async () => {
                     modelVariant: VARIANT_FIRE,
                     anims: [[
                       createAttributeAnimation(
-                        999 * (Math.random()+player.fireReservior/9999),
+                        999 * (Math.random()+entity.fireReservior/9999),
                         'at',
                         EASING_QUAD_IN,
                         createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
@@ -1708,6 +1909,8 @@ window.onload = async () => {
 
                   addEntity(ball);
                 }
+              } else {
+                // TODO
               }
               const targetLateralPosition = entity.targetLateralPosition || entity.position;
               let targetYRotation = 0;
@@ -1803,12 +2006,14 @@ window.onload = async () => {
               }
               // bank smoothly
               const yDiff = mathAngleDiff(entity.yRotation, targetYRotation);
-              player.yRotation += yDiff > 0
+              entity.yRotation += yDiff > 0
                 ? Math.min(yDiff, cappedDelta * Z_TORQUE)
                 : Math.max(yDiff, cappedDelta * -Z_TORQUE);
             }
             
-            (entity as DynamicEntity).velocity[2] -= cappedDelta * ((entity as DynamicEntity).gravity || 0);
+            if (entity.gravity) {
+              entity.velocity[2] -= cappedDelta * entity.gravity;
+            }
             if (FLAG_DEBUG_PHYSICS) {
               entity.logs = entity.logs?.slice(-30) || [];
             }
@@ -2180,10 +2385,126 @@ window.onload = async () => {
                 entity.logs = [];
               }  
             }
+            if (entity.position[2] < 0) {
+              // TODO add fake water entity
+              //collisionEntities.add(WATER);
+            }
+          
+            collisionEntities.forEach(check => {
+              const {
+                position,
+                inverseMass = 0,
+              } = entity;
+              
+              if (check && !face && !check.face && (inverseMass || check.inverseMass)) {
+                const entityDelta = vectorNScaleThenAdd(
+                  position,
+                  check.position,
+                  -1
+                );
+                const entityDistance = vectorNLength(entityDelta);
+                const entityOverlap = (entity as DynamicEntity).collisionRadius
+                  + (check as DynamicEntity).collisionRadius
+                  - entityDistance;
             
-            collisionEntities.forEach(collisionEntity => {
-              // TODO can inline handleCollision here
-              handleCollision(entity, addEntity, collisionEntity);
+                const divisor = 1999*(inverseMass + (check.inverseMass || 0));
+                entity.velocity = entity.velocity && vectorNScaleThenAdd(
+                  entity.velocity,
+                  entityDelta,
+                  entityOverlap*inverseMass/divisor
+                );
+                check.velocity = check.velocity && vectorNScaleThenAdd(
+                  check.velocity,
+                  entityDelta,
+                  -entityOverlap*(check.inverseMass || 0)/divisor,
+                );
+              }
+            
+              let checkInvincible = check && check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE);
+              let checkDamaged: Booleanish;
+            
+              switch (entity.entityType) {
+                case ENTITY_TYPE_FIREBALL:
+                  entity.dead = 1;
+                  addEntity({
+                    body: {
+                      modelId: MODEL_ID_SPHERE,
+                    },
+                    bounds: rect3FromRadius(.3),
+                    collisionGroup: COLLISION_GROUP_PLAYER,
+                    collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_SCENERY | COLLISION_GROUP_TERRAIN,
+                    collisionRadius: .3,
+                    entityType: ENTITY_TYPE_FIRE,
+                    id: nextEntityId++,
+                    position: entity.position,
+                    renderGroupId: nextRenderGroupId++,
+                    resolutions: [0, 1, 2, 3, 4],
+                    velocity: [0, 0, 0],
+                    anims: [
+                      [
+                        createAttributeAnimation(
+                          200,
+                          'at',
+                          EASING_QUAD_OUT,
+                          createMatrixUpdate(matrix4Scale),
+                          e => {
+                            // turn it into a flame so we can see fires at distance
+                            e.body = {
+                              modelId: MODEL_ID_BILLBOARD,
+                            };
+                            // TODO feel like setting all these should be one operation
+                            // model id has variant and symbol baked in?
+                            e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
+                            e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
+                            (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
+                          },
+                        ),
+                      ],
+                      [
+                        createAttributeAnimation(
+                          -999,
+                          'at',
+                          EASING_QUAD_IN_OUT,
+                          createMatrixUpdate(p => matrix4Scale(p/5 + .9))
+                        ),
+                      ]
+                    ],
+                    transient: 1,
+                    inverseFriction: 0,
+                    modelVariant: VARIANT_FIRE,
+                    health: 9,
+                  });
+                  checkDamaged = 1;
+                  break;
+                case ENTITY_TYPE_FIRE:
+                  entity.lastCollisionTick = tick;
+                  if (
+                    check
+                      && check.health
+                      && !checkInvincible
+                  ) {
+                    // do damage to thing
+                    checkDamaged = 1;
+                    // gain some health
+                    entity.health += 9;
+                  }
+                  break;
+              }
+              if (checkDamaged && check && check.health && !checkInvincible) {
+                check.health--;
+                check.anims = [
+                  ...(check.anims || []),
+                  [
+                    createAttributeAnimation(
+                      300 + 99 * Math.random(),
+                      'at',
+                      EASING_BOUNCE,
+                      createMatrixUpdate(p => matrix4Scale(1 - p/2, 1 - p/2, 1 + p/3)),
+                    ),
+                    ACTION_ID_TAKE_DAMAGE
+                  ],
+                ];
+              }
             });
             addEntity(entity, tiles);
           }
@@ -2193,12 +2514,14 @@ window.onload = async () => {
           // update any passive behaviours
           let lookAtCamera: Booleanish;
           switch (entity.entityType) {
-            case ENTITY_TYPE_FIREBALL:
-              if (entity.position[2] < 0) {
-                handleCollision(entity, addEntity);
-              }
-              break;
             case ENTITY_TYPE_FIRE:
+              // only fall down if not burning something
+              if (entity.lastCollisionTick == tick) {
+                entity.gravity = 0;
+                entity.velocity = [0, 0, 0];
+              } else {
+                entity.gravity = DEFAULT_GRAVITY;
+              }
               // burn
               if ((entity.lastSpawnedParticle || 0) + 99 < time) {
                 addEntity({
@@ -2247,12 +2570,14 @@ window.onload = async () => {
               lookAtCamera = 1;
               break;
             case ENTITY_TYPE_PARTICLE:
-              entity.position = vectorNScaleThenAdd(
-                entity.position,
-                entity.velocity,
-                cappedDelta,
-              );
+              // not required? particles are now treated like other entities
+              // entity.position = vectorNScaleThenAdd(
+              //   entity.position,
+              //   entity.velocity,
+              //   cappedDelta,
+              // );
               // fall through
+            case ENTITY_TYPE_INTELLIGENT:
             case ENTITY_TYPE_SCENERY:
               lookAtCamera = 1;
               break;
