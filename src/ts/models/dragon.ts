@@ -1,5 +1,6 @@
 /// <reference path="./types.ts"/>
 /// <reference path="../world/types.ts"/>
+/// <reference path="../world/body_part.ts"/>
 
 const DRAGON_PART_ID_BODY = 0;
 const DRAGON_PART_ID_NECK= 1;
@@ -12,6 +13,7 @@ const DRAGON_PART_ID_SHIN_LEFT = -5;
 const DRAGON_PART_ID_WING_1_RIGHT = 6;
 const DRAGON_PART_ID_WING_2_RIGHT = 7;
 const DRAGON_PART_ID_WING_3_RIGHT = 8;
+const DRAGON_PART_ID_CLAW_RIGHT = 9;
 
 
 type DragonPartIds = 
@@ -26,6 +28,7 @@ type DragonPartIds =
   | typeof DRAGON_PART_ID_WING_1_RIGHT
   | typeof DRAGON_PART_ID_WING_2_RIGHT
   | typeof DRAGON_PART_ID_WING_3_RIGHT
+  | typeof DRAGON_PART_ID_CLAW_RIGHT
   ;
 
 const DRAGON_BODY_SMOOTH_METADATA: PlaneMetadata = {
@@ -362,6 +365,11 @@ const DRAGON_LEG_RIGHT: BodyPart<DragonPartIds> = {
     modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
     preRotationOffset: [.01, -.05, -.11],
     preRotation: [Math.PI/3, 0, 0],
+    children: [{
+      id: DRAGON_PART_ID_CLAW_RIGHT,
+      preRotationOffset: [-.1, 0, -.22],
+      postRotation: [0, -Math.PI/4, -Math.PI/2],
+    }]
   }],
 };
 const DRAGON_LEG_LEFT = synthesizeOppositeBodyPart(DRAGON_LEG_RIGHT);

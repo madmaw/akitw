@@ -33,7 +33,7 @@ const TERRAIN_COLORS: readonly number[] = [
   .2, .8, .1, .8,
   // stone
   .1, .1, .1, 1,
-  .2, .1, .1, 1,
+  .2, .2, .2, 1,
 ];
 
 const VARIANTS: Record<VariantId, Variant> = {

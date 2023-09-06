@@ -114,13 +114,14 @@ type BaseEntity<PartId extends number = number> = {
   readonly resolutions: number[];
 
   // TODO remove position from static entity
-  position: ReadonlyVector3,
+  pos: ReadonlyVector3,
   // collision and render bounds, whichever is larger
   readonly bounds: ReadonlyRect3,
   logs?: any[][];
 
   readonly joints?: Record<PartId, Joint>,
   body?: BodyPart<PartId> | Falsey,
+  holding?: Partial<Record<PartId, Entity | Falsey>>,
   // reference to textures/colours/etc...
   modelVariant?: VariantId;
   // the index of the atlas to use
@@ -132,6 +133,7 @@ type BaseEntity<PartId extends number = number> = {
   // what we will hit
   collisionMask?: number,
   health?: number,
+  pendingDamage?: number,
   // indicates that the entity dies when it goes out of view
   transient?: Booleanish,
   // persistent transform applied to the body
@@ -166,6 +168,7 @@ type StaticEntity<PartId extends number = number> = {
   zRotation?: undefined,
   shadows?: Falsey,
   gravity?: undefined,
+  collisionVelocityLoss?: undefined,
 } & BaseEntity<PartId>;
 
 type BaseDynamicEntity<PartId extends number = number> = {
@@ -182,6 +185,8 @@ type BaseDynamicEntity<PartId extends number = number> = {
   lastOnGroundTime?: number,
   // the angle at which we last made contact with the ground
   lastOnGroundNormal?: Vector3,
+  // the tptal amount of velocity that was removed through collisions
+  collisionVelocityLoss?: number,
   shadows?: Booleanish,
 } & BaseEntity<PartId>;
 
@@ -211,6 +216,7 @@ type DragonEntity<PartId extends number = number> = {
     | EntityTypeDragon,
   fireReservior?: number,
   lastFired?: number,
+  grabbing?: Booleanish | number,
 } & ActiveEntity<PartId>;
 
 type FireEntity<PartId extends number = number> = {
@@ -223,7 +229,7 @@ type FireEntity<PartId extends number = number> = {
 } & BaseDynamicEntity<PartId>;
 
 type Impulse = {
-  target: Entity | Pick<Entity, 'position'>,
+  target: Entity | Pick<Entity, 'pos'>,
   // negative indicates wants to run away
   intensity: number,
 }
@@ -231,7 +237,7 @@ type Impulse = {
 type IntelligentEntity<PartId extends number = number> = {
   readonly entityType:
     | EntityTypeIntelligent,
-  home?: ReadonlyVector3,
+  homePosition?: ReadonlyVector3,
   impulses?: Impulse[],
   // the last time we made a decision
   lastDecision?: number,

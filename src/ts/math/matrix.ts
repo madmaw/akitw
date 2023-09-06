@@ -77,25 +77,6 @@ const matrix4Multiply = (baseMatrix: ReadonlyMatrix4 | Falsey, ...matrices: read
 }
 
 const matrix4Perspective = (tanFovyDiv2: number, aspect: number, znear: number, zfar: number): ReadonlyMatrix4 => {
-
-  /*
-  var top = znear * tan(fovy / 2);
-  var bottom = -top;
-  var left = bottom * aspect;
-  var right = top * aspect;
-  var X = 2 * znear / (right - left);
-  var Y = 2 * znear / (top - bottom);
-  var A = (right + left) / (right - left);
-  var B = (top + bottom) / (top - bottom);
-  var C = -(zfar + znear) / (zfar - znear);
-  var D = -2 * zfar * znear / (zfar - znear);
-  return [
-      X, 0, 0, 0,
-      0, Y, 0, 0,
-      A, B, C, -1,
-      0, 0, D, 0
-  ];
-  */
   let f = 1 / tanFovyDiv2;
   let nf = 1 / (znear - zfar);
   return [

@@ -58,7 +58,7 @@ const INPUT_LEFT = KEY_A;
 const INPUT_RIGHT = KEY_D;
 const INPUT_UP = KEY_W;
 const INPUT_DOWN = KEY_S;
-const INPUT_RUN = KEY_SHIFT;
+const INPUT_WALK = KEY_SHIFT;
 const INPUT_JUMP = KEY_SPACE;
 const INPUT_FIRE = KEY_SYNTHETIC_LEFT_MOUSE_BUTTON;
 
@@ -67,7 +67,7 @@ type Input =
     | typeof INPUT_RIGHT
     | typeof INPUT_UP
     | typeof INPUT_DOWN
-    | typeof INPUT_RUN
+    | typeof INPUT_WALK
     | typeof INPUT_JUMP
     | typeof INPUT_FIRE
     ;

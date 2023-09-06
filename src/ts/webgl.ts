@@ -3,7 +3,7 @@
 // creates a shader of the given type, uploads the source and
 // compiles it.
 //
-const loadShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
+function loadShader(gl: WebGL2RenderingContext, type: number, source: string) {
 
   const shader = gl.createShader(type);
 

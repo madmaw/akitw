@@ -71,7 +71,7 @@ const BIOME_LOOKUP_TABLE: ([
   ],
   // desert
   [
-    [9],
+    [99],
     // cactus
     [
       1,
@@ -180,7 +180,7 @@ const BIOME_LOOKUP_TABLE: ([
         collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
         modelAtlasIndex: 8,
         health: 4,
-        inverseMass: 1,
+        inverseMass: 2,
         shadows: 1,
       },
       1.5,
