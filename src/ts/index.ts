@@ -500,7 +500,14 @@ window.onload = async () => {
             const scale = choiceScale * biomeScale;
 
             const radius = scale/2;
-            const resolutions = new Array(Math.min(Math.sqrt(scale * 2) + 2 | 0, RESOLUTIONS - 2))
+            const resolutions = new Array(
+              Math.min(
+                Math.sqrt(scale * 2) + 2
+                  // boost entities that can move
+                  + (entityPrototype.inverseMass ? 1 : 0) | 0,
+                  RESOLUTIONS - 2,
+                )
+            )
               .fill(0)
               .map((_, i) => i);
 
@@ -525,21 +532,16 @@ window.onload = async () => {
               xRotation: 0,
               yRotation: 0,
               zRotation: 0,
-              maximumLateralVelocity: .01,
-              maximumLateralAcceleration: .00002,
-              inverseFriction: 0,              
+              maximumLateralVelocity: .005,
+              maximumLateralAcceleration: .00001,
+              inverseFriction: 1,
             };
             // don't overlap with anything
             if (
               (entity.health || !destructiblesOnly)
                 && biomeScale > .4
-                && !iterateEntityBounds(entity).some(t => {
-                  for(let entityId in t.entities) {
-                    const e = t.entities[entityId];
-                    if(!e.face && rectNOverlaps(e.position, e.bounds, position, bounds)) {
-                      return 1;
-                    }
-                  }
+                && !iterateEntityBoundsEntities(entity).some(e => {
+                  return !e.face;
                 })
             ) {
               addEntity(entity);  
@@ -564,7 +566,7 @@ window.onload = async () => {
   });
   const reversedWorld = [...world].reverse();
 
-  function iterateEntityBounds(
+  function iterateEntityBoundsTiles(
     { 
       resolutions,
       position,
@@ -573,7 +575,7 @@ window.onload = async () => {
     f?: (tile: Tile, x: number, y: number) => void,
     populate?: Booleanish,
   ) {
-    let tiles: Tile[] = [];
+    const tiles: Tile[] = [];
     for (let resolution of resolutions) {
       const divisor = Math.pow(2, resolution);
       const resolutionDimension = Math.pow(2, RESOLUTIONS - resolution);
@@ -598,9 +600,39 @@ window.onload = async () => {
     }
     return tiles;
   }
+
+  function iterateEntityBoundsEntities(
+    area: Pick<Entity, 'position' | 'bounds' | 'resolutions'>,
+    f?: (entity: Entity) => void,
+    populateTiles?: Booleanish,
+  ) {
+    const {
+      bounds,
+      position,
+    } = area;
+    const checkedEntities: Record<EntityId, Truthy> = {};
+    const entities: Entity[] = [];
+    iterateEntityBoundsTiles(
+      area,
+      tile => {
+        for (let entityId in tile.entities) {
+          if (!checkedEntities[entityId]) {
+            checkedEntities[entityId] = 1;
+            const entity = tile.entities[entityId];
+            if (rectNOverlaps(position, bounds, entity.position, entity.bounds)) {
+              entities.push(entity);
+              f?.(entity);
+            }
+          }
+        }
+      },
+      populateTiles,
+    );
+    return entities;
+  }
   
   function addEntity(entity: Entity, activeTiles?: Set<Tile>) {
-    const tiles = iterateEntityBounds(entity);
+    const tiles = iterateEntityBoundsTiles(entity);
     if (!entity.transient || !activeTiles || tiles.some(tile => activeTiles.has(tile))) {
       tiles.forEach(tile => {
         tile.entities[entity.id] = entity;
@@ -609,7 +641,7 @@ window.onload = async () => {
   }
   
   function removeEntity(entity: Entity) {
-    iterateEntityBounds(entity, tile => {
+    iterateEntityBoundsTiles(entity, tile => {
       delete tile.entities[entity.id];
     });
   }
@@ -1523,7 +1555,7 @@ window.onload = async () => {
     zRotation: 0,
     velocity: [0, 0, 0],
     maximumLateralVelocity: .01,
-    maximumLateralAcceleration: .00002,
+    maximumLateralAcceleration: .00001,
     gravity: DEFAULT_GRAVITY,
     collisionGroup: COLLISION_GROUP_PLAYER,
     collisionMask: COLLISION_GROUP_TERRAIN
@@ -1757,20 +1789,13 @@ window.onload = async () => {
                 if (jumpUnread) {
                   if (!flapping) {
                     if (readInput(INPUT_JUMP)) {
-                      // TODO just supply numbers that don't require normalisation
-                      const targetNormal = vectorNNormalize(
-                        vector3TransformMatrix4(
-                          matrix4Multiply(
-                            matrix4Rotate(entity.zRotation, 0, 0, 1),
-                            matrix4Rotate(entity.xRotation, 1, 0, 0),
-                          ),
-                          0, 1, 1,
-                        )
+                      const extraVelocity = vector3TransformMatrix4(
+                        matrix4RotateZXY(entity.xRotation, entity.yRotation, entity.zRotation),
+                        0, .002, .007,
                       );
                       entity.velocity = vectorNScaleThenAdd(
                         entity.velocity,
-                        targetNormal,
-                        .005,
+                        extraVelocity,
                       );
                       entity.lastOnGroundTime = 0;
                       setJointAnimations(entity, DRAGON_ANIMATION_FLAP);    
@@ -1910,7 +1935,72 @@ window.onload = async () => {
                   addEntity(ball);
                 }
               } else {
-                // TODO
+                // maybe consider situation
+                // randomness ensures that everything in the tile doesn't make its next decision simultaneously
+                // TODO (awareness per entity)
+                if ((entity.lastDecision || 0) + 999 < time && Math.random() > .9) {
+                  entity.lastDecision = time;
+                  const newImpulses: Impulse[] = [];
+                  iterateEntityBoundsEntities({
+                    // TODO vision per entity
+                    bounds: rect3FromRadius(9),
+                    position: entity.position,
+                    resolutions: [0],
+                  }, seen => {
+                    if (!seen.face && (seen.collisionMask & entity.collisionGroup)) {
+                      // TODO don't just run away from everything
+                      newImpulses.push({
+                        intensity: -9,
+                        target: seen,
+                      });
+                    }
+                  });
+                  entity.impulses = entity.impulses?.filter(v => {
+                    v.intensity = v.intensity * .9 | 0;
+                    return v.intensity && !newImpulses.some(i => i.target == v.target);
+                  }) || [];
+                  entity.impulses.push(...newImpulses);
+                  
+                  entity.targetUrgency = Math.min(
+                    1,
+                    entity.impulses.reduce((acc, impulse) => {
+                      return acc + Math.abs(impulse.intensity)/9;
+                    }, 0)
+                  );  
+                }
+                entity.home = entity.home || entity.position;
+                if (!entity.impulses?.length) {
+                  entity.impulses = [{
+                    intensity: 1,
+                    target: {
+                      // TODO make milling range configurable
+                      position: vectorNScaleThenAdd(
+                        entity.home,
+                        [Math.random() - .5, Math.random() - .5, 0],
+                        9,
+                      ),
+                    }
+                  }];
+                  entity.targetUrgency = .1;
+                }
+
+
+                const deltaPosition = entity.impulses.reduce<Vector3>(
+                  (acc, impulse) => {
+                    const delta = vectorNScaleThenAdd(
+                      impulse.target.position,
+                      entity.position,
+                      -1,
+                    );
+                    return vectorNScaleThenAdd(
+                      acc,
+                      delta,
+                      impulse.intensity/(vectorNLength(delta) + 1),
+                    );
+                  },
+                  [0, 0, 0],
+                );
+                entity.targetLateralPosition = vectorNScaleThenAdd(entity.position, deltaPosition);
               }
               const targetLateralPosition = entity.targetLateralPosition || entity.position;
               let targetYRotation = 0;
@@ -1925,7 +2015,7 @@ window.onload = async () => {
                   ? Math.atan2(targetLateralDelta[1], targetLateralDelta[0])
                   : 0;
                 const totalTargetVelocity = Math.min(
-                  entity.maximumLateralVelocity,
+                  entity.maximumLateralVelocity * (entity.targetUrgency || 1),
                   length/cappedDelta,
                 );
                 const targetVelocity = [
@@ -2052,225 +2142,215 @@ window.onload = async () => {
               let minCollisionTime = remainingCollisionTime;
               let minCollisionNormal: Vector3 | Falsey;
               let minCollisionEntity: Entity | Falsey;
-              const checkedEntities: Record<EntityId, Truthy> = {};
               // update dynamic entity
-              iterateEntityBounds(targetEntity, tile => {
-                for (let checkEntityId in tile.entities) {
-                  let check = tile.entities[checkEntityId];
-                  if (!checkedEntities[checkEntityId] && (check.collisionGroup & collisionMask)) {
-                    checkedEntities[checkEntityId] = 1;
-                    let collisionTime: number | undefined;
-                    if (check.face) {
-                      let planeCollisionNormal: ReadonlyVector3 | Falsey;
-                      const {
-                        rotateToPlaneCoordinates,
+              iterateEntityBoundsEntities(targetEntity, check => {
+                let collisionTime: number | undefined;
+                if (check.collisionGroup & collisionMask) {
+                  if (check.face) {
+                    let planeCollisionNormal: ReadonlyVector3 | Falsey;
+                    const {
+                      rotateToPlaneCoordinates,
+                      worldToPlaneCoordinates,
+                      position: checkPosition,
+                      bounds: checkBounds,
+                      face: {
+                        polygons,
+                        rotateToModelCoordinates,
+                      },
+                    } = check as StaticEntity;
+  
+                    // only check static collisions
+                    const planeVelocity = vector3TransformMatrix4(
+                      rotateToPlaneCoordinates,
+                      ...velocity,
+                    );
+                    const planeVelocityZ = planeVelocity[2];
+                    // avoid divide by 0
+                    if (planeVelocityZ) {
+                      // NOTE: the z coordinate here is incorrect, do not use this vector in
+                      // 3d transformations (2d is fine)
+                      const startPlanePosition = vector3TransformMatrix4(
                         worldToPlaneCoordinates,
-                        position: checkPosition,
-                        bounds: checkBounds,
-                        face: {
-                          polygons,
-                          rotateToModelCoordinates,
-                        },
-                      } = check as StaticEntity;
-
-                      
-                      if (
-                        rectNOverlaps(targetPosition, targetUnionBounds, checkPosition, checkBounds)
-                      ) {
-                        // only check static collisions
-                        const planeVelocity = vector3TransformMatrix4(
-                          rotateToPlaneCoordinates,
-                          ...velocity,
-                        );
-                        const planeVelocityZ = planeVelocity[2];
-                        // avoid divide by 0
-                        if (planeVelocityZ) {
-                          // NOTE: the z coordinate here is incorrect, do not use this vector in
-                          // 3d transformations (2d is fine)
-                          const startPlanePosition = vector3TransformMatrix4(
-                            worldToPlaneCoordinates,
-                            ...position,
-                          );
-                          const planeZ = polygons[0][0][2];
-                          const startPlanePositionZ = startPlanePosition[2] - planeZ;
-
-                          const minPlaneIntersectionTime = planeVelocityZ < 0
-                            ? (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ
-                            // start position z should be -ve
-                            : (-startPlanePositionZ - collisionRadiusFromCenter)/planeVelocityZ;
-                          const maxPlaneIntersectionTime = planeVelocityZ < 0
-                            ? (collisionRadiusFromCenter + startPlanePositionZ)/-planeVelocityZ
-                            : (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ;
-
-                          // do they already overlap
-                          if (FLAG_CHECK_STARTS_OVERLAPPING) {
-                            let inside: Booleanish;
-                            if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
-                              if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadiusFromCenter*2/planeVelocityZ) {
-                                if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
-                                  inside = 1;
-                                  if (FLAG_DEBUG_PHYSICS) {
-                                    entity.logs.push(['inside center']);
-                                  }
-                                } else {
-                                  const startIntersectionRadius = Math.sqrt(
-                                    collisionRadiusFromCenter * collisionRadiusFromCenter - startPlanePositionZ * startPlanePositionZ
-                                  );
-                                  const closestPoint = vector2PolygonsEdgeOverlapsCircle(
-                                    polygons,
-                                    startPlanePosition,
-                                    startIntersectionRadius,
-                                  );
-                                  if (closestPoint) {
-                                    const [dx, dy] = vectorNScaleThenAdd(closestPoint, startPlanePosition, -1);
-                                    let distanceSquared = dx * dx + dy * dy + startPlanePositionZ * startPlanePositionZ;
-                                    if (distanceSquared < startIntersectionRadius * startIntersectionRadius) {
-                                      inside = 1;
-                                      if (FLAG_DEBUG_PHYSICS) {
-                                        entity.logs.push(['inside edge', Math.sqrt(distanceSquared), startIntersectionRadius, collisionRadiusFromCenter]);
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                            if (inside && FLAG_DEBUG_PHYSICS) {
-                              entity.logs.forEach(log => console.log(...log));
-                              console.log('inside', entity.position, check.id, ...toPoints(check), minPlaneIntersectionTime);
-                              entity.logs = [];
-                            }
-                          }
-
-                          if (
-                            maxPlaneIntersectionTime >= 0
-                            && minPlaneIntersectionTime <= remainingCollisionTime
-                          ) {
-
-                            const intersectionPlanePosition = vectorNScaleThenAdd(
-                              startPlanePosition,
-                              planeVelocity,
-                              minPlaneIntersectionTime,
-                            );
-                            if (
-                              planeVelocityZ < 0
-                              && vector2PolygonsContain(polygons, ...intersectionPlanePosition)
-                              && FLAG_QUICK_COLLISIONS
-                            ) {
-                              if (minPlaneIntersectionTime > 0) {
-                                collisionTime = minPlaneIntersectionTime; 
-                                planeCollisionNormal = NORMAL_Z;  
+                        ...position,
+                      );
+                      const planeZ = polygons[0][0][2];
+                      const startPlanePositionZ = startPlanePosition[2] - planeZ;
+  
+                      const minPlaneIntersectionTime = planeVelocityZ < 0
+                        ? (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ
+                        // start position z should be -ve
+                        : (-startPlanePositionZ - collisionRadiusFromCenter)/planeVelocityZ;
+                      const maxPlaneIntersectionTime = planeVelocityZ < 0
+                        ? (collisionRadiusFromCenter + startPlanePositionZ)/-planeVelocityZ
+                        : (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ;
+  
+                      // do they already overlap
+                      if (FLAG_CHECK_STARTS_OVERLAPPING) {
+                        let inside: Booleanish;
+                        if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
+                          if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadiusFromCenter*2/planeVelocityZ) {
+                            if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
+                              inside = 1;
+                              if (FLAG_DEBUG_PHYSICS) {
+                                entity.logs.push(['inside center']);
                               }
                             } else {
-                              //const planeIntersectionPositionZ = planeIntersectionPosition[2];
-                              // handle edge collisions
-                              // const intersectionRadius = Math.sqrt(
-                              //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
-                              // );
-                              // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
-                              // const planeTargetPosition = vector3TransformMatrix4(
-                              //   worldToPlaneCoordinates,
-                              //   ...targetPosition,
-                              // );
-                              // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
-                              //let minTime = 0;
-                              let minTime = Math.max(0, minPlaneIntersectionTime);
-                              let maxTime = Math.min(maxPlaneIntersectionTime, remainingCollisionTime);
-                              for (let i=0; i<MAX_COLLISION_STEPS; i++) {
-                                const testTime = i ? (minTime + maxTime)/2 : maxTime;
-                                const testPlanePosition = vector3TransformMatrix4(
-                                  worldToPlaneCoordinates,
-                                  ...vectorNScaleThenAdd(position, velocity, testTime),
-                                );
-                                const testPlanePositionZ = testPlanePosition[2] - planeZ;
-                                let hit: Booleanish;
-                                if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
-                                  planeCollisionNormal = NORMAL_Z;
-                                  hit = 1;
-                                } else {
-                                  const testIntersectionRadius = Math.sqrt(
-                                    collisionRadiusFromCenter * collisionRadiusFromCenter - testPlanePositionZ * testPlanePositionZ
-                                  );
-                                  const closestPoint = vector2PolygonsEdgeOverlapsCircle(
-                                    polygons,
-                                    testPlanePosition,
-                                    testIntersectionRadius,
-                                  );
-                                  if (closestPoint) {
-                                    const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
-                                    let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
-                                    if (rsq < collisionRadiusFromCenter * collisionRadiusFromCenter) {
-                                      const [closestPointX, closestPointY] = closestPoint;
-                                      // const angleZ = Math.atan2(
-                                      //   closestPointX - testPlanePosition[1],
-                                      //   closestPointY - testPlanePosition[0],
-                                      // ); 
-                                      // const cosAngleX = testPlanePositionZ / collisionRadius;
-                                      // const angleX = Math.acos(cosAngleX);
-                                      
-                                      planeCollisionNormal = vectorNNormalize(
-                                        vectorNScaleThenAdd(
-                                          testPlanePosition,
-                                          [closestPointX, closestPointY, planeZ],
-                                          -1,
-                                        ),
-                                      );
-                                      //planeCollisionNormal = NORMAL_Z;
-                                      hit = 1;
-                                    }
+                              const startIntersectionRadius = Math.sqrt(
+                                collisionRadiusFromCenter * collisionRadiusFromCenter - startPlanePositionZ * startPlanePositionZ
+                              );
+                              const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                                polygons,
+                                startPlanePosition,
+                                startIntersectionRadius,
+                              );
+                              if (closestPoint) {
+                                const [dx, dy] = vectorNScaleThenAdd(closestPoint, startPlanePosition, -1);
+                                let distanceSquared = dx * dx + dy * dy + startPlanePositionZ * startPlanePositionZ;
+                                if (distanceSquared < startIntersectionRadius * startIntersectionRadius) {
+                                  inside = 1;
+                                  if (FLAG_DEBUG_PHYSICS) {
+                                    entity.logs.push(['inside edge', Math.sqrt(distanceSquared), startIntersectionRadius, collisionRadiusFromCenter]);
                                   }
-                                }
-                                if (hit) {
-                                  if (i) {
-                                    maxTime = testTime;
-                                  }
-                                  // first loop is a special case
-                                } else {
-                                  if (!i) {
-                                    // no collision, exit loop
-                                    i = MAX_COLLISION_STEPS;
-                                  } else {
-                                    minTime = testTime;
-                                  }
-                                }
-                              }
-                              if (planeCollisionNormal) {
-                                // if the collisionNormal is already aligned with the velocity
-                                // just ignore it
-                                if (vectorNDotProduct(planeVelocity, planeCollisionNormal) < 0) {
-                                  collisionTime = minTime;
-                                } else {
-                                  planeCollisionNormal = 0;
                                 }
                               }
                             }
                           }
                         }
+                        if (inside && FLAG_DEBUG_PHYSICS) {
+                          entity.logs.forEach(log => console.log(...log));
+                          console.log('inside', entity.position, check.id, ...toPoints(check), minPlaneIntersectionTime);
+                          entity.logs = [];
+                        }
                       }
-                      if (planeCollisionNormal
-                        && (collisionTime < minCollisionTime || !minCollisionNormal)
+  
+                      if (
+                        maxPlaneIntersectionTime >= 0
+                        && minPlaneIntersectionTime <= remainingCollisionTime
                       ) {
-                        const collisionNormal = vector3TransformMatrix4(
-                          rotateToModelCoordinates,
-                          ...planeCollisionNormal,
+  
+                        const intersectionPlanePosition = vectorNScaleThenAdd(
+                          startPlanePosition,
+                          planeVelocity,
+                          minPlaneIntersectionTime,
                         );
-                        minCollisionTime = collisionTime;
-                        minCollisionNormal = collisionNormal;
-                        minCollisionEntity = check;
+                        if (
+                          planeVelocityZ < 0
+                          && vector2PolygonsContain(polygons, ...intersectionPlanePosition)
+                          && FLAG_QUICK_COLLISIONS
+                        ) {
+                          if (minPlaneIntersectionTime > 0) {
+                            collisionTime = minPlaneIntersectionTime; 
+                            planeCollisionNormal = NORMAL_Z;  
+                          }
+                        } else {
+                          //const planeIntersectionPositionZ = planeIntersectionPosition[2];
+                          // handle edge collisions
+                          // const intersectionRadius = Math.sqrt(
+                          //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
+                          // );
+                          // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
+                          // const planeTargetPosition = vector3TransformMatrix4(
+                          //   worldToPlaneCoordinates,
+                          //   ...targetPosition,
+                          // );
+                          // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
+                          //let minTime = 0;
+                          let minTime = Math.max(0, minPlaneIntersectionTime);
+                          let maxTime = Math.min(maxPlaneIntersectionTime, remainingCollisionTime);
+                          for (let i=0; i<MAX_COLLISION_STEPS; i++) {
+                            const testTime = i ? (minTime + maxTime)/2 : maxTime;
+                            const testPlanePosition = vector3TransformMatrix4(
+                              worldToPlaneCoordinates,
+                              ...vectorNScaleThenAdd(position, velocity, testTime),
+                            );
+                            const testPlanePositionZ = testPlanePosition[2] - planeZ;
+                            let hit: Booleanish;
+                            if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
+                              planeCollisionNormal = NORMAL_Z;
+                              hit = 1;
+                            } else {
+                              const testIntersectionRadius = Math.sqrt(
+                                collisionRadiusFromCenter * collisionRadiusFromCenter - testPlanePositionZ * testPlanePositionZ
+                              );
+                              const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                                polygons,
+                                testPlanePosition,
+                                testIntersectionRadius,
+                              );
+                              if (closestPoint) {
+                                const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
+                                let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
+                                if (rsq < collisionRadiusFromCenter * collisionRadiusFromCenter) {
+                                  const [closestPointX, closestPointY] = closestPoint;
+                                  // const angleZ = Math.atan2(
+                                  //   closestPointX - testPlanePosition[1],
+                                  //   closestPointY - testPlanePosition[0],
+                                  // ); 
+                                  // const cosAngleX = testPlanePositionZ / collisionRadius;
+                                  // const angleX = Math.acos(cosAngleX);
+                                  
+                                  planeCollisionNormal = vectorNNormalize(
+                                    vectorNScaleThenAdd(
+                                      testPlanePosition,
+                                      [closestPointX, closestPointY, planeZ],
+                                      -1,
+                                    ),
+                                  );
+                                  //planeCollisionNormal = NORMAL_Z;
+                                  hit = 1;
+                                }
+                              }
+                            }
+                            if (hit) {
+                              if (i) {
+                                maxTime = testTime;
+                              }
+                              // first loop is a special case
+                            } else {
+                              if (!i) {
+                                // no collision, exit loop
+                                i = MAX_COLLISION_STEPS;
+                              } else {
+                                minTime = testTime;
+                              }
+                            }
+                          }
+                          if (planeCollisionNormal) {
+                            // if the collisionNormal is already aligned with the velocity
+                            // just ignore it
+                            if (vectorNDotProduct(planeVelocity, planeCollisionNormal) < 0) {
+                              collisionTime = minTime;
+                            } else {
+                              planeCollisionNormal = 0;
+                            }
+                          }
+                        }
                       }
-                    } else {
-
-                      // update any dynamic-dynamic collision behaviours
-
-                      const entityDelta = vectorNScaleThenAdd(
-                        targetPosition,
-                        check.position,
-                        -1
+                    }
+                    if (planeCollisionNormal
+                      && (collisionTime < minCollisionTime || !minCollisionNormal)
+                    ) {
+                      const collisionNormal = vector3TransformMatrix4(
+                        rotateToModelCoordinates,
+                        ...planeCollisionNormal,
                       );
-                      const entityDistance = vectorNLength(entityDelta);
-                      const entityOverlap = collisionRadiusFromCenter + (check as DynamicEntity).collisionRadius - entityDistance;
-                      if (entityOverlap > 0) {
-                        collisionEntities.add(check);
-                      }
+                      minCollisionTime = collisionTime;
+                      minCollisionNormal = collisionNormal;
+                      minCollisionEntity = check;
+                    }
+                  } else {
+  
+                    // update any dynamic-dynamic collision behaviours
+  
+                    const entityDelta = vectorNScaleThenAdd(
+                      targetPosition,
+                      check.position,
+                      -1
+                    );
+                    const entityDistance = vectorNLength(entityDelta);
+                    const entityOverlap = collisionRadiusFromCenter + (check as DynamicEntity).collisionRadius - entityDistance;
+                    if (entityOverlap > 0) {
+                      collisionEntities.add(check);
                     }
                   }
                 }
@@ -2492,6 +2572,8 @@ window.onload = async () => {
               }
               if (checkDamaged && check && check.health && !checkInvincible) {
                 check.health--;
+                // rethink life choices
+                (check as IntelligentEntity).lastDecision = 0;
                 check.anims = [
                   ...(check.anims || []),
                   [
@@ -2595,7 +2677,7 @@ window.onload = async () => {
           }
           if (entity.transient) {
             let found: Booleanish;
-            iterateEntityBounds(entity, tile => {
+            iterateEntityBoundsTiles(entity, tile => {
               found ||= tiles.has(tile);
             });
             entity.dead ||= !found;

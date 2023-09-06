@@ -198,6 +198,7 @@ type DynamicEntity<PartId extends number = number> = {
 type ActiveEntity<PartId extends number = number> = {
   // lateral, so the z point can be ignored
   targetLateralPosition?: ReadonlyVector3;
+  targetUrgency?: number,
   maximumLateralVelocity: number,
   maximumLateralAcceleration: number,
   xRotation: number,
@@ -221,8 +222,17 @@ type FireEntity<PartId extends number = number> = {
   yRotation?: undefined,
 } & BaseDynamicEntity<PartId>;
 
+type Impulse = {
+  target: Entity | Pick<Entity, 'position'>,
+  // negative indicates wants to run away
+  intensity: number,
+}
+
 type IntelligentEntity<PartId extends number = number> = {
   readonly entityType:
     | EntityTypeIntelligent,
   home?: ReadonlyVector3,
+  impulses?: Impulse[],
+  // the last time we made a decision
+  lastDecision?: number,
 } & ActiveEntity<PartId>;
