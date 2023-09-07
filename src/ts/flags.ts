@@ -20,4 +20,5 @@ const FLAG_CLEAR_COLOR = false;
 const FLAG_PREVENT_DEFAULT = ENVIRONMENT != 'ultra';
 const FLAG_ALLOW_ZOOM = ENVIRONMENT == 'test';
 const FLAG_REPOPULATE = true;
-const FLAG_SLOW_HEAD_TURN = ENVIRONMENT == 'test';
+const FLAG_SLOW_HEAD_TURN = ENVIRONMENT != 'ultra';
+const FLAG_SLOW_CAMERA = true;

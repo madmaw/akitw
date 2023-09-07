@@ -778,11 +778,6 @@ window.onload = async () => {
 
   let projectionMatrix: ReadonlyMatrix4;
   
-  let cameraZoom = -2;
-  let cameraZRotation = 0;
-  let cameraXRotation = 0;
-  let cameraPosition = VECTOR3_EMPTY;
-
   const onResize = () => {
     Z.width = Z.clientWidth;
     Z.height = Z.clientHeight;
@@ -1542,7 +1537,7 @@ window.onload = async () => {
   // add in a "player"
   const player: DragonEntity<DragonPartIds> = {
     entityType: ENTITY_TYPE_PLAYER_CONTROLLED,
-    resolutions: [0],
+    resolutions: [0, 1],
     body: DRAGON_PART,
     joints: {
       [DRAGON_PART_ID_BODY]: {},
@@ -1587,12 +1582,19 @@ window.onload = async () => {
   };
   addEntity(player);
 
+  let cameraZoom = -2;
+  let cameraZRotation = 0;
+  let cameraXRotation = 0;
+  let cameraPosition = player.pos;
+  let zoomedCameraPosition = player.pos;
+
   window.onmousedown = () => {
     setKeyState(INPUT_FIRE, 1);
     Z.requestPointerLock();
   };
   window.onmouseup = () => {
     setKeyState(INPUT_FIRE, 0);
+  };
   window.onmousemove = (e: MouseEvent) => {
     const movement: ReadonlyVector2 = [e.movementX, e.movementY];
     const rotation = vectorNLength(movement)/399;
@@ -1606,7 +1608,6 @@ window.onload = async () => {
         ),
       );
     }
-  };
   };
   if (FLAG_ALLOW_ZOOM || FLAG_PREVENT_DEFAULT) {
     const cb = (e: WheelEvent) => {
@@ -1655,8 +1656,8 @@ window.onload = async () => {
     const delta = now - then;
     then = now;
     tick++;
-    //const cappedDelta = 16;
-    const cappedDelta = Math.min(delta, 40);
+    const cappedDelta = 20;
+    //const cappedDelta = Math.min(delta, 40);
     time += cappedDelta;
     
     if (FLAG_SHOW_FPS) {
@@ -1759,25 +1760,11 @@ window.onload = async () => {
       }
     }
 
-    const targetCameraPosition = vectorNScaleThenAdd(player.pos, [0, 0, 1]);
-
-    cameraPosition = vectorNScaleThenAdd(
-      cameraPosition,
-      vectorNScaleThenAdd(targetCameraPosition, cameraPosition, -1),
-      cappedDelta/99,
-    );
-    const cameraPositionAndRotationMatrix = matrix4Multiply(
-      matrix4Translate(...cameraPosition),
-      matrix4Rotate(cameraZRotation, 0, 0, 1),
-      matrix4Rotate(cameraXRotation, 1, 0, 0),
-      matrix4Translate(0, cameraZoom, 0),
-    );
-    const cameraPositionAndProjectionMatrix = matrix4Multiply(
-      projectionMatrix,
-      matrix4Invert(cameraPositionAndRotationMatrix),
-    );
-
-    const cameraWorldPosition: Vector2 = vectorNScale(cameraPosition.slice(0, 2), 1/WORLD_DIMENSION) as any;
+    const cameraZRotationMatrix = matrix4Rotate(cameraZRotation, 0, 0, 1);
+    // operate off the previous camera position
+    const previousCameraWorldPosition: Vector2 = vectorNScale(cameraPosition.slice(0, 2), 1/WORLD_DIMENSION) as any;
+    const cameraZNormal = vector3TransformMatrix4(cameraZRotationMatrix, 0, 1, 0);
+    const visionConeThreshold = Math.max(-Math.sin(cameraXRotation), .1);
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
@@ -1789,32 +1776,35 @@ window.onload = async () => {
       cellsToCheck.forEach((cell) => {
         const [gridX, gridY] = cell;
         const worldPosition = vectorNScale(vectorNScaleThenAdd(cell, [.5, .5]), scale);
-        const distance = vectorNLength(
-          vectorNScaleThenAdd(cameraWorldPosition, worldPosition, -1),
-          // approximate distance to the edge
-        ) - scale/2;
-        const minResolution = Math.pow(Math.max(0, distance * 2), .4) * RESOLUTIONS - .5;
-        //const minResolution = Math.min(distance * resolutions * 8, 6);
-        if (resolution > minResolution && resolution) {
-          nextCellsToCheck.push(
-            ...offsets.map(offset => vectorNScaleThenAdd(vectorNScale(cell, 2), offset)),
-          );
-        } else {
-          tiles.add(getAndMaybePopulateTile(gridX | 0, gridY | 0, resolution));
-          if (FLAG_REPOPULATE) {
-            // secretly refresh this tile
-            if (resolution == 4 && Math.random() < .0001) {
-              const gridScale = Math.pow(2, resolution);
-              populate(
-                [
-                  [gridX * gridScale, gridY * gridScale],
-                  [(gridX+1)*gridScale, (gridY+1)*gridScale],
-                ],
-                // only populate things that can be killed, otherwise the world
-                // fills up with rubbish
-                1,
-              );
-            }
+        const delta = vectorNScaleThenAdd(previousCameraWorldPosition, worldPosition, -1);
+        const cosa = vectorNDotProduct(delta, cameraZNormal);
+        // approximate distance to the edge
+        const distance = vectorNLength(delta) - scale/2;
+        // ignore stuff we can't see
+        if (cosa < visionConeThreshold || distance < scale) {
+          const minResolution = Math.pow(Math.max(0, distance * 2), .4) * RESOLUTIONS - .5;
+          //const minResolution = Math.min(distance * resolutions * 8, 6);
+          if (resolution > minResolution && resolution) {
+            nextCellsToCheck.push(
+              ...offsets.map(offset => vectorNScaleThenAdd(vectorNScale(cell, 2), offset)),
+            );
+          } else {
+            tiles.add(getAndMaybePopulateTile(gridX | 0, gridY | 0, resolution));
+            if (FLAG_REPOPULATE) {
+              // secretly refresh this tile
+              if (resolution == 4 && Math.random() < .0001) {
+                const gridScale = Math.pow(2, resolution);
+                populate(
+                  [
+                    [gridX * gridScale, gridY * gridScale],
+                    [(gridX+1)*gridScale, (gridY+1)*gridScale],
+                  ],
+                  // only populate things that can be killed, otherwise the world
+                  // fills up with rubbish
+                  1,
+                );
+              }
+            }  
           }  
         }
       });
@@ -1967,10 +1957,11 @@ window.onload = async () => {
                 let headAndNeckRotation: ReadonlyVector3;
                 if (FLAG_SLOW_HEAD_TURN) {
                   const existingRotation = entity.joints[DRAGON_PART_ID_NECK]['r'] || VECTOR3_EMPTY;
+                  
                   headAndNeckRotation = targetRotation.map((target, i) => {
                     const existing = existingRotation[i];
                     const diff = mathAngleDiff(existing, target);
-                    return existing + diff * cappedDelta/99;
+                    return existing + diff * cappedDelta/200;
                   }) as any;
                 } else {
                   headAndNeckRotation = targetRotation;
@@ -2825,8 +2816,8 @@ window.onload = async () => {
           if( lookAtCamera) {
             // rotate to look at camera
             entity.zRotation = Math.atan2(
-              cameraPosition[1] - entity.pos[1],
-              cameraPosition[0] - entity.pos[0],
+              zoomedCameraPosition[1] - entity.pos[1],
+              zoomedCameraPosition[0] - entity.pos[0],
             );
           }
 
@@ -2926,10 +2917,37 @@ window.onload = async () => {
     //
     // render
     //
+    const targetCameraPosition = vectorNScaleThenAdd(player.pos, [0, 0, 1]);
+
+    if (FLAG_SLOW_CAMERA) {
+      const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, cameraPosition, -1);
+      const targetCameraDistance = vectorNLength(deltaCameraPosition);
+      // turning up or down speeds up the camera 
+      const cameraVelocity = targetCameraDistance * .01 / (Math.cos(cameraXRotation)+1);
+
+      cameraPosition = vectorNScaleThenAdd(
+        cameraPosition,
+        deltaCameraPosition,
+        cameraVelocity * cappedDelta,
+      );
+    } else {
+      cameraPosition = targetCameraPosition;
+    }
+    const cameraPositionAndRotationMatrix = matrix4Multiply(
+      matrix4Translate(...cameraPosition),
+      cameraZRotationMatrix,
+      matrix4Rotate(cameraXRotation, 1, 0, 0),
+      matrix4Translate(0, cameraZoom, 0),
+    );
+    const cameraPositionAndProjectionMatrix = matrix4Multiply(
+      projectionMatrix,
+      matrix4Invert(cameraPositionAndRotationMatrix),
+    );
+    zoomedCameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
-    gl.uniform3fv(uCameraPosition, cameraPosition as any);
+    gl.uniform3fv(uCameraPosition, zoomedCameraPosition as any);
     gl.uniform3fv(uFocusPosition, player.pos as any);
     gl.uniform4fv(
       uShadows,
