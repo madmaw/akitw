@@ -1593,7 +1593,6 @@ window.onload = async () => {
   };
   window.onmouseup = () => {
     setKeyState(INPUT_FIRE, 0);
-  };
   window.onmousemove = (e: MouseEvent) => {
     const movement: ReadonlyVector2 = [e.movementX, e.movementY];
     const rotation = vectorNLength(movement)/399;
@@ -1607,6 +1606,7 @@ window.onload = async () => {
         ),
       );
     }
+  };
   };
   if (FLAG_ALLOW_ZOOM || FLAG_PREVENT_DEFAULT) {
     const cb = (e: WheelEvent) => {
@@ -1670,13 +1670,12 @@ window.onload = async () => {
       }  
     }
 
-    const cameraZRotationMatrix = matrix4Rotate(cameraZRotation, 0, 0, 1);
-
     // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
     const handledEntities: Record<EntityId, Truthy> = {};
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
     // variantId -> modelId -> position, rotation, resolution, atlasIndex
+    const shadows: ReadonlyVector4[] = [];
     const toRender: Partial<Record<VariantId, Record<ModelId, [ReadonlyVector3, ReadonlyMatrix4, number, number][]>>> = {};
     function appendRender(
       entity: Entity,
@@ -1759,10 +1758,28 @@ window.onload = async () => {
         }
       }
     }
-    const shadows: ReadonlyVector4[] = [];
+
+    const targetCameraPosition = vectorNScaleThenAdd(player.pos, [0, 0, 1]);
+
+    cameraPosition = vectorNScaleThenAdd(
+      cameraPosition,
+      vectorNScaleThenAdd(targetCameraPosition, cameraPosition, -1),
+      cappedDelta/99,
+    );
+    const cameraPositionAndRotationMatrix = matrix4Multiply(
+      matrix4Translate(...cameraPosition),
+      matrix4Rotate(cameraZRotation, 0, 0, 1),
+      matrix4Rotate(cameraXRotation, 1, 0, 0),
+      matrix4Translate(0, cameraZoom, 0),
+    );
+    const cameraPositionAndProjectionMatrix = matrix4Multiply(
+      projectionMatrix,
+      matrix4Invert(cameraPositionAndRotationMatrix),
+    );
+
+    const cameraWorldPosition: Vector2 = vectorNScale(cameraPosition.slice(0, 2), 1/WORLD_DIMENSION) as any;
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
-    const playerWorldPosition: Vector2 = vectorNScale(player.pos, 1/WORLD_DIMENSION).slice(0, 2) as any;
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
     const [tiles] = reversedWorld.reduce<[Set<Tile>, ReadonlyVector2[]]>(([tiles, cellsToCheck], _, reverseResolution) => {
       const scale = 1/Math.pow(2, reverseResolution + 1);
@@ -1773,7 +1790,7 @@ window.onload = async () => {
         const [gridX, gridY] = cell;
         const worldPosition = vectorNScale(vectorNScaleThenAdd(cell, [.5, .5]), scale);
         const distance = vectorNLength(
-          vectorNScaleThenAdd(playerWorldPosition, worldPosition, -1),
+          vectorNScaleThenAdd(cameraWorldPosition, worldPosition, -1),
           // approximate distance to the edge
         ) - scale/2;
         const minResolution = Math.pow(Math.max(0, distance * 2), .4) * RESOLUTIONS - .5;
@@ -1946,9 +1963,20 @@ window.onload = async () => {
                 // );
                 // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
                 // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
-                const rotation: ReadonlyVector3 = [cameraXRotation/2 + Math.PI*.01, 0, deltaZRotation/2];
-                entity.joints[DRAGON_PART_ID_NECK]['r'] = rotation;
-                entity.joints[DRAGON_PART_ID_HEAD]['r'] = rotation;
+                const targetRotation: ReadonlyVector3 = [cameraXRotation/2 + Math.PI/99, 0, deltaZRotation/2];
+                let headAndNeckRotation: ReadonlyVector3;
+                if (FLAG_SLOW_HEAD_TURN) {
+                  const existingRotation = entity.joints[DRAGON_PART_ID_NECK]['r'] || VECTOR3_EMPTY;
+                  headAndNeckRotation = targetRotation.map((target, i) => {
+                    const existing = existingRotation[i];
+                    const diff = mathAngleDiff(existing, target);
+                    return existing + diff * cappedDelta/99;
+                  }) as any;
+                } else {
+                  headAndNeckRotation = targetRotation;
+                }
+                entity.joints[DRAGON_PART_ID_NECK]['r'] = headAndNeckRotation;
+                entity.joints[DRAGON_PART_ID_HEAD]['r'] = headAndNeckRotation;
 
                 entity.fireReservior = Math.min((entity.fireReservior || 0) + cappedDelta, 9999);
 
@@ -2898,21 +2926,6 @@ window.onload = async () => {
     //
     // render
     //
-
-    const playerHeadPosition = vectorNScaleThenAdd(player.pos, [0, 0, 1]);
-    const cameraPositionMatrix = matrix4Translate(...playerHeadPosition);
-    const cameraPositionAndRotationMatrix = matrix4Multiply(
-      cameraPositionMatrix,
-      cameraZRotationMatrix,
-      matrix4Rotate(cameraXRotation, 1, 0, 0),
-      matrix4Translate(0, cameraZoom, 0),
-    );
-    const cameraPositionAndProjectionMatrix = matrix4Multiply(
-      projectionMatrix,
-      matrix4Invert(cameraPositionAndRotationMatrix),
-    );
-
-    cameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
