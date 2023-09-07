@@ -371,9 +371,12 @@ window.onload = async () => {
       terrainNormal(worldPoint),
       NORMAL_Z,
     );
-    result[BIOME_ROAD] = Math.max(1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2, 1 - dc/4);
+    result[BIOME_ROAD] = 1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2;
     result[BIOME_BEACH] = Math.pow(Math.random(), Math.max(0, depth - .2) * 50);
-    result[BIOME_DESERT] = Math.pow(slopeNormal, 9) - Math.pow(Math.random(), Math.pow(depth/14, 16));
+    result[BIOME_DESERT] = Math.max(
+      Math.pow(slopeNormal, 9) - Math.pow(Math.random(), Math.pow(depth/14, 16)),
+      1 - Math.sqrt(dc/4)
+    );
     // result[BIOME_GRASSLAND] = Math.min(
     //   1 - result[BIOME_ROAD],
     //   1 - result[BIOME_BEACH],
@@ -1232,7 +1235,7 @@ window.onload = async () => {
     ],
     ...[
       // TEXTURE_SYMBOL_MAP
-      //0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5
+      //0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5 6 7
       '🌴🌳🌲🌵🌿🌼🌻🍖🐐🐄🐇🛖🏠⛪🕌🏦🏰🥚',
       // TEXTURE_SYMBOL_BRIGHT_MAP
       '🔥',
@@ -1607,6 +1610,32 @@ window.onload = async () => {
     inverseFriction: 1,
   };
   addEntity(camera);
+
+  new Array(3).fill(0).map(() => {
+    // add in eggs
+    const egg: DynamicEntity = {
+      entityType: ENTITY_TYPE_SCENERY,
+      bounds: rect3FromRadius(.5),
+      collisionGroup: COLLISION_GROUP_SCENERY,
+      collisionRadius: .5,
+      health: 1,
+      id: nextEntityId++,
+      pos: [
+        WORLD_DIMENSION*.5  + Math.random() - .5,
+        WORLD_DIMENSION*.5 + Math.random() - .5,
+        terrain(.5, .5) + .5,
+      ],
+      velocity: [0, 0, 0],
+      renderGroupId: nextRenderGroupId++,
+      resolutions: [0, 1, 2],
+      modelAtlasIndex: 17,
+      modelVariant: VARIANT_SYMBOLS,
+      body: {
+        modelId: MODEL_ID_BILLBOARD,
+      },
+    };
+    addEntity(egg);
+  });
 
   // leave external to camera since we are going to remove this in the final build
   let cameraZoom = -2;
