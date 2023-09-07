@@ -266,11 +266,21 @@ window.onload = async () => {
     if (Math.abs(dx) == DEPTH_DIMENSION/2 || Math.abs(dy) == DEPTH_DIMENSION/2) {
       return -1;
     }
+    // pin ring road
     const r = Math.sqrt(dx * dx + dy * dy);
     if(r > DEPTH_DIMENSION/2 - 4 && r < DEPTH_DIMENSION/2 - 3) {
       return .2;
     }
+    // pin crater in middle
+    // if (dx + dy < 2) {
+    //   return 30 + (dx + dy)*2;
+    // }
+    if (r < 4) {
+      return 6 + r * (Math.random() + 1)/2;
+    }
   });
+
+  console.log(depths);
 
   for (let i=0; i<DEPTH_RESOLUTIONS; i++) {
     const chunkDimension = Math.pow(2, DEPTH_RESOLUTIONS - i);
@@ -361,7 +371,7 @@ window.onload = async () => {
       terrainNormal(worldPoint),
       NORMAL_Z,
     );
-    result[BIOME_ROAD] = 1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2;
+    result[BIOME_ROAD] = Math.max(1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2, 1 - dc/4);
     result[BIOME_BEACH] = Math.pow(Math.random(), Math.max(0, depth - .2) * 50);
     result[BIOME_DESERT] = Math.pow(slopeNormal, 9) - Math.pow(Math.random(), Math.pow(depth/14, 16));
     // result[BIOME_GRASSLAND] = Math.min(
@@ -439,7 +449,7 @@ window.onload = async () => {
         4,
       ),
       (zx, zy, z) => {
-        const v = 1 - Math.min(1, Math.abs(z - 6)/3);
+        const v = 1 - Math.min(1, Math.abs(z - 9)/6);
         return Math.pow((1 - zones[zx][zy][BIOME_MOUNTAINS]) * v, .1);
       }
     ],
@@ -1223,7 +1233,7 @@ window.onload = async () => {
     ...[
       // TEXTURE_SYMBOL_MAP
       //0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5
-      '🌴🌳🌲🌵🌿🌼🌻🍖🐐🐄🛖🏠⛪🕌🏦🏰',
+      '🌴🌳🌲🌵🌿🌼🌻🍖🐐🐄🐇🛖🏠⛪🕌🏦🏰🥚',
       // TEXTURE_SYMBOL_BRIGHT_MAP
       '🔥',
     ].map<[number, ...Material[][]]>(s => {
@@ -1560,8 +1570,8 @@ window.onload = async () => {
     id: nextEntityId++,
     pos: [
       WORLD_DIMENSION*.5,
-      WORLD_DIMENSION*.1,
-      terrain(.5, .1) + playerRadius,
+      WORLD_DIMENSION*.5,
+      terrain(.5, .5) + playerRadius + .1,
     ],
     renderGroupId: nextRenderGroupId++,
     xRotation: 0,
@@ -1576,7 +1586,7 @@ window.onload = async () => {
       | COLLISION_GROUP_SCENERY
       | COLLISION_GROUP_ENEMY
       | COLLISION_GROUP_ITEMS,
-    inverseMass: 9,
+    inverseMass: 2,
     shadows: 1,
     modelVariant: VARIANT_DRAGON_BODY,
   };
@@ -1784,7 +1794,7 @@ window.onload = async () => {
     // operate off the previous camera position
     const previousCameraWorldPosition: Vector2 = vectorNScale(camera.pos.slice(0, 2), 1/WORLD_DIMENSION) as any;
     const cameraZNormal = vector3TransformMatrix4(cameraZRotationMatrix, 0, 1, 0);
-    const visionConeThreshold = Math.max(-Math.sin(camera.xRotation), .1);
+    const visionConeThreshold = Math.max(-Math.sin(camera.xRotation), 0);
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
@@ -1799,10 +1809,10 @@ window.onload = async () => {
         const delta = vectorNScaleThenAdd(previousCameraWorldPosition, worldPosition, -1);
         const cosa = vectorNDotProduct(delta, cameraZNormal);
         // approximate distance to the edge
-        const distance = vectorNLength(delta) - scale/2;
+        const distance = vectorNLength(delta);
         // ignore stuff we can't see
         if (cosa < visionConeThreshold || distance < scale) {
-          const minResolution = Math.pow(Math.max(0, distance * 2), .4) * RESOLUTIONS - .5;
+          const minResolution = Math.pow(Math.max(0, distance * 2 - scale), .4) * RESOLUTIONS - .5;
           //const minResolution = Math.min(distance * resolutions * 8, 6);
           if (resolution > minResolution && resolution) {
             nextCellsToCheck.push(
@@ -1842,7 +1852,7 @@ window.onload = async () => {
     [player, camera, ...entities].forEach((entity, i) => {
       // the entity has not been removed by someone else's update
       // allow camera and player to move out of bounds and still be updated
-      if (entity.lastTile.entities[entity.id] || i < 2) {
+      if (i < 2 || entity.lastTile.entities[entity.id]) {
         const {
           entityType,
           bounds,
@@ -1872,6 +1882,7 @@ window.onload = async () => {
               entity.grabbing = readInput(INPUT_UP, 1);
               let targetUnrotatedLateralOffset: ReadonlyVector2;
               let targetXRotation: number;
+              let targetZRotation = entity.zRotation;
               if (onGround) {
                 // set the xRotation to match the ground 
                 const cosXRotation = vectorNDotProduct(
@@ -1883,10 +1894,7 @@ window.onload = async () => {
   
                 if (someLateralInputsWereUnreadOrNonZero) {
                   // turn nicely
-                  const zDiff = mathAngleDiff(entity.zRotation, camera.zRotation);
-                  entity.zRotation += zDiff > 0
-                    ? Math.min(zDiff, cappedDelta * Z_TORQUE)
-                    : Math.max(zDiff, cappedDelta * -Z_TORQUE);
+                  targetZRotation = camera.zRotation;
                 }  
                 targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<Vector2>((velocity, [input, vector, runMultiplier = 0]) => {
                   const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
@@ -1900,7 +1908,8 @@ window.onload = async () => {
                 targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
                   ? camera.xRotation + Math.PI*.1
                   : entity.xRotation;
-                entity.zRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - Math.PI/2;
+                targetZRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - Math.PI/2;
+                
                 if (readInput(INPUT_UP)) {
                   targetUnrotatedLateralOffset = [0, 1];
                 } else {
@@ -1915,6 +1924,11 @@ window.onload = async () => {
               entity.xRotation += xDiff > 0
                 ? Math.min(xDiff, cappedDelta * X_TORQUE)
                 : Math.max(xDiff, cappedDelta * -X_TORQUE);
+              const zDiff = mathAngleDiff(entity.zRotation, targetZRotation);
+              entity.zRotation += zDiff > 0
+                ? Math.min(zDiff, cappedDelta * Z_TORQUE)
+                : Math.max(zDiff, cappedDelta * -Z_TORQUE);
+
   
               const targetLateralOffset = vector3TransformMatrix4(
                 matrix4Rotate(camera.zRotation, 0, 0, 1),
@@ -1930,9 +1944,16 @@ window.onload = async () => {
               if (jumpUnread) {
                 if (!flapping) {
                   if (readInput(INPUT_JUMP)) {
+                    let totalMass = 1/entity.inverseMass;
+                    if ((entity as DragonEntity).holding) {
+                      for (const partId in entity.holding) {
+                        const held = entity.holding[partId];
+                        totalMass += 1/held.inverseMass;
+                      }
+                    }
                     const extraVelocity = vector3TransformMatrix4(
-                      matrix4RotateZXY(entity.xRotation, entity.yRotation, entity.zRotation),
-                      0, .002, .008,
+                      matrix4RotateZXY(entity.xRotation, entity.yRotation, camera.zRotation),
+                      0, .002, .008/Math.pow(totalMass, .1),
                     );
                     entity.velocity = vectorNScaleThenAdd(
                       entity.velocity,
@@ -2039,7 +2060,7 @@ window.onload = async () => {
                   vectorNScaleThenAdd(
                     vector3TransformMatrix4(
                       headPositionTransform,
-                      0, 1, 0,
+                      0, 1, .2,
                     ),
                     headPosition,
                     -1,
@@ -2095,7 +2116,7 @@ window.onload = async () => {
               if (!entity.grabbing || onGround) {
                 const held = entity.holding?.[DRAGON_PART_ID_CLAW_RIGHT];
                 if (held) {
-                  entity.holding[DRAGON_PART_ID_CLAW_RIGHT] = 0;
+                  delete entity.holding[DRAGON_PART_ID_CLAW_RIGHT];
                   held.pos = vectorNScaleThenAdd(
                     entity.pos,
                     NORMAL_Z,
@@ -2278,7 +2299,7 @@ window.onload = async () => {
               const totalPlayerVelocity = vectorNLength(player.velocity);
               const playerTurn = Math.sin(mathAngleDiff(camera.zRotation, player.zRotation));
               const targetCameraPosition = vectorNScaleThenAdd(
-                vectorNScaleThenAdd(player.pos, [0, 0, 1]),
+                vectorNScaleThenAdd(player.pos, [0, 0, 1.3]),
                 vector3TransformMatrix4(
                   cameraRotateMatrix,
                   playerTurn,
@@ -2799,6 +2820,15 @@ window.onload = async () => {
                     removeEntity(check);
                     entity.holding = entity.holding || {};
                     entity.holding[DRAGON_PART_ID_CLAW_RIGHT] = check;
+                    // take the average of the velocities, adjusting for weight
+                    entity.velocity = vectorNScale(
+                      vectorNScaleThenAdd(
+                        vectorNScale(check.velocity, 1/check.inverseMass),
+                        entity.velocity,
+                        1/entity.inverseMass,
+                      ),
+                      1/(1/check.inverseMass + 1/entity.inverseMass),
+                    );
                   }
                 }
                 break;
@@ -2892,8 +2922,9 @@ window.onload = async () => {
         }
   
         if (entity.collisionVelocityLoss && entity.inverseMass) {
-          const damage = Math.pow(entity.collisionVelocityLoss * 99 / entity.inverseMass, 2) | 0;
-          entity.pendingDamage += damage;
+          const damage = Math.pow(entity.collisionVelocityLoss * 99 / Math.sqrt(entity.inverseMass), 2);
+          //damage > .1 && console.log(entity.collisionVelocityLoss, entity.inverseMass, damage);
+          entity.pendingDamage += damage | 0;
         }
   
         const pendingDamage = entity.pendingDamage;
@@ -2964,7 +2995,7 @@ window.onload = async () => {
   
           body && appendRender(
             entity,
-            entity.lastTile.resolution,
+            entity.lastTile?.resolution || 0,
             body,
             entity.pos,
             matrix4Multiply(

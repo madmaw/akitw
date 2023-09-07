@@ -53,7 +53,7 @@ const BIOME_LOOKUP_TABLE: ([
       {
         entityType: ENTITY_TYPE_SCENERY,
         collisionGroup: COLLISION_GROUP_SCENERY,
-        modelAtlasIndex: 10,
+        modelAtlasIndex: 11,
         health: 9,
       },
       4,
@@ -100,12 +100,12 @@ const BIOME_LOOKUP_TABLE: ([
       5,
     ],
   ],
-  // gassland
+  // grassland
   [
-    [99],
+    [999],
     // flower
     [
-      1,
+      9,
       {
         entityType: ENTITY_TYPE_SCENERY,
         collisionGroup: COLLISION_GROUP_NONE,
@@ -115,7 +115,7 @@ const BIOME_LOOKUP_TABLE: ([
     ],
     // cow
     [
-      .1,
+      1,
       {
         entityType: ENTITY_TYPE_INTELLIGENT,
         collisionGroup: COLLISION_GROUP_ENEMY,
@@ -126,7 +126,22 @@ const BIOME_LOOKUP_TABLE: ([
         shadows: 1,
       },
       2
+    ],
+    // rabbit
+    [
+      2,
+      {
+        entityType: ENTITY_TYPE_INTELLIGENT,
+        collisionGroup: COLLISION_GROUP_ENEMY,
+        collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
+        modelAtlasIndex: 10,
+        health: 1,
+        inverseMass: 6,
+        shadows: 1,
+      },
+      1
     ]
+    
   ],
   // broadleaf forest
   [
@@ -180,7 +195,7 @@ const BIOME_LOOKUP_TABLE: ([
         collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
         modelAtlasIndex: 8,
         health: 4,
-        inverseMass: 2,
+        inverseMass: 1,
         shadows: 1,
       },
       1.5,

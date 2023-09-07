@@ -126,7 +126,7 @@ type BaseEntity<PartId extends number = number> = {
 
   readonly joints?: Record<PartId, Joint>,
   body?: BodyPart<PartId> | Falsey,
-  holding?: Partial<Record<PartId, Entity | Falsey>>,
+  holding?: Partial<Record<PartId, Entity>>,
   // reference to textures/colours/etc...
   modelVariant?: VariantId;
   // the index of the atlas to use
