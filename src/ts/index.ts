@@ -1581,12 +1581,29 @@ window.onload = async () => {
     modelVariant: VARIANT_DRAGON_BODY,
   };
   addEntity(player);
+  const camera: CameraEntity = {
+    entityType: ENTITY_TYPE_CAMERA,
+    bounds: rect3FromRadius(.4),
+    collisionRadius: .4,
+    collisionGroup: COLLISION_GROUP_NONE,
+    collisionMask: COLLISION_GROUP_TERRAIN,
+    id: nextEntityId++,
+    pos: player.pos,
+    renderGroupId: nextRenderGroupId++,
+    resolutions: [0],
+    velocity: [0, 0, 0],
+    xRotation: 0,
+    zRotation: 0,
+    inverseFriction: 1,
+  };
+  addEntity(camera);
 
+  // leave external to camera since we are going to remove this in the final build
   let cameraZoom = -2;
-  let cameraZRotation = 0;
-  let cameraXRotation = 0;
-  let cameraPosition = player.pos;
-  let zoomedCameraPosition = player.pos;
+  // let cameraZRotation = 0;
+  // let cameraXRotation = 0;
+  // let cameraPosition = player.pos;
+  // let zoomedCameraPosition = player.pos;
 
   window.onmousedown = () => {
     setKeyState(INPUT_FIRE, 1);
@@ -1599,12 +1616,12 @@ window.onload = async () => {
     const movement: ReadonlyVector2 = [e.movementX, e.movementY];
     const rotation = vectorNLength(movement)/399;
     if (rotation > EPSILON) {
-      cameraZRotation -= movement[0]/399;
-      cameraXRotation = Math.max(
+      camera.zRotation -= movement[0]/399;
+      camera.xRotation = Math.max(
         -Math.PI/2,
         Math.min(
           Math.PI/6,
-          cameraXRotation - movement[1]/199,
+          camera.xRotation - movement[1]/199,
         ),
       );
     }
@@ -1656,8 +1673,8 @@ window.onload = async () => {
     const delta = now - then;
     then = now;
     tick++;
-    const cappedDelta = 20;
-    //const cappedDelta = Math.min(delta, 40);
+    //const cappedDelta = 20;
+    const cappedDelta = Math.min(delta, 40);
     time += cappedDelta;
     
     if (FLAG_SHOW_FPS) {
@@ -1671,9 +1688,7 @@ window.onload = async () => {
       }  
     }
 
-    // TODO don't iterate entire world (only do around player), render at lower LoD
     // further away
-    const handledEntities: Record<EntityId, Truthy> = {};
     const renderedEntities: Record<RenderGroupId, Truthy> = {};
     // variantId -> modelId -> position, rotation, resolution, atlasIndex
     const shadows: ReadonlyVector4[] = [];
@@ -1760,15 +1775,20 @@ window.onload = async () => {
       }
     }
 
-    const cameraZRotationMatrix = matrix4Rotate(cameraZRotation, 0, 0, 1);
+    const cameraZRotationMatrix = matrix4Rotate(camera.zRotation, 0, 0, 1);
+    const cameraRotateMatrix = matrix4Multiply(
+      cameraZRotationMatrix,
+      matrix4Rotate(camera.xRotation, 1, 0, 0),
+    );
+    
     // operate off the previous camera position
-    const previousCameraWorldPosition: Vector2 = vectorNScale(cameraPosition.slice(0, 2), 1/WORLD_DIMENSION) as any;
+    const previousCameraWorldPosition: Vector2 = vectorNScale(camera.pos.slice(0, 2), 1/WORLD_DIMENSION) as any;
     const cameraZNormal = vector3TransformMatrix4(cameraZRotationMatrix, 0, 1, 0);
-    const visionConeThreshold = Math.max(-Math.sin(cameraXRotation), .1);
+    const visionConeThreshold = Math.max(-Math.sin(camera.xRotation), .1);
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
-    const [tiles] = reversedWorld.reduce<[Set<Tile>, ReadonlyVector2[]]>(([tiles, cellsToCheck], _, reverseResolution) => {
+    const [entities, tiles] = reversedWorld.reduce<[Set<Entity>, Set<Tile>, ReadonlyVector2[]]>(([entities, tiles, cellsToCheck], _, reverseResolution) => {
       const scale = 1/Math.pow(2, reverseResolution + 1);
       const resolution = reversedWorld.length - reverseResolution - 1;
       // add in all the tiles within the bounds, but not in the view area
@@ -1789,7 +1809,7 @@ window.onload = async () => {
               ...offsets.map(offset => vectorNScaleThenAdd(vectorNScale(cell, 2), offset)),
             );
           } else {
-            tiles.add(getAndMaybePopulateTile(gridX | 0, gridY | 0, resolution));
+            const tile = getAndMaybePopulateTile(gridX | 0, gridY | 0, resolution);
             if (FLAG_REPOPULATE) {
               // secretly refresh this tile
               if (resolution == 4 && Math.random() < .0001) {
@@ -1804,1105 +1824,1154 @@ window.onload = async () => {
                   1,
                 );
               }
-            }  
+            }
+            tiles.add(tile);
+            for (let entityId in tile.entities) {
+              const entity = tile.entities[entityId];
+              entity != player && entity != camera && entities.add(entity);
+              entity.lastTile = tile;
+            }
           }  
         }
       });
-      return [tiles, nextCellsToCheck];
-    }, [new Set<Tile>(), offsets]);
+      return [entities, tiles, nextCellsToCheck];
+    }, [new Set<Entity>(), new Set<Tile>(), offsets]);
 
-    // const grid = world[0];
-    // const tiles = grid.map((gridX, x) => gridX.map((_, y) => getOrCreateGridTile(x, y, 0))).flat(1);    
-
-    // NOTE: we could convert all forEaches to maps, but set doesn't support map
-    tiles.forEach((tile) => {
-      for (let entityId in tile.entities) {
-        const entity: Entity = tile.entities[entityId];
-        if (!handledEntities[entityId]) {
-          handledEntities[entityId] = 1;
-          const {
-            entityType,
-            bounds,
-            renderGroupId: renderId,
-            renderTile,
-            face,
-          } = entity;
-
-          if (!face) {
-            if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED || entityType == ENTITY_TYPE_INTELLIGENT) {
-              const onGround = entity.lastOnGroundTime + 99 > time && entity.lastOnGroundNormal;
-              // do AI stuff
-              const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
-              const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
-              const gliding = hasJointAnimation(entity, ACTION_ID_GLIDE);
-              const flapping = hasJointAnimation(entity, ACTION_ID_FLAP);
-
-              if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED) {
-                const entityFacingNormal = vector3TransformMatrix4(
-                  matrix4Rotate(entity.zRotation, 0, 0, 1),
-                  0, 1, 0,
+    // always update player and camera, and always update the player first so the camera
+    // is looking at the right spot
+    [player, camera, ...entities].forEach((entity, i) => {
+      // the entity has not been removed by someone else's update
+      // allow camera and player to move out of bounds and still be updated
+      if (entity.lastTile.entities[entity.id] || i < 2) {
+        const {
+          entityType,
+          bounds,
+          renderGroupId: renderId,
+          renderTile,
+          face,
+        } = entity;
+  
+        if (!face) {
+          if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED || entityType == ENTITY_TYPE_INTELLIGENT) {
+            const onGround = entity.lastOnGroundTime + 99 > time && entity.lastOnGroundNormal;
+            // do AI stuff
+            const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
+            const totalEntityLateralVelocity = vectorNLength(entityLateralVelocity);
+            const gliding = hasJointAnimation(entity, ACTION_ID_GLIDE);
+            const flapping = hasJointAnimation(entity, ACTION_ID_FLAP);
+  
+            if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED) {
+              const entityFacingNormal = vector3TransformMatrix4(
+                matrix4Rotate(entity.zRotation, 0, 0, 1),
+                0, 1, 0,
+              );
+              const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(
+                ([input]) => someInputUnread(input) || readInput(input),
+              );
+              const running = 1 - readInput(INPUT_WALK);
+              entity.grabbing = readInput(INPUT_UP, 1);
+              let targetUnrotatedLateralOffset: ReadonlyVector2;
+              let targetXRotation: number;
+              if (onGround) {
+                // set the xRotation to match the ground 
+                const cosXRotation = vectorNDotProduct(
+                  entityFacingNormal,
+                  entity.lastOnGroundNormal,
                 );
-                const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(
-                  ([input]) => someInputUnread(input) || readInput(input),
-                );
-                const running = 1 - readInput(INPUT_WALK);
-                entity.grabbing = readInput(INPUT_UP, 1);
-                let targetUnrotatedLateralOffset: ReadonlyVector2;
-                let targetXRotation: number;
-                if (onGround) {
-                  // set the xRotation to match the ground 
-                  const cosXRotation = vectorNDotProduct(
-                    entityFacingNormal,
-                    entity.lastOnGroundNormal,
+                
+                targetXRotation = Math.acos(cosXRotation) - Math.PI/2;
+  
+                if (someLateralInputsWereUnreadOrNonZero) {
+                  // turn nicely
+                  const zDiff = mathAngleDiff(entity.zRotation, camera.zRotation);
+                  entity.zRotation += zDiff > 0
+                    ? Math.min(zDiff, cappedDelta * Z_TORQUE)
+                    : Math.max(zDiff, cappedDelta * -Z_TORQUE);
+                }  
+                targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<Vector2>((velocity, [input, vector, runMultiplier = 0]) => {
+                  const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
+                  return vectorNScaleThenAdd(
+                    velocity,
+                    vector,
+                    cappedDelta * entity.maximumLateralVelocity * multiplier,
                   );
-                  
-                  targetXRotation = Math.acos(cosXRotation) - Math.PI/2;
-
-                  if (someLateralInputsWereUnreadOrNonZero) {
-                    // turn nicely
-                    const zDiff = mathAngleDiff(entity.zRotation, cameraZRotation);
-                    entity.zRotation += zDiff > 0
-                      ? Math.min(zDiff, cappedDelta * Z_TORQUE)
-                      : Math.max(zDiff, cappedDelta * -Z_TORQUE);
-                  }  
-                  targetUnrotatedLateralOffset = CARDINAL_INPUT_VECTORS.reduce<Vector2>((velocity, [input, vector, runMultiplier = 0]) => {
-                    const multiplier = (readInput(input) * (running * 2 * runMultiplier + 1))/3;
-                    return vectorNScaleThenAdd(
-                      velocity,
-                      vector,
-                      cappedDelta * entity.maximumLateralVelocity * multiplier,
+                }, [0, 0])
+              } else {
+                targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
+                  ? camera.xRotation + Math.PI*.1
+                  : entity.xRotation;
+                entity.zRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - Math.PI/2;
+                if (readInput(INPUT_UP)) {
+                  targetUnrotatedLateralOffset = [0, 1];
+                } else {
+                  // preemptively undo the rotation below so we continue on in the same direction
+                  targetUnrotatedLateralOffset = [
+                    Math.cos(entity.zRotation - camera.zRotation + Math.PI/2),
+                    Math.sin(entity.zRotation - camera.zRotation + Math.PI/2),
+                  ];
+                }
+              }
+              const xDiff = mathAngleDiff(entity.xRotation, targetXRotation);
+              entity.xRotation += xDiff > 0
+                ? Math.min(xDiff, cappedDelta * X_TORQUE)
+                : Math.max(xDiff, cappedDelta * -X_TORQUE);
+  
+              const targetLateralOffset = vector3TransformMatrix4(
+                matrix4Rotate(camera.zRotation, 0, 0, 1),
+                ...targetUnrotatedLateralOffset,
+                0,
+              );
+              // set the friction so we don't slip around when not moving
+              entity.inverseFriction = someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > EPSILON
+                ? 1
+                : 0;
+              entity.targetLateralPosition = vectorNScaleThenAdd(entity.pos, targetLateralOffset);
+              const jumpUnread = someInputUnread(INPUT_JUMP);
+              if (jumpUnread) {
+                if (!flapping) {
+                  if (readInput(INPUT_JUMP)) {
+                    const extraVelocity = vector3TransformMatrix4(
+                      matrix4RotateZXY(entity.xRotation, entity.yRotation, entity.zRotation),
+                      0, .002, .008,
                     );
-                  }, [0, 0])
-                } else {
-                  targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
-                    ? cameraXRotation + Math.PI*.1
-                    : entity.xRotation;
-                  entity.zRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - Math.PI/2;
-                  if (readInput(INPUT_UP)) {
-                    targetUnrotatedLateralOffset = [0, 1];
-                  } else {
-                    // preemptively undo the rotation below so we continue on in the same direction
-                    targetUnrotatedLateralOffset = [
-                      Math.cos(entity.zRotation - cameraZRotation + Math.PI/2),
-                      Math.sin(entity.zRotation - cameraZRotation + Math.PI/2),
-                    ];
+                    entity.velocity = vectorNScaleThenAdd(
+                      entity.velocity,
+                      extraVelocity,
+                    );
+                    entity.lastOnGroundTime = 0;
+                    setJointAnimations(entity, DRAGON_ANIMATION_FLAP);    
                   }
                 }
-                const xDiff = mathAngleDiff(entity.xRotation, targetXRotation);
-                entity.xRotation += xDiff > 0
-                  ? Math.min(xDiff, cappedDelta * X_TORQUE)
-                  : Math.max(xDiff, cappedDelta * -X_TORQUE);
-
-                const targetLateralOffset = vector3TransformMatrix4(
-                  matrix4Rotate(cameraZRotation, 0, 0, 1),
-                  ...targetUnrotatedLateralOffset,
-                  0,
+              } else {
+                if (readInput(INPUT_JUMP, 1) && !onGround) {
+                  setJointAnimations(entity, DRAGON_ANIMATION_GLIDE);
+                }
+              }
+              // animate behaviour
+              const jointAnimation = (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > .001) && onGround
+                ? targetUnrotatedLateralOffset[1] < 0
+                  ? DRAGON_ANIMATION_WALK_BACKWARD
+                  : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
+                    ? DRAGON_ANIMATION_RUN
+                    : DRAGON_ANIMATION_WALK
+                : onGround
+                  ? DRAGON_ANIMATION_IDLE
+                  : DRAGON_ANIMATION_FALL;
+              setJointAnimations(entity, jointAnimation);
+  
+              // align the neck/head with the camera rotation
+              let deltaZRotation = mathAngleDiff(entity.zRotation || 0, camera.zRotation);
+              deltaZRotation = deltaZRotation > 0
+                ? Math.min(deltaZRotation, Math.PI/2)
+                : Math.max(deltaZRotation, -Math.PI/2);
+              // const neckAndHeadTransform = matrix4Multiply(
+              //   matrix4Rotate(deltaZRotation/2, 0, 0, 1),
+              //   matrix4Rotate(cameraXRotation/2, 1, 0, 0),
+              // );
+              // player.joints[DRAGON_PART_ID_NECK].transform = neckAndHeadTransform;
+              // player.joints[DRAGON_PART_ID_HEAD].transform = matrix4Multiply(
+              //   matrix4Invert(neckAndHeadTransform),
+              //   matrix4Rotate(deltaZRotation, 0, 0, 1),
+              //   matrix4Rotate(cameraXRotation, 1, 0, 0),
+              // );
+              // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
+              // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
+              const targetRotation: ReadonlyVector3 = [camera.xRotation/2 + Math.PI/99, 0, deltaZRotation/2];
+              let headAndNeckRotation: ReadonlyVector3;
+              if (FLAG_SLOW_HEAD_TURN) {
+                const existingRotation = entity.joints[DRAGON_PART_ID_NECK]['r'] || VECTOR3_EMPTY;
+                
+                headAndNeckRotation = targetRotation.map((target, i) => {
+                  const existing = existingRotation[i];
+                  const diff = mathAngleDiff(existing, target);
+                  return existing + diff * cappedDelta/200;
+                }) as any;
+              } else {
+                headAndNeckRotation = targetRotation;
+              }
+              entity.joints[DRAGON_PART_ID_NECK]['r'] = headAndNeckRotation;
+              entity.joints[DRAGON_PART_ID_HEAD]['r'] = headAndNeckRotation;
+  
+              entity.fireReservior = Math.min((entity.fireReservior || 0) + cappedDelta, 9999);
+  
+              if (
+                (entity.lastFired || 0) + 50 - Math.sqrt(entity.fireReservior) < time
+                  && readInput(INPUT_FIRE)
+              ) {
+                setJointAnimations(entity, DRAGON_ANIMATION_SHOOT);
+                entity.lastFired = time;
+                entity.fireReservior -= 99;
+                // use exact player transform chain
+                const body = entity.body as BodyPart<DragonPartIds>;
+                const neck = body.children[0];
+                const head = neck.children[0];
+                const headPositionTransforms = [body, neck, head].map(part => {
+                  const joint = entity.joints[part.id];
+                  return [
+                    // pre/post rotatoin happen not to be populated on head/neck/body
+                    //part.preRotation && matrix4RotateZXY(...part.preRotation),
+                    part.preRotationOffset && matrix4Translate(...part.preRotationOffset),
+                    joint['r'] && matrix4RotateZXY(...joint['r']),
+                    //part.postRotation && matrix4RotateZXY(...part.postRotation),
+                  ]
+                }).flat(1);
+                const headPositionTransform = matrix4Multiply(
+                  matrix4Translate(...entity.pos),
+                  matrix4RotateZXY(
+                    entity.xRotation + Math.random()*.2-.1,
+                    entity.yRotation,
+                    entity.zRotation + Math.random()*.2-.1,
+                  ),
+                  // matrix4Rotate(player.zRotation, 0, 0, 1),
+                  // matrix4Rotate(player.xRotation, 1, 0, 0),
+                  // matrix4Rotate(player.yRotation, 0, 1, 0),
+                  ...headPositionTransforms,
                 );
-                // set the friction so we don't slip around when not moving
-                entity.inverseFriction = someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > EPSILON
-                  ? 1
-                  : 0;
-                entity.targetLateralPosition = vectorNScaleThenAdd(entity.pos, targetLateralOffset);
-                const jumpUnread = someInputUnread(INPUT_JUMP);
-                if (jumpUnread) {
-                  if (!flapping) {
-                    if (readInput(INPUT_JUMP)) {
-                      const extraVelocity = vector3TransformMatrix4(
-                        matrix4RotateZXY(entity.xRotation, entity.yRotation, entity.zRotation),
-                        0, .002, .008,
-                      );
-                      entity.velocity = vectorNScaleThenAdd(
-                        entity.velocity,
-                        extraVelocity,
-                      );
-                      entity.lastOnGroundTime = 0;
-                      setJointAnimations(entity, DRAGON_ANIMATION_FLAP);    
-                    }
-                  }
-                } else {
-                  if (readInput(INPUT_JUMP, 1) && !onGround) {
-                    setJointAnimations(entity, DRAGON_ANIMATION_GLIDE);
-                  }
-                }
-                // animate behaviour
-                const jointAnimation = (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > .001) && onGround
-                  ? targetUnrotatedLateralOffset[1] < 0
-                    ? DRAGON_ANIMATION_WALK_BACKWARD
-                    : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
-                      ? DRAGON_ANIMATION_RUN
-                      : DRAGON_ANIMATION_WALK
-                  : onGround
-                    ? DRAGON_ANIMATION_IDLE
-                    : DRAGON_ANIMATION_FALL;
-                setJointAnimations(entity, jointAnimation);
-
-                // align the neck/head with the camera rotation
-                let deltaZRotation = mathAngleDiff(entity.zRotation || 0, cameraZRotation);
-                deltaZRotation = deltaZRotation > 0
-                  ? Math.min(deltaZRotation, Math.PI/2)
-                  : Math.max(deltaZRotation, -Math.PI/2);
-                // const neckAndHeadTransform = matrix4Multiply(
-                //   matrix4Rotate(deltaZRotation/2, 0, 0, 1),
-                //   matrix4Rotate(cameraXRotation/2, 1, 0, 0),
-                // );
-                // player.joints[DRAGON_PART_ID_NECK].transform = neckAndHeadTransform;
-                // player.joints[DRAGON_PART_ID_HEAD].transform = matrix4Multiply(
-                //   matrix4Invert(neckAndHeadTransform),
-                //   matrix4Rotate(deltaZRotation, 0, 0, 1),
-                //   matrix4Rotate(cameraXRotation, 1, 0, 0),
-                // );
-                // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
-                // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
-                const targetRotation: ReadonlyVector3 = [cameraXRotation/2 + Math.PI/99, 0, deltaZRotation/2];
-                let headAndNeckRotation: ReadonlyVector3;
-                if (FLAG_SLOW_HEAD_TURN) {
-                  const existingRotation = entity.joints[DRAGON_PART_ID_NECK]['r'] || VECTOR3_EMPTY;
-                  
-                  headAndNeckRotation = targetRotation.map((target, i) => {
-                    const existing = existingRotation[i];
-                    const diff = mathAngleDiff(existing, target);
-                    return existing + diff * cappedDelta/200;
-                  }) as any;
-                } else {
-                  headAndNeckRotation = targetRotation;
-                }
-                entity.joints[DRAGON_PART_ID_NECK]['r'] = headAndNeckRotation;
-                entity.joints[DRAGON_PART_ID_HEAD]['r'] = headAndNeckRotation;
-
-                entity.fireReservior = Math.min((entity.fireReservior || 0) + cappedDelta, 9999);
-
-                if (
-                  (entity.lastFired || 0) + 50 - Math.sqrt(entity.fireReservior) < time
-                    && readInput(INPUT_FIRE)
-                ) {
-                  setJointAnimations(entity, DRAGON_ANIMATION_SHOOT);
-                  entity.lastFired = time;
-                  entity.fireReservior -= 99;
-                  // use exact player transform chain
-                  const body = entity.body as BodyPart<DragonPartIds>;
-                  const neck = body.children[0];
-                  const head = neck.children[0];
-                  const headPositionTransforms = [body, neck, head].map(part => {
-                    const joint = entity.joints[part.id];
-                    return [
-                      // pre/post rotatoin happen not to be populated on head/neck/body
-                      //part.preRotation && matrix4RotateZXY(...part.preRotation),
-                      part.preRotationOffset && matrix4Translate(...part.preRotationOffset),
-                      joint['r'] && matrix4RotateZXY(...joint['r']),
-                      //part.postRotation && matrix4RotateZXY(...part.postRotation),
-                    ]
-                  }).flat(1);
-                  const headPositionTransform = matrix4Multiply(
-                    matrix4Translate(...entity.pos),
-                    matrix4RotateZXY(
-                      entity.xRotation + Math.random()*.2-.1,
-                      entity.yRotation,
-                      entity.zRotation + Math.random()*.2-.1,
-                    ),
-                    // matrix4Rotate(player.zRotation, 0, 0, 1),
-                    // matrix4Rotate(player.xRotation, 1, 0, 0),
-                    // matrix4Rotate(player.yRotation, 0, 1, 0),
-                    ...headPositionTransforms,
-                  );
-                  const headPosition = vector3TransformMatrix4(
+                const headPosition = vectorNScaleThenAdd(
+                  vector3TransformMatrix4(
                     headPositionTransform,
                     0, 0, 0,
-                  );
-                  const headDirection = vectorNNormalize(
-                    vectorNScaleThenAdd(
-                      vector3TransformMatrix4(
-                        headPositionTransform,
-                        0, 1, 0,
-                      ),
-                      headPosition,
-                      -1,
-                    )
-                  );
-
-                  // const playerTransform = matrix4Multiply(
-                  //   matrix4Rotate(cameraZRotation + Math.random()*.2-.1, 0, 0, 1),
-                  //   matrix4Rotate(cameraXRotation + Math.PI/20 + Math.random()*.2-.1, 1, 0, 0),
-                  // );
-                  const velocity: Vector3 = vectorNScaleThenAdd(
-                    entity.velocity,
-                    headDirection,
-                    .01,
-                  );
-
-                  const collisionRadius = .1;
-
-                  // fire a ball 
-                  const ball: DynamicEntity = {
-                    entityType: ENTITY_TYPE_FIREBALL,
-                    body: {
-                      modelId: MODEL_ID_SPHERE,
-                    },
-                    resolutions: [0, 1],
-                    bounds: rect3FromRadius(collisionRadius),
-                    id: nextEntityId++,
-                    collisionRadius,
-                    collisionGroup: COLLISION_GROUP_PLAYER,
-                    collisionMask: COLLISION_GROUP_ENEMY
-                      | COLLISION_GROUP_SCENERY
-                      | COLLISION_GROUP_TERRAIN,
-                    pos: headPosition,
-                    velocity,
-                    renderGroupId: nextRenderGroupId++,
-                    inverseMass: 9,
-                    transient: 1,
-                    modelVariant: VARIANT_FIRE,
-                    anims: [[
-                      createAttributeAnimation(
-                        999 * (Math.random()+entity.fireReservior/9999),
-                        'at',
-                        EASING_QUAD_IN,
-                        createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
-                        e => e.dead = 1,
-                      )
-                    ]]
-                  };
-
-                  addEntity(ball);
-                }                
-                // drop when not pushing forward or on the ground
-                if (!entity.grabbing || onGround) {
-                  const held = entity.holding?.[DRAGON_PART_ID_CLAW_RIGHT];
-                  if (held) {
-                    entity.holding[DRAGON_PART_ID_CLAW_RIGHT] = 0;
-                    held.pos = vectorNScaleThenAdd(
-                      entity.pos,
-                      NORMAL_Z,
-                      onGround ? 0 : -entity.collisionRadius,
-                    );
-                    held.velocity = entity.velocity;
-                    addEntity(held);
-                  }
-                }
-
-              } else {
-                // AI
-                // maybe consider situation
-                // randomness ensures that everything in the tile doesn't make its next decision simultaneously
-                // TODO (awareness per entity)
-                if ((entity.lastDecision || 0) + 999 < time && Math.random() > .9) {
-                  entity.lastDecision = time;
-                  const newImpulses: Impulse[] = [];
-                  iterateEntityBoundsEntities({
-                    // TODO vision per entity
-                    bounds: rect3FromRadius(9),
-                    pos: entity.pos,
-                    resolutions: [0],
-                  }, seen => {
-                    if (!seen.face && (seen.collisionMask & entity.collisionGroup)) {
-                      // TODO don't just run away from everything
-                      newImpulses.push({
-                        intensity: -9,
-                        target: seen,
-                      });
-                    }
-                  });
-                  entity.impulses = entity.impulses?.filter(v => {
-                    v.intensity = v.intensity * .9 | 0;
-                    return v.intensity && !newImpulses.some(i => i.target == v.target);
-                  }) || [];
-                  entity.impulses.push(...newImpulses);
-                  
-                  entity.targetUrgency = Math.min(
-                    1,
-                    entity.impulses.reduce((acc, impulse) => {
-                      return acc + Math.abs(impulse.intensity)/9;
-                    }, 0)
-                  );  
-                }
-                entity.homePosition = entity.homePosition || entity.pos;
-                if (!entity.impulses?.length) {
-                  entity.impulses = [{
-                    intensity: 1,
-                    target: {
-                      // TODO make milling range configurable
-                      pos: vectorNScaleThenAdd(
-                        entity.homePosition,
-                        [Math.random() - .5, Math.random() - .5, 0],
-                        9,
-                      ),
-                    }
-                  }];
-                  entity.targetUrgency = .1;
-                }
-
-
-                const deltaPosition = entity.impulses.reduce<Vector3>(
-                  (acc, impulse) => {
-                    const delta = vectorNScaleThenAdd(
-                      impulse.target.pos,
-                      entity.pos,
-                      -1,
-                    );
-                    return vectorNScaleThenAdd(
-                      acc,
-                      delta,
-                      impulse.intensity/(vectorNLength(delta) + 1),
-                    );
-                  },
-                  [0, 0, 0],
-                );
-                entity.targetLateralPosition = vectorNScaleThenAdd(entity.pos, deltaPosition);
-              }
-              const targetLateralPosition = entity.targetLateralPosition || entity.pos;
-              let targetYRotation = 0;
-              if (onGround) {
-                const targetLateralDelta = vectorNScaleThenAdd(
-                  targetLateralPosition,
-                  entity.pos,
-                  -1,
-                ).slice(0, 2) as Vector2;
-                const length = vectorNLength(targetLateralDelta);
-                const angle = length > EPSILON
-                  ? Math.atan2(targetLateralDelta[1], targetLateralDelta[0])
-                  : 0;
-                const totalTargetVelocity = Math.min(
-                  entity.maximumLateralVelocity * (entity.targetUrgency || 1),
-                  length/cappedDelta,
-                );
-                const targetVelocity = [
-                  Math.cos(angle) * totalTargetVelocity,
-                  Math.sin(angle) * totalTargetVelocity,
-                ];
-                const deltaVelocity = vectorNScaleThenAdd(
-                  targetVelocity,
-                  entityLateralVelocity,
-                  -1,
-                );
-                const totalDeltaVelocity = vectorNLength(deltaVelocity);
-                // apply maximum acceleration to delta
-                entity.velocity = [
-                  ...vectorNScaleThenAdd(
-                    entityLateralVelocity,
-                    deltaVelocity,
-                    Math.min(
-                      1,
-                      entity.maximumLateralAcceleration * cappedDelta / totalDeltaVelocity,
-                    ),
                   ),
-                  entity.velocity[2],
-                ];
-                
-              } else {
-                // flying/falling
-                const gravity = entity.gravity;
-                if (gliding && gravity) {
-                  const xRotation = entity.xRotation || 0;
-                  const targetLateralDirection = vectorNScaleThenAdd(targetLateralPosition, entity.pos, -1);
-                  const targetLateralNormal = vectorNNormalize(
-                    vectorNLength(targetLateralDirection) > EPSILON
-                      ? targetLateralDirection
-                      : entity.velocity
+                  entity.velocity,
+                  cappedDelta,
+                );
+                const headDirection = vectorNNormalize(
+                  vectorNScaleThenAdd(
+                    vector3TransformMatrix4(
+                      headPositionTransform,
+                      0, 1, 0,
+                    ),
+                    headPosition,
+                    -1,
+                  )
+                );
+  
+                // const playerTransform = matrix4Multiply(
+                //   matrix4Rotate(cameraZRotation + Math.random()*.2-.1, 0, 0, 1),
+                //   matrix4Rotate(cameraXRotation + Math.PI/20 + Math.random()*.2-.1, 1, 0, 0),
+                // );
+                const velocity: Vector3 = vectorNScaleThenAdd(
+                  entity.velocity,
+                  headDirection,
+                  .01,
+                );
+  
+                const collisionRadius = .1;
+  
+                // fire a ball 
+                const ball: DynamicEntity = {
+                  entityType: ENTITY_TYPE_FIREBALL,
+                  body: {
+                    modelId: MODEL_ID_SPHERE,
+                  },
+                  resolutions: [0, 1],
+                  bounds: rect3FromRadius(collisionRadius),
+                  id: nextEntityId++,
+                  collisionRadius,
+                  collisionGroup: COLLISION_GROUP_PLAYER,
+                  collisionMask: COLLISION_GROUP_ENEMY
+                    | COLLISION_GROUP_SCENERY
+                    | COLLISION_GROUP_TERRAIN,
+                  pos: headPosition,
+                  velocity,
+                  renderGroupId: nextRenderGroupId++,
+                  inverseMass: 9,
+                  transient: 1,
+                  modelVariant: VARIANT_FIRE,
+                  anims: [[
+                    createAttributeAnimation(
+                      999 * (Math.random()+entity.fireReservior/9999),
+                      'at',
+                      EASING_QUAD_IN,
+                      createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
+                      e => e.dead = 1,
+                    )
+                  ]]
+                };
+  
+                addEntity(ball);
+              }                
+              // drop when not pushing forward or on the ground
+              if (!entity.grabbing || onGround) {
+                const held = entity.holding?.[DRAGON_PART_ID_CLAW_RIGHT];
+                if (held) {
+                  entity.holding[DRAGON_PART_ID_CLAW_RIGHT] = 0;
+                  held.pos = vectorNScaleThenAdd(
+                    entity.pos,
+                    NORMAL_Z,
+                    onGround ? 0 : -entity.collisionRadius,
                   );
-                  const velocityNormal = vectorNNormalize(entity.velocity);
-                  const targetLateralAngle = Math.atan2(targetLateralNormal[1], targetLateralNormal[0]) - Math.PI/2;
-                  // tilt up or down to match the x rotation
-                  const targetVelocityNormal = vector3TransformMatrix4(
-                    matrix4Rotate(xRotation, Math.cos(targetLateralAngle), Math.sin(targetLateralAngle), 0),
-                    ...targetLateralNormal,
-                  );
-                  let achievableVelocity = entity.velocity;
-                  const cosa = vectorNDotProduct(velocityNormal, targetVelocityNormal);
-                  if (cosa < 1 - EPSILON) {
-                    const targetAngle = Math.acos(cosa);
-                    const axis = vectorNNormalize(
-                      vector3CrossProduct(velocityNormal, targetVelocityNormal),
-                    );
-                    
-                    const achievableAngle = targetAngle > 0
-                      ? Math.min(targetAngle, cappedDelta * TURN_TORQUE)
-                      : Math.max(targetAngle, cappedDelta * -TURN_TORQUE);
-                    // TODO maybe rotate on the y axis by the amount missing?
-                    achievableVelocity = vector3TransformMatrix4(
-                      matrix4Rotate(achievableAngle, ...axis),
-                      ...vectorNScale(achievableVelocity, Math.cos(achievableAngle)),
-                    );    
-                  }
-                  const lateralVelocityNormal = vectorNNormalize<ReadonlyVector3>([...velocityNormal.slice(0, 2), 0] as Vector3);
-                  const bankCos = vectorNDotProduct<ReadonlyVector3>(
-                    lateralVelocityNormal,
-                    targetLateralNormal,
-                  );
-                  if (bankCos < 1 - EPSILON) {
-                    const bankAxis = vector3CrossProduct(lateralVelocityNormal, targetLateralNormal);
-                    const bankAngle = Math.acos(bankCos);
-                    targetYRotation = bankAxis[2] > 0 ? -bankAngle : bankAngle;
-                  }
-
-                  // reverse the effects of gravity by the amount we are facing up
-                  // achievableVelocity[2] = gravity * cappedDelta
-                  //   * (1 + Math.sin(xRotation))
-                  //   * Math.min(1, velocityLength*99);
-                  entity.velocity = achievableVelocity;
+                  held.velocity = entity.velocity;
+                  addEntity(held);
                 }
               }
-              // bank smoothly
-              const yDiff = mathAngleDiff(entity.yRotation, targetYRotation);
-              entity.yRotation += yDiff > 0
-                ? Math.min(yDiff, cappedDelta * Z_TORQUE)
-                : Math.max(yDiff, cappedDelta * -Z_TORQUE);
+  
+            } else {
+              // AI
+              // maybe consider situation
+              // randomness ensures that everything in the tile doesn't make its next decision simultaneously
+              // TODO (awareness per entity)
+              if ((entity.lastDecision || 0) + 999 < time && Math.random() > .9) {
+                entity.lastDecision = time;
+                const newImpulses: Impulse[] = [];
+                iterateEntityBoundsEntities({
+                  // TODO vision per entity
+                  bounds: rect3FromRadius(9),
+                  pos: entity.pos,
+                  resolutions: [0],
+                }, seen => {
+                  if (!seen.face && (seen.collisionMask & entity.collisionGroup)) {
+                    // TODO don't just run away from everything
+                    newImpulses.push({
+                      intensity: -9,
+                      target: seen,
+                    });
+                  }
+                });
+                entity.impulses = entity.impulses?.filter(v => {
+                  v.intensity = v.intensity * .9 | 0;
+                  return v.intensity && !newImpulses.some(i => i.target == v.target);
+                }) || [];
+                entity.impulses.push(...newImpulses);
+                
+                entity.targetUrgency = Math.min(
+                  1,
+                  entity.impulses.reduce((acc, impulse) => {
+                    return acc + Math.abs(impulse.intensity)/9;
+                  }, 0)
+                );  
+              }
+              entity.homePosition = entity.homePosition || entity.pos;
+              if (!entity.impulses?.length) {
+                entity.impulses = [{
+                  intensity: 1,
+                  target: {
+                    // TODO make milling range configurable
+                    pos: vectorNScaleThenAdd(
+                      entity.homePosition,
+                      [Math.random() - .5, Math.random() - .5, 0],
+                      9,
+                    ),
+                  }
+                }];
+                entity.targetUrgency = .1;
+              }
+  
+  
+              const deltaPosition = entity.impulses.reduce<Vector3>(
+                (acc, impulse) => {
+                  const delta = vectorNScaleThenAdd(
+                    impulse.target.pos,
+                    entity.pos,
+                    -1,
+                  );
+                  return vectorNScaleThenAdd(
+                    acc,
+                    delta,
+                    impulse.intensity/(vectorNLength(delta) + 1),
+                  );
+                },
+                [0, 0, 0],
+              );
+              entity.targetLateralPosition = vectorNScaleThenAdd(entity.pos, deltaPosition);
             }
-            
-            if (entity.gravity) {
-              entity.velocity[2] -= cappedDelta * entity.gravity;
-            }
-            (entity as BaseDynamicEntity).collisionVelocityLoss = 0;
-            entity.pendingDamage ||= 0;
-            if (FLAG_DEBUG_PHYSICS) {
-              entity.logs = entity.logs?.slice(-30) || [];
-            }
-            removeEntity(entity);
-            const collisionEntities = new Set<Entity>();
-
-            const collidedEntities: Record<EntityId, Truthy> = {};
-            let duplicateCollisionCount = 1;
-            // TODO enforce max speed
-            let remainingCollisionTime = cappedDelta;
-            let collisionCount = 0;
-            while (
-              remainingCollisionTime > EPSILON
-              && collisionCount < MAX_COLLISIONS
-              && !entity.dead
-            ) {
-              const {
-                pos: position,
-                velocity,
-                collisionRadius: collisionRadiusFromCenter,
-                restitution = 0,
-                collisionMask,
-              } = entity as DynamicEntity;
-
-              const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
-
-              const targetUnionBounds: ReadonlyRect3 = [
-                velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime - EPSILON) as Vector3,
-                velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime + EPSILON) as Vector3,
+            const targetLateralPosition = entity.targetLateralPosition || entity.pos;
+            let targetYRotation = 0;
+            if (onGround) {
+              const targetLateralDelta = vectorNScaleThenAdd(
+                targetLateralPosition,
+                entity.pos,
+                -1,
+              ).slice(0, 2) as Vector2;
+              const length = vectorNLength(targetLateralDelta);
+              const angle = length > EPSILON
+                ? Math.atan2(targetLateralDelta[1], targetLateralDelta[0])
+                : 0;
+              const totalTargetVelocity = Math.min(
+                entity.maximumLateralVelocity * (entity.targetUrgency || 1),
+                length/cappedDelta,
+              );
+              const targetVelocity = [
+                Math.cos(angle) * totalTargetVelocity,
+                Math.sin(angle) * totalTargetVelocity,
               ];
-              const targetEntity = {
-                pos: targetPosition,
-                bounds: targetUnionBounds,
-                resolutions: [0, 1],
-              };
-              let minCollisionTime = remainingCollisionTime;
-              let minCollisionNormal: Vector3 | Falsey;
-              let minCollisionEntity: Entity | Falsey;
-              // update dynamic entity
-              iterateEntityBoundsEntities(targetEntity, check => {
-                let collisionTime: number | undefined;
-                if (check.collisionGroup & collisionMask) {
-                  if (check.face) {
-                    let planeCollisionNormal: ReadonlyVector3 | Falsey;
-                    const {
-                      rotateToPlaneCoordinates,
-                      worldToPlaneCoordinates,
-                      pos: checkPosition,
-                      bounds: checkBounds,
-                      face: {
-                        polygons,
-                        rotateToModelCoordinates,
-                      },
-                    } = check as StaticEntity;
-  
-                    // only check static collisions
-                    const planeVelocity = vector3TransformMatrix4(
-                      rotateToPlaneCoordinates,
-                      ...velocity,
-                    );
-                    const planeVelocityZ = planeVelocity[2];
-                    // avoid divide by 0
-                    if (planeVelocityZ) {
-                      // NOTE: the z coordinate here is incorrect, do not use this vector in
-                      // 3d transformations (2d is fine)
-                      const startPlanePosition = vector3TransformMatrix4(
-                        worldToPlaneCoordinates,
-                        ...position,
-                      );
-                      const planeZ = polygons[0][0][2];
-                      const startPlanePositionZ = startPlanePosition[2] - planeZ;
-  
-                      const minPlaneIntersectionTime = planeVelocityZ < 0
-                        ? (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ
-                        // start position z should be -ve
-                        : (-startPlanePositionZ - collisionRadiusFromCenter)/planeVelocityZ;
-                      const maxPlaneIntersectionTime = planeVelocityZ < 0
-                        ? (collisionRadiusFromCenter + startPlanePositionZ)/-planeVelocityZ
-                        : (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ;
-  
-                      // do they already overlap
-                      if (FLAG_CHECK_STARTS_OVERLAPPING) {
-                        let inside: Booleanish;
-                        if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
-                          if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadiusFromCenter*2/planeVelocityZ) {
-                            if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
-                              inside = 1;
-                              if (FLAG_DEBUG_PHYSICS) {
-                                entity.logs.push(['inside center']);
-                              }
-                            } else {
-                              const startIntersectionRadius = Math.sqrt(
-                                collisionRadiusFromCenter * collisionRadiusFromCenter - startPlanePositionZ * startPlanePositionZ
-                              );
-                              const closestPoint = vector2PolygonsEdgeOverlapsCircle(
-                                polygons,
-                                startPlanePosition,
-                                startIntersectionRadius,
-                              );
-                              if (closestPoint) {
-                                const [dx, dy] = vectorNScaleThenAdd(closestPoint, startPlanePosition, -1);
-                                let distanceSquared = dx * dx + dy * dy + startPlanePositionZ * startPlanePositionZ;
-                                if (distanceSquared < startIntersectionRadius * startIntersectionRadius) {
-                                  inside = 1;
-                                  if (FLAG_DEBUG_PHYSICS) {
-                                    entity.logs.push(['inside edge', Math.sqrt(distanceSquared), startIntersectionRadius, collisionRadiusFromCenter]);
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                        if (inside && FLAG_DEBUG_PHYSICS) {
-                          entity.logs.forEach(log => console.log(...log));
-                          console.log('inside', entity.pos, check.id, ...toPoints(check), minPlaneIntersectionTime);
-                          entity.logs = [];
-                        }
-                      }
-  
-                      if (
-                        maxPlaneIntersectionTime >= 0
-                        && minPlaneIntersectionTime <= remainingCollisionTime
-                      ) {
-  
-                        const intersectionPlanePosition = vectorNScaleThenAdd(
-                          startPlanePosition,
-                          planeVelocity,
-                          minPlaneIntersectionTime,
-                        );
-                        if (
-                          planeVelocityZ < 0
-                          && vector2PolygonsContain(polygons, ...intersectionPlanePosition)
-                          && FLAG_QUICK_COLLISIONS
-                        ) {
-                          if (minPlaneIntersectionTime > 0) {
-                            collisionTime = minPlaneIntersectionTime; 
-                            planeCollisionNormal = NORMAL_Z;  
-                          }
-                        } else {
-                          //const planeIntersectionPositionZ = planeIntersectionPosition[2];
-                          // handle edge collisions
-                          // const intersectionRadius = Math.sqrt(
-                          //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
-                          // );
-                          // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
-                          // const planeTargetPosition = vector3TransformMatrix4(
-                          //   worldToPlaneCoordinates,
-                          //   ...targetPosition,
-                          // );
-                          // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
-                          //let minTime = 0;
-                          let minTime = Math.max(0, minPlaneIntersectionTime);
-                          let maxTime = Math.min(maxPlaneIntersectionTime, remainingCollisionTime);
-                          for (let i=0; i<MAX_COLLISION_STEPS; i++) {
-                            const testTime = i ? (minTime + maxTime)/2 : maxTime;
-                            const testPlanePosition = vector3TransformMatrix4(
-                              worldToPlaneCoordinates,
-                              ...vectorNScaleThenAdd(position, velocity, testTime),
-                            );
-                            const testPlanePositionZ = testPlanePosition[2] - planeZ;
-                            let hit: Booleanish;
-                            if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
-                              planeCollisionNormal = NORMAL_Z;
-                              hit = 1;
-                            } else {
-                              const testIntersectionRadius = Math.sqrt(
-                                collisionRadiusFromCenter * collisionRadiusFromCenter - testPlanePositionZ * testPlanePositionZ
-                              );
-                              const closestPoint = vector2PolygonsEdgeOverlapsCircle(
-                                polygons,
-                                testPlanePosition,
-                                testIntersectionRadius,
-                              );
-                              if (closestPoint) {
-                                const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
-                                let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
-                                if (rsq < collisionRadiusFromCenter * collisionRadiusFromCenter) {
-                                  const [closestPointX, closestPointY] = closestPoint;
-                                  // const angleZ = Math.atan2(
-                                  //   closestPointX - testPlanePosition[1],
-                                  //   closestPointY - testPlanePosition[0],
-                                  // ); 
-                                  // const cosAngleX = testPlanePositionZ / collisionRadius;
-                                  // const angleX = Math.acos(cosAngleX);
-                                  
-                                  planeCollisionNormal = vectorNNormalize(
-                                    vectorNScaleThenAdd(
-                                      testPlanePosition,
-                                      [closestPointX, closestPointY, planeZ],
-                                      -1,
-                                    ),
-                                  );
-                                  //planeCollisionNormal = NORMAL_Z;
-                                  hit = 1;
-                                }
-                              }
-                            }
-                            if (hit) {
-                              if (i) {
-                                maxTime = testTime;
-                              }
-                              // first loop is a special case
-                            } else {
-                              if (!i) {
-                                // no collision, exit loop
-                                i = MAX_COLLISION_STEPS;
-                              } else {
-                                minTime = testTime;
-                              }
-                            }
-                          }
-                          if (planeCollisionNormal) {
-                            // if the collisionNormal is already aligned with the velocity
-                            // just ignore it
-                            if (vectorNDotProduct(planeVelocity, planeCollisionNormal) < 0) {
-                              collisionTime = minTime;
-                            } else {
-                              planeCollisionNormal = 0;
-                            }
-                          }
-                        }
-                      }
-                    }
-                    if (planeCollisionNormal
-                      && (collisionTime < minCollisionTime || !minCollisionNormal)
-                    ) {
-                      const collisionNormal = vector3TransformMatrix4(
-                        rotateToModelCoordinates,
-                        ...planeCollisionNormal,
-                      );
-                      minCollisionTime = collisionTime;
-                      minCollisionNormal = collisionNormal;
-                      minCollisionEntity = check;
-                    }
-                  } else {
-  
-                    // update any dynamic-dynamic collision behaviours
-  
-                    const entityDelta = vectorNScaleThenAdd(
-                      targetPosition,
-                      check.pos,
-                      -1
-                    );
-                    const entityDistance = vectorNLength(entityDelta);
-                    const entityOverlap = collisionRadiusFromCenter + (check as DynamicEntity).collisionRadius - entityDistance;
-                    if (entityOverlap > 0) {
-                      collisionEntities.add(check);
-                    }
-                  }
-                }
-              }, 1);
-              if (minCollisionNormal) {
-
-                const boundedCollisionTime = Math.max(0, minCollisionTime - EPSILON);
-
-                if (FLAG_DEBUG_PHYSICS) {
-                  const minCollisionEntityId = (minCollisionEntity as Entity).id;
-                  if (collidedEntities[minCollisionEntityId]) {
-                    duplicateCollisionCount++;
-                  }
-                  collidedEntities[minCollisionEntityId] = 1;
-  
-                  entity.logs.push([
-                    'collision',
-                    collisionCount,
-                    minCollisionTime,
-                    minCollisionNormal,
-                    remainingCollisionTime,
-                    position,
-                    targetUnionBounds,
-                  ]);
-                  entity.logs.push([
-                    '  with',
-                    (minCollisionEntity as Entity).id,
-                    ...toPoints(minCollisionEntity),
-                    vector3TransformMatrix4((minCollisionEntity as Entity).face.rotateToModelCoordinates, 0, 0, 1),
-                  ]);  
-                  // console.log(
-                  //   'collision',
-                  //   count,
-                  //   (minCollisionEntity as Entity).id,
-                  //   minCollisionTime,
-                  //   remainingCollisionTime,
-                  //   minCollisionNormal,
-
-                  // );
-                  entity.logs.push([
-                    '  velocity b', vectorNLength(velocity), velocity
-                  ]);
-                  // console.log('  velocity b', vectorNLength(velocity), velocity);
-                }
-                
-
-                entity.pos = vectorNScaleThenAdd(
-                  entity.pos,
-                  velocity,
-                  boundedCollisionTime,
+              const deltaVelocity = vectorNScaleThenAdd(
+                targetVelocity,
+                entityLateralVelocity,
+                -1,
+              );
+              const totalDeltaVelocity = vectorNLength(deltaVelocity);
+              // apply maximum acceleration to delta
+              entity.velocity = [
+                ...vectorNScaleThenAdd(
+                  entityLateralVelocity,
+                  deltaVelocity,
+                  Math.min(
+                    1,
+                    entity.maximumLateralAcceleration * cappedDelta / totalDeltaVelocity,
+                  ),
+                ),
+                entity.velocity[2],
+              ];
+              
+            } else {
+              // flying/falling
+              const gravity = entity.gravity;
+              if (gliding && gravity) {
+                const xRotation = entity.xRotation || 0;
+                const targetLateralDirection = vectorNScaleThenAdd(targetLateralPosition, entity.pos, -1);
+                const targetLateralNormal = vectorNNormalize(
+                  vectorNLength(targetLateralDirection) > EPSILON
+                    ? targetLateralDirection
+                    : entity.velocity
                 );
-
-                const inverseFriction = (entity as DynamicEntity).inverseFriction || 0;
-
-                const cosa = vectorNDotProduct(minCollisionNormal, NORMAL_Z);
-                const a = Math.acos(cosa);
-                const axis = a > EPSILON
-                  ? vectorNNormalize(vector3CrossProduct(minCollisionNormal, NORMAL_Z))
-                  : NORMAL_X;
-                const rotate = matrix4Rotate(a, ...axis);
-                const unrotate = matrix4Rotate(-a, ...axis);
-                const v = vector3TransformMatrix4(rotate, ...velocity);
-                if (FLAG_DEBUG_PHYSICS) {
-                  entity.logs.push(['  velocity i', vectorNLength(v), v]);
-                }
-                // console.log('  velocity i', vectorNLength(v), v);
-                const outputV = vectorNMultiply(v, [
-                  inverseFriction,
-                  inverseFriction,
-                  // bounce it out, want the restitution to increase to 1 (or more!) as we
-                  // keep colliding so we don't end up in a degenerate state
-                  -restitution,
-                ]);
-                (entity as BaseDynamicEntity).collisionVelocityLoss -= v[2];
-
-                // avoid rounding errors by ensuring that any collision bounces out at 
-                // at least EPSILON velocity
-                if (FLAG_SAFE_UNROTATED_VELOCITY) {
-                  outputV[2] = Math.max(outputV[2], EPSILON/9 * duplicateCollisionCount);
-                }
-                if (FLAG_DEBUG_PHYSICS) {
-                  // console.log('  velocity s', vectorNLength(v), v);
-                  entity.logs.push(['  velocity s', vectorNLength(outputV), outputV]);
-                }
-
-                (entity as DynamicEntity).velocity = vector3TransformMatrix4(unrotate, ...outputV);
-                if (FLAG_DEBUG_PHYSICS) {
-                  // console.log('  velocity a', vectorNLength((entity as DynamicEntity).velocity), (entity as DynamicEntity).velocity);
-                  entity.logs.push([
-                    '  velocity a',
-                    vectorNLength((entity as DynamicEntity).velocity),
-                    [...(entity as DynamicEntity).velocity],
-                  ]);
-                }
-
-                (entity as DynamicEntity).lastOnGroundNormal = minCollisionNormal;
-                (entity as DynamicEntity).lastOnGroundTime = time;
-                collisionEntities.add(minCollisionEntity as Entity);
-                
-                remainingCollisionTime -= boundedCollisionTime;
-              } else {
-                entity.pos = vectorNScaleThenAdd(
-                  entity.pos,
-                  velocity,
-                  Math.max(0, remainingCollisionTime - EPSILON),
+                const velocityNormal = vectorNNormalize(entity.velocity);
+                const targetLateralAngle = Math.atan2(targetLateralNormal[1], targetLateralNormal[0]) - Math.PI/2;
+                // tilt up or down to match the x rotation
+                const targetVelocityNormal = vector3TransformMatrix4(
+                  matrix4Rotate(xRotation, Math.cos(targetLateralAngle), Math.sin(targetLateralAngle), 0),
+                  ...targetLateralNormal,
                 );
-                remainingCollisionTime = 0;
+                let achievableVelocity = entity.velocity;
+                const cosa = vectorNDotProduct(velocityNormal, targetVelocityNormal);
+                if (cosa < 1 - EPSILON) {
+                  const targetAngle = Math.acos(cosa);
+                  const axis = vectorNNormalize(
+                    vector3CrossProduct(velocityNormal, targetVelocityNormal),
+                  );
+                  
+                  const achievableAngle = targetAngle > 0
+                    ? Math.min(targetAngle, cappedDelta * TURN_TORQUE)
+                    : Math.max(targetAngle, cappedDelta * -TURN_TORQUE);
+                  // TODO maybe rotate on the y axis by the amount missing?
+                  achievableVelocity = vector3TransformMatrix4(
+                    matrix4Rotate(achievableAngle, ...axis),
+                    ...vectorNScale(achievableVelocity, Math.cos(achievableAngle)),
+                  );    
+                }
+                const lateralVelocityNormal = vectorNNormalize<ReadonlyVector3>([...velocityNormal.slice(0, 2), 0] as Vector3);
+                const bankCos = vectorNDotProduct<ReadonlyVector3>(
+                  lateralVelocityNormal,
+                  targetLateralNormal,
+                );
+                if (bankCos < 1 - EPSILON) {
+                  const bankAxis = vector3CrossProduct(lateralVelocityNormal, targetLateralNormal);
+                  const bankAngle = Math.acos(bankCos);
+                  targetYRotation = bankAxis[2] > 0 ? -bankAngle : bankAngle;
+                }
+  
+                // reverse the effects of gravity by the amount we are facing up
+                // achievableVelocity[2] = gravity * cappedDelta
+                //   * (1 + Math.sin(xRotation))
+                //   * Math.min(1, velocityLength*99);
+                entity.velocity = achievableVelocity;
               }
-              collisionCount++;
-              if (collisionCount > MAX_COLLISIONS && FLAG_DEBUG_PHYSICS) {
-                entity.logs.forEach(log => console.log(...log));
-                console.log('too many collisions');
-                entity.logs = [];
-              }  
+            }
+            // bank smoothly
+            const yDiff = mathAngleDiff(entity.yRotation, targetYRotation);
+            entity.yRotation += yDiff > 0
+              ? Math.min(yDiff, cappedDelta * Z_TORQUE)
+              : Math.max(yDiff, cappedDelta * -Z_TORQUE);
+          }
+          if (entity.entityType == ENTITY_TYPE_CAMERA) {
+            if (FLAG_SLOW_CAMERA) {
+              const totalPlayerVelocity = vectorNLength(player.velocity);
+              const playerTurn = Math.sin(mathAngleDiff(camera.zRotation, player.zRotation));
+              const targetCameraPosition = vectorNScaleThenAdd(
+                vectorNScaleThenAdd(player.pos, [0, 0, 1]),
+                vector3TransformMatrix4(
+                  cameraRotateMatrix,
+                  playerTurn,
+                  cameraZoom - totalPlayerVelocity * 99,
+                  0,
+                ),
+              );
+              const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, camera.pos, -1);
+              
+              camera.velocity = vectorNMultiply(
+                deltaCameraPosition,
+                [
+                  1/cappedDelta,
+                  1/cappedDelta,
+                  Math.pow(
+                    1 - Math.cos(camera.xRotation) * .9,
+                    1/(Math.abs(deltaCameraPosition[2])+1)
+                  )/cappedDelta,
+                ],
+              ) as any;
+            } else {
+              const targetCameraPosition = vectorNScaleThenAdd(
+                vectorNScaleThenAdd(player.pos, [0, 0, 1]),
+                vector3TransformMatrix4(
+                  cameraRotateMatrix,
+                  0,
+                  cameraZoom,
+                  0,
+                ),
+              );
+              const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, camera.pos, -1);
+              camera.velocity = vectorNScale(
+                deltaCameraPosition,
+                1/cappedDelta,
+              ) as any;
+            }
+          }
+          
+          if (entity.gravity) {
+            entity.velocity[2] -= cappedDelta * entity.gravity;
+          }
+          (entity as BaseDynamicEntity).collisionVelocityLoss = 0;
+          entity.pendingDamage ||= 0;
+          if (FLAG_DEBUG_PHYSICS) {
+            entity.logs = entity.logs?.slice(-30) || [];
+          }
+          removeEntity(entity);
+          const collisionEntities = new Set<Entity>();
+  
+          const collidedEntities: Record<EntityId, Truthy> = {};
+          let duplicateCollisionCount = 1;
+          // TODO enforce max speed
+          let remainingCollisionTime = cappedDelta;
+          let collisionCount = 0;
+          while (
+            remainingCollisionTime > EPSILON
+            && collisionCount < MAX_COLLISIONS
+            && !entity.dead
+          ) {
+            const {
+              pos: position,
+              velocity,
+              collisionRadius: collisionRadiusFromCenter,
+              restitution = 0,
+              collisionMask,
+            } = entity as DynamicEntity;
+  
+            const targetPosition = vectorNScaleThenAdd(position, velocity, remainingCollisionTime);
+  
+            const targetUnionBounds: ReadonlyRect3 = [
+              velocity.map((v, i) => bounds[0][i] + Math.min(0, v) * remainingCollisionTime - EPSILON) as Vector3,
+              velocity.map((v, i) => bounds[1][i] + Math.max(0, v) * remainingCollisionTime + EPSILON) as Vector3,
+            ];
+            const targetEntity = {
+              pos: targetPosition,
+              bounds: targetUnionBounds,
+              resolutions: [0, 1],
+            };
+            let minCollisionTime = remainingCollisionTime;
+            let minCollisionNormal: Vector3 | Falsey;
+            let minCollisionEntity: Entity | Falsey;
+            // update dynamic entity
+            iterateEntityBoundsEntities(targetEntity, check => {
+              let collisionTime: number | undefined;
+              if (check.collisionGroup & collisionMask) {
+                if (check.face) {
+                  let planeCollisionNormal: ReadonlyVector3 | Falsey;
+                  const {
+                    rotateToPlaneCoordinates,
+                    worldToPlaneCoordinates,
+                    pos: checkPosition,
+                    bounds: checkBounds,
+                    face: {
+                      polygons,
+                      rotateToModelCoordinates,
+                    },
+                  } = check as StaticEntity;
+  
+                  // only check static collisions
+                  const planeVelocity = vector3TransformMatrix4(
+                    rotateToPlaneCoordinates,
+                    ...velocity,
+                  );
+                  const planeVelocityZ = planeVelocity[2];
+                  // avoid divide by 0
+                  if (planeVelocityZ) {
+                    // NOTE: the z coordinate here is incorrect, do not use this vector in
+                    // 3d transformations (2d is fine)
+                    const startPlanePosition = vector3TransformMatrix4(
+                      worldToPlaneCoordinates,
+                      ...position,
+                    );
+                    const planeZ = polygons[0][0][2];
+                    const startPlanePositionZ = startPlanePosition[2] - planeZ;
+  
+                    const minPlaneIntersectionTime = planeVelocityZ < 0
+                      ? (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ
+                      // start position z should be -ve
+                      : (-startPlanePositionZ - collisionRadiusFromCenter)/planeVelocityZ;
+                    const maxPlaneIntersectionTime = planeVelocityZ < 0
+                      ? (collisionRadiusFromCenter + startPlanePositionZ)/-planeVelocityZ
+                      : (collisionRadiusFromCenter - startPlanePositionZ)/planeVelocityZ;
+  
+                    // do they already overlap
+                    if (FLAG_CHECK_STARTS_OVERLAPPING) {
+                      let inside: Booleanish;
+                      if (rectNOverlaps(position, bounds, checkPosition, checkBounds)) {
+                        if (minPlaneIntersectionTime < 0 && minPlaneIntersectionTime > collisionRadiusFromCenter*2/planeVelocityZ) {
+                          if (vector2PolygonsContain(polygons, ...startPlanePosition)) {
+                            inside = 1;
+                            if (FLAG_DEBUG_PHYSICS) {
+                              entity.logs.push(['inside center']);
+                            }
+                          } else {
+                            const startIntersectionRadius = Math.sqrt(
+                              collisionRadiusFromCenter * collisionRadiusFromCenter - startPlanePositionZ * startPlanePositionZ
+                            );
+                            const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                              polygons,
+                              startPlanePosition,
+                              startIntersectionRadius,
+                            );
+                            if (closestPoint) {
+                              const [dx, dy] = vectorNScaleThenAdd(closestPoint, startPlanePosition, -1);
+                              let distanceSquared = dx * dx + dy * dy + startPlanePositionZ * startPlanePositionZ;
+                              if (distanceSquared < startIntersectionRadius * startIntersectionRadius) {
+                                inside = 1;
+                                if (FLAG_DEBUG_PHYSICS) {
+                                  entity.logs.push(['inside edge', Math.sqrt(distanceSquared), startIntersectionRadius, collisionRadiusFromCenter]);
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      if (inside && FLAG_DEBUG_PHYSICS) {
+                        entity.logs.forEach(log => console.log(...log));
+                        console.log('inside', entity.pos, check.id, ...toPoints(check), minPlaneIntersectionTime);
+                        entity.logs = [];
+                      }
+                    }
+  
+                    if (
+                      maxPlaneIntersectionTime >= 0
+                      && minPlaneIntersectionTime <= remainingCollisionTime
+                    ) {
+  
+                      const intersectionPlanePosition = vectorNScaleThenAdd(
+                        startPlanePosition,
+                        planeVelocity,
+                        minPlaneIntersectionTime,
+                      );
+                      if (
+                        planeVelocityZ < 0
+                        && vector2PolygonsContain(polygons, ...intersectionPlanePosition)
+                        && FLAG_QUICK_COLLISIONS
+                      ) {
+                        if (minPlaneIntersectionTime > 0) {
+                          collisionTime = minPlaneIntersectionTime; 
+                          planeCollisionNormal = NORMAL_Z;  
+                        }
+                      } else {
+                        //const planeIntersectionPositionZ = planeIntersectionPosition[2];
+                        // handle edge collisions
+                        // const intersectionRadius = Math.sqrt(
+                        //   collisionRadius * collisionRadius - planeIntersectionPositionZ * planeIntersectionPositionZ
+                        // );
+                        // const closestCollisionPoint = vector2PolygonsEdgeOverlapsCircle(polygons, planeIntersectionPosition, intersectionRadius);
+                        // const planeTargetPosition = vector3TransformMatrix4(
+                        //   worldToPlaneCoordinates,
+                        //   ...targetPosition,
+                        // );
+                        // if (closestCollisionPoint || vector2PolygonsContain(polygons, ...planeTargetPosition)) {
+                        //let minTime = 0;
+                        let minTime = Math.max(0, minPlaneIntersectionTime);
+                        let maxTime = Math.min(maxPlaneIntersectionTime, remainingCollisionTime);
+                        for (let i=0; i<MAX_COLLISION_STEPS; i++) {
+                          const testTime = i ? (minTime + maxTime)/2 : maxTime;
+                          const testPlanePosition = vector3TransformMatrix4(
+                            worldToPlaneCoordinates,
+                            ...vectorNScaleThenAdd(position, velocity, testTime),
+                          );
+                          const testPlanePositionZ = testPlanePosition[2] - planeZ;
+                          let hit: Booleanish;
+                          if (vector2PolygonsContain(polygons, ...testPlanePosition)) {
+                            planeCollisionNormal = NORMAL_Z;
+                            hit = 1;
+                          } else {
+                            const testIntersectionRadius = Math.sqrt(
+                              collisionRadiusFromCenter * collisionRadiusFromCenter - testPlanePositionZ * testPlanePositionZ
+                            );
+                            const closestPoint = vector2PolygonsEdgeOverlapsCircle(
+                              polygons,
+                              testPlanePosition,
+                              testIntersectionRadius,
+                            );
+                            if (closestPoint) {
+                              const [dx, dy] = vectorNScaleThenAdd(closestPoint, testPlanePosition, -1);
+                              let rsq = dx * dx + dy * dy + testPlanePositionZ * testPlanePositionZ;
+                              if (rsq < collisionRadiusFromCenter * collisionRadiusFromCenter) {
+                                const [closestPointX, closestPointY] = closestPoint;
+                                // const angleZ = Math.atan2(
+                                //   closestPointX - testPlanePosition[1],
+                                //   closestPointY - testPlanePosition[0],
+                                // ); 
+                                // const cosAngleX = testPlanePositionZ / collisionRadius;
+                                // const angleX = Math.acos(cosAngleX);
+                                
+                                planeCollisionNormal = vectorNNormalize(
+                                  vectorNScaleThenAdd(
+                                    testPlanePosition,
+                                    [closestPointX, closestPointY, planeZ],
+                                    -1,
+                                  ),
+                                );
+                                //planeCollisionNormal = NORMAL_Z;
+                                hit = 1;
+                              }
+                            }
+                          }
+                          if (hit) {
+                            if (i) {
+                              maxTime = testTime;
+                            }
+                            // first loop is a special case
+                          } else {
+                            if (!i) {
+                              // no collision, exit loop
+                              i = MAX_COLLISION_STEPS;
+                            } else {
+                              minTime = testTime;
+                            }
+                          }
+                        }
+                        if (planeCollisionNormal) {
+                          // if the collisionNormal is already aligned with the velocity
+                          // just ignore it
+                          if (vectorNDotProduct(planeVelocity, planeCollisionNormal) < 0) {
+                            collisionTime = minTime;
+                          } else {
+                            planeCollisionNormal = 0;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  if (planeCollisionNormal
+                    && (collisionTime < minCollisionTime || !minCollisionNormal)
+                  ) {
+                    const collisionNormal = vector3TransformMatrix4(
+                      rotateToModelCoordinates,
+                      ...planeCollisionNormal,
+                    );
+                    minCollisionTime = collisionTime;
+                    minCollisionNormal = collisionNormal;
+                    minCollisionEntity = check;
+                  }
+                } else {
+  
+                  // update any dynamic-dynamic collision behaviours
+  
+                  const entityDelta = vectorNScaleThenAdd(
+                    targetPosition,
+                    check.pos,
+                    -1
+                  );
+                  const entityDistance = vectorNLength(entityDelta);
+                  const entityOverlap = collisionRadiusFromCenter + (check as DynamicEntity).collisionRadius - entityDistance;
+                  if (entityOverlap > 0) {
+                    collisionEntities.add(check);
+                  }
+                }
+              }
+            }, 1);
+            if (minCollisionNormal) {
+  
+              const boundedCollisionTime = Math.max(0, minCollisionTime - EPSILON);
+  
+              if (FLAG_DEBUG_PHYSICS) {
+                const minCollisionEntityId = (minCollisionEntity as Entity).id;
+                if (collidedEntities[minCollisionEntityId]) {
+                  duplicateCollisionCount++;
+                }
+                collidedEntities[minCollisionEntityId] = 1;
+  
+                entity.logs.push([
+                  'collision',
+                  collisionCount,
+                  minCollisionTime,
+                  minCollisionNormal,
+                  remainingCollisionTime,
+                  position,
+                  targetUnionBounds,
+                ]);
+                entity.logs.push([
+                  '  with',
+                  (minCollisionEntity as Entity).id,
+                  ...toPoints(minCollisionEntity),
+                  vector3TransformMatrix4((minCollisionEntity as Entity).face.rotateToModelCoordinates, 0, 0, 1),
+                ]);  
+                // console.log(
+                //   'collision',
+                //   count,
+                //   (minCollisionEntity as Entity).id,
+                //   minCollisionTime,
+                //   remainingCollisionTime,
+                //   minCollisionNormal,
+  
+                // );
+                entity.logs.push([
+                  '  velocity b', vectorNLength(velocity), velocity
+                ]);
+                // console.log('  velocity b', vectorNLength(velocity), velocity);
+              }
+              
+  
+              entity.pos = vectorNScaleThenAdd(
+                entity.pos,
+                velocity,
+                boundedCollisionTime,
+              );
+  
+              const inverseFriction = (entity as DynamicEntity).inverseFriction || 0;
+  
+              const cosa = vectorNDotProduct(minCollisionNormal, NORMAL_Z);
+              const a = Math.acos(cosa);
+              const axis = a > EPSILON
+                ? vectorNNormalize(vector3CrossProduct(minCollisionNormal, NORMAL_Z))
+                : NORMAL_X;
+              const rotate = matrix4Rotate(a, ...axis);
+              const unrotate = matrix4Rotate(-a, ...axis);
+              const v = vector3TransformMatrix4(rotate, ...velocity);
+              if (FLAG_DEBUG_PHYSICS) {
+                entity.logs.push(['  velocity i', vectorNLength(v), v]);
+              }
+              // console.log('  velocity i', vectorNLength(v), v);
+              const outputV = vectorNMultiply(v, [
+                inverseFriction,
+                inverseFriction,
+                // bounce it out, want the restitution to increase to 1 (or more!) as we
+                // keep colliding so we don't end up in a degenerate state
+                -restitution,
+              ]);
+              (entity as BaseDynamicEntity).collisionVelocityLoss -= v[2];
+  
+              // avoid rounding errors by ensuring that any collision bounces out at 
+              // at least EPSILON velocity
+              if (FLAG_SAFE_UNROTATED_VELOCITY) {
+                outputV[2] = Math.max(outputV[2], EPSILON/9 * duplicateCollisionCount);
+              }
+              if (FLAG_DEBUG_PHYSICS) {
+                // console.log('  velocity s', vectorNLength(v), v);
+                entity.logs.push(['  velocity s', vectorNLength(outputV), outputV]);
+              }
+  
+              (entity as DynamicEntity).velocity = vector3TransformMatrix4(unrotate, ...outputV);
+              if (FLAG_DEBUG_PHYSICS) {
+                // console.log('  velocity a', vectorNLength((entity as DynamicEntity).velocity), (entity as DynamicEntity).velocity);
+                entity.logs.push([
+                  '  velocity a',
+                  vectorNLength((entity as DynamicEntity).velocity),
+                  [...(entity as DynamicEntity).velocity],
+                ]);
+              }
+  
+              (entity as DynamicEntity).lastOnGroundNormal = minCollisionNormal;
+              (entity as DynamicEntity).lastOnGroundTime = time;
+              collisionEntities.add(minCollisionEntity as Entity);
+              
+              remainingCollisionTime -= boundedCollisionTime;
+            } else {
+              entity.pos = vectorNScaleThenAdd(
+                entity.pos,
+                velocity,
+                Math.max(0, remainingCollisionTime - EPSILON),
+              );
+              remainingCollisionTime = 0;
+            }
+            collisionCount++;
+            if (collisionCount > MAX_COLLISIONS && FLAG_DEBUG_PHYSICS) {
+              entity.logs.forEach(log => console.log(...log));
+              console.log('too many collisions');
+              entity.logs = [];
+            }  
+          }
+        
+          [...collisionEntities].forEach(check => {
+            const {
+              pos: position,
+              inverseMass = 0,
+            } = entity;
+  
+            const entityDelta = vectorNScaleThenAdd(
+              position,
+              check.pos,
+              -1
+            );
+            
+            if (check && !face && !check.face && (inverseMass || check.inverseMass)) {
+              const entityDistance = vectorNLength(entityDelta);
+  
+              const entityOverlap = (entity as DynamicEntity).collisionRadius
+                + (check as DynamicEntity).collisionRadius
+                - entityDistance;
+          
+              const divisor = 1999*(inverseMass + (check.inverseMass || 0));
+              entity.velocity = entity.velocity && vectorNScaleThenAdd(
+                entity.velocity,
+                entityDelta,
+                entityOverlap*inverseMass/divisor
+              );
+              check.velocity = check.velocity && vectorNScaleThenAdd(
+                check.velocity,
+                entityDelta,
+                -entityOverlap*(check.inverseMass || 0)/divisor,
+              );
             }
           
-            collisionEntities.forEach(check => {
-              const {
-                pos: position,
-                inverseMass = 0,
-              } = entity;
-
-              const entityDelta = vectorNScaleThenAdd(
-                position,
-                check.pos,
-                -1
-              );
-              
-              if (check && !face && !check.face && (inverseMass || check.inverseMass)) {
-                const entityDistance = vectorNLength(entityDelta);
-
-                const entityOverlap = (entity as DynamicEntity).collisionRadius
-                  + (check as DynamicEntity).collisionRadius
-                  - entityDistance;
-            
-                const divisor = 1999*(inverseMass + (check.inverseMass || 0));
-                entity.velocity = entity.velocity && vectorNScaleThenAdd(
-                  entity.velocity,
-                  entityDelta,
-                  entityOverlap*inverseMass/divisor
-                );
-                check.velocity = check.velocity && vectorNScaleThenAdd(
-                  check.velocity,
-                  entityDelta,
-                  -entityOverlap*(check.inverseMass || 0)/divisor,
-                );
-              }
-            
-              let checkInvincible = check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE);
-              let checkDamaged: Booleanish;
-            
-              switch (entity.entityType) {
-                case ENTITY_TYPE_FIREBALL:
-                  entity.dead = 1;
-                  addEntity({
-                    body: {
-                      modelId: MODEL_ID_SPHERE,
-                    },
-                    bounds: rect3FromRadius(.3),
-                    collisionGroup: COLLISION_GROUP_PLAYER,
-                    collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_SCENERY | COLLISION_GROUP_TERRAIN,
-                    collisionRadius: .3,
-                    entityType: ENTITY_TYPE_FIRE,
-                    id: nextEntityId++,
-                    pos: entity.pos,
-                    renderGroupId: nextRenderGroupId++,
-                    resolutions: [0, 1, 2, 3, 4],
-                    velocity: [0, 0, 0],
-                    anims: [
-                      [
-                        createAttributeAnimation(
-                          200,
-                          'at',
-                          EASING_QUAD_OUT,
-                          createMatrixUpdate(matrix4Scale),
-                          e => {
-                            // turn it into a flame so we can see fires at distance
-                            e.body = {
-                              modelId: MODEL_ID_BILLBOARD,
-                            };
-                            // TODO feel like setting all these should be one operation
-                            // model id has variant and symbol baked in?
-                            e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
-                            e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
-                            (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
-                          },
-                        ),
-                      ],
-                      [
-                        createAttributeAnimation(
-                          -999,
-                          'at',
-                          EASING_QUAD_IN_OUT,
-                          createMatrixUpdate(p => matrix4Scale(p/5 + .9))
-                        ),
-                      ]
-                    ],
-                    transient: 1,
-                    inverseFriction: 0,
-                    modelVariant: VARIANT_FIRE,
-                    health: 9,
-                  });
-                  checkDamaged = 1;
-                  break;
-                case ENTITY_TYPE_FIRE:
-                  entity.lastCollisionTick = tick;
-                  if (
-                    check
-                      && check.health
-                      && !checkInvincible
-                  ) {
-                    // do damage to thing
-                    checkDamaged = 1;
-                    // gain some health
-                    entity.health += 9;
-                  }
-                  break;
-                case ENTITY_TYPE_PLAYER_CONTROLLED:
-                  const onGround = entity.lastOnGroundTime + 99 > time;
-                  // maybe pick up the thing
-                  if (!check.face) {
-                    if (check.inverseMass
-                      && entityDelta[2] > 0
-                      && !onGround
-                      && entity.grabbing
-                      && !entity.holding?.[DRAGON_PART_ID_CLAW_RIGHT]
-                    ) {
-                      removeEntity(check);
-                      entity.holding = entity.holding || {};
-                      entity.holding[DRAGON_PART_ID_CLAW_RIGHT] = check;
-                    }
-                  }
-                  break;
-              }
-              if (checkDamaged) {
-                check.pendingDamage = (check.pendingDamage || 0) + 1;
-              }
-            });
-            addEntity(entity, tiles);
-          }
-          if(entity.shadows) {
-            shadows.push([...entity.pos, (entity as BaseDynamicEntity).collisionRadius]);
-          }
-          // update any passive behaviours
-          let lookAtCamera: Booleanish;
-          switch (entity.entityType) {
-            case ENTITY_TYPE_FIRE:
-              // only fall down if not burning something
-              if (entity.lastCollisionTick == tick) {
-                entity.gravity = 0;
-                entity.velocity = [0, 0, 0];
-              } else {
-                entity.gravity = DEFAULT_GRAVITY;
-              }
-              // burn
-              if ((entity.lastSpawnedParticle || 0) + 99 < time) {
+            let checkInvincible = check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE);
+            let checkDamaged: Booleanish;
+          
+            switch (entity.entityType) {
+              case ENTITY_TYPE_FIREBALL:
+                entity.dead = 1;
                 addEntity({
-                  body: BILLBOARD_PART,
-                  transform: matrix4Scale(.4),
-                  modelVariant: VARIANT_SYMBOLS_BRIGHT,
-                  modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
-                  bounds: rect3FromRadius(.2),
-                  collisionGroup: COLLISION_GROUP_NONE,
-                  collisionRadius: .2,
-                  entityType: ENTITY_TYPE_PARTICLE,
+                  body: {
+                    modelId: MODEL_ID_SPHERE,
+                  },
+                  bounds: rect3FromRadius(.3),
+                  collisionGroup: COLLISION_GROUP_PLAYER,
+                  collisionMask: COLLISION_GROUP_ENEMY | COLLISION_GROUP_SCENERY | COLLISION_GROUP_TERRAIN,
+                  collisionRadius: .3,
+                  entityType: ENTITY_TYPE_FIRE,
                   id: nextEntityId++,
-                  pos: vectorNScaleThenAdd(
-                    entity.pos,
-                    new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
-                    entity.collisionRadius,
-                  ),
-                  velocity: [0, 0, .001],
+                  pos: entity.pos,
                   renderGroupId: nextRenderGroupId++,
-                  resolutions: [0, 1],
-                  transient: 1,
+                  resolutions: [0, 1, 2, 3, 4],
+                  velocity: [0, 0, 0],
                   anims: [
                     [
                       createAttributeAnimation(
-                        999 + Math.random() * 999,
+                        200,
                         'at',
-                        EASING_QUAD_IN,
-                        createMatrixUpdate(p => matrix4Scale(1 - p)),
-                        e => e.dead = 1,
-                      )
+                        EASING_QUAD_OUT,
+                        createMatrixUpdate(matrix4Scale),
+                        e => {
+                          // turn it into a flame so we can see fires at distance
+                          e.body = {
+                            modelId: MODEL_ID_BILLBOARD,
+                          };
+                          // TODO feel like setting all these should be one operation
+                          // model id has variant and symbol baked in?
+                          e.modelVariant = VARIANT_SYMBOLS_BRIGHT;
+                          e.modelAtlasIndex = VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE;
+                          (e as DynamicEntity).gravity = DEFAULT_GRAVITY;
+                        },
+                      ),
                     ],
-                    // TODO this is gold plating really
                     [
                       createAttributeAnimation(
-                        -400,
+                        -999,
                         'at',
                         EASING_QUAD_IN_OUT,
-                        createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
-                      )
+                        createMatrixUpdate(p => matrix4Scale(p/5 + .9))
+                      ),
                     ]
                   ],
-                }, tiles);
-                entity.health--;
-                entity.lastSpawnedParticle = time;
-              }
-              lookAtCamera = 1;
-              break;
-            case ENTITY_TYPE_PARTICLE:
-              // not required? particles are now treated like other entities
-              // entity.position = vectorNScaleThenAdd(
-              //   entity.position,
-              //   entity.velocity,
-              //   cappedDelta,
-              // );
-              // fall through
-            case ENTITY_TYPE_INTELLIGENT:
-            case ENTITY_TYPE_SCENERY:
-              lookAtCamera = 1;
-              break;
-          }
-          if( lookAtCamera) {
-            // rotate to look at camera
-            entity.zRotation = Math.atan2(
-              zoomedCameraPosition[1] - entity.pos[1],
-              zoomedCameraPosition[0] - entity.pos[0],
-            );
-          }
-
-          if (entity.collisionVelocityLoss && entity.inverseMass) {
-            const damage = Math.pow(entity.collisionVelocityLoss * 99 / entity.inverseMass, 2) | 0;
-            entity.pendingDamage += damage;
-          }
-
-          const pendingDamage = entity.pendingDamage;
-          if (
-            !entity.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE)
-            && pendingDamage
-            && entity.health
-          ) {
-            // rethink life choices
-            (entity as IntelligentEntity).lastDecision = 0;
-            entity.pendingDamage = 0;
-
-            const pendingDamageScale = Math.sqrt(pendingDamage) * .1;
-            entity.anims = [
-              ...(entity.anims || []),
-              [
-                createAttributeAnimation(
-                  300 + 99 * Math.random(),
-                  'at',
-                  EASING_BOUNCE,
-                  createMatrixUpdate(p => matrix4Scale(
-                    1 - p * pendingDamageScale,
-                    1 - p * pendingDamageScale,
-                    1 + p * pendingDamageScale
-                  )),
-                  e => e.health -= pendingDamage,
+                  transient: 1,
+                  inverseFriction: 0,
+                  modelVariant: VARIANT_FIRE,
+                  health: 9,
+                });
+                checkDamaged = 1;
+                break;
+              case ENTITY_TYPE_FIRE:
+                entity.lastCollisionTick = tick;
+                if (
+                  check
+                    && check.health
+                    && !checkInvincible
+                ) {
+                  // do damage to thing
+                  checkDamaged = 1;
+                  // gain some health
+                  entity.health += 9;
+                }
+                break;
+              case ENTITY_TYPE_PLAYER_CONTROLLED:
+                const onGround = entity.lastOnGroundTime + 99 > time;
+                // maybe pick up the thing
+                if (!check.face) {
+                  if (check.inverseMass
+                    && entityDelta[2] > 0
+                    && !onGround
+                    && entity.grabbing
+                    && !entity.holding?.[DRAGON_PART_ID_CLAW_RIGHT]
+                  ) {
+                    removeEntity(check);
+                    entity.holding = entity.holding || {};
+                    entity.holding[DRAGON_PART_ID_CLAW_RIGHT] = check;
+                  }
+                }
+                break;
+            }
+            if (checkDamaged) {
+              check.pendingDamage = (check.pendingDamage || 0) + 1;
+            }
+          });
+          addEntity(entity, tiles);
+        }
+        if(entity.shadows) {
+          shadows.push([...entity.pos, (entity as BaseDynamicEntity).collisionRadius]);
+        }
+        // update any passive behaviours
+        let lookAtCamera: Booleanish;
+        switch (entity.entityType) {
+          case ENTITY_TYPE_FIRE:
+            // only fall down if not burning something
+            if (entity.lastCollisionTick == tick) {
+              entity.gravity = 0;
+              entity.velocity = [0, 0, 0];
+            } else {
+              entity.gravity = DEFAULT_GRAVITY;
+            }
+            // burn
+            if ((entity.lastSpawnedParticle || 0) + 99 < time) {
+              addEntity({
+                body: BILLBOARD_PART,
+                transform: matrix4Scale(.4),
+                modelVariant: VARIANT_SYMBOLS_BRIGHT,
+                modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
+                bounds: rect3FromRadius(.2),
+                collisionGroup: COLLISION_GROUP_NONE,
+                collisionRadius: .2,
+                entityType: ENTITY_TYPE_PARTICLE,
+                id: nextEntityId++,
+                pos: vectorNScaleThenAdd(
+                  entity.pos,
+                  new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
+                  entity.collisionRadius,
                 ),
-                ACTION_ID_TAKE_DAMAGE
-              ],
-            ];
-            // TODO drop some blood
-            // TODO drop appropriate items
-            // drop a body
-          }
-
-          if (entity.health <= 0) {
-
-            entity.dead = 1;
-          }
-          if (entity.transient) {
-            let found: Booleanish;
-            iterateEntityBoundsTiles(entity, tile => {
-              found ||= tiles.has(tile);
-            });
-            entity.dead ||= !found;
-          }
-
-          // update any animations
-          entity['at'] = entity.transform;
-          entity.anims = entity.anims?.filter(([anim]) => !anim(entity, cappedDelta));
-          if (entity.transient && entity.lastUpdated < tick - 1) {
-            entity.dead = 1;
-          }
-          entity.lastUpdated = tick;
-
-          if (entity.dead) {
-            removeEntity(entity);
-          } else if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
-            // render
-            renderedEntities[renderId] = 1;
-            const { 
-              body,
-              xRotation,
-              yRotation,
-              zRotation,
-            } = entity;
-
-
-            body && appendRender(
-              entity,
-              tile.resolution,
-              body,
-              entity.pos,
-              matrix4Multiply(
-                matrix4RotateZXY(xRotation, yRotation, zRotation),
-                entity['at'],
-              ),              
-            );
-          }
+                velocity: [0, 0, .001],
+                renderGroupId: nextRenderGroupId++,
+                resolutions: [0, 1],
+                transient: 1,
+                anims: [
+                  [
+                    createAttributeAnimation(
+                      999 + Math.random() * 999,
+                      'at',
+                      EASING_QUAD_IN,
+                      createMatrixUpdate(p => matrix4Scale(1 - p)),
+                      e => e.dead = 1,
+                    )
+                  ],
+                  // TODO this is gold plating really
+                  [
+                    createAttributeAnimation(
+                      -400,
+                      'at',
+                      EASING_QUAD_IN_OUT,
+                      createMatrixUpdate(p => matrix4Translate(0, p/9, 0)),
+                    )
+                  ]
+                ],
+              }, tiles);
+              entity.health--;
+              entity.lastSpawnedParticle = time;
+            }
+            lookAtCamera = 1;
+            break;
+          case ENTITY_TYPE_PARTICLE:
+            // not required? particles are now treated like other entities
+            // entity.position = vectorNScaleThenAdd(
+            //   entity.position,
+            //   entity.velocity,
+            //   cappedDelta,
+            // );
+            // fall through
+          case ENTITY_TYPE_INTELLIGENT:
+          case ENTITY_TYPE_SCENERY:
+            lookAtCamera = 1;
+            break;
+        }
+        if( lookAtCamera) {
+          // rotate to look at camera
+          entity.zRotation = Math.atan2(
+            camera.pos[1] - entity.pos[1],
+            camera.pos[0] - entity.pos[0],
+          );
+        }
+  
+        if (entity.collisionVelocityLoss && entity.inverseMass) {
+          const damage = Math.pow(entity.collisionVelocityLoss * 99 / entity.inverseMass, 2) | 0;
+          entity.pendingDamage += damage;
+        }
+  
+        const pendingDamage = entity.pendingDamage;
+        if (
+          !entity.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE)
+          && pendingDamage
+          && entity.health
+        ) {
+          // rethink life choices
+          (entity as IntelligentEntity).lastDecision = 0;
+          entity.pendingDamage = 0;
+  
+          const pendingDamageScale = Math.sqrt(pendingDamage) * .1;
+          entity.anims = [
+            ...(entity.anims || []),
+            [
+              createAttributeAnimation(
+                300 + 99 * Math.random(),
+                'at',
+                EASING_BOUNCE,
+                createMatrixUpdate(p => matrix4Scale(
+                  1 - p * pendingDamageScale,
+                  1 - p * pendingDamageScale,
+                  1 + p * pendingDamageScale
+                )),
+                e => e.health -= pendingDamage,
+              ),
+              ACTION_ID_TAKE_DAMAGE
+            ],
+          ];
+          // TODO drop some blood
+          // TODO drop appropriate items
+          // drop a body
+        }
+  
+        if (entity.health <= 0) {
+  
+          entity.dead = 1;
+        }
+        if (entity.transient) {
+          let found: Booleanish;
+          iterateEntityBoundsTiles(entity, tile => {
+            found ||= tiles.has(tile);
+          });
+          entity.dead ||= !found;
+        }
+  
+        // update any animations
+        entity['at'] = entity.transform;
+        entity.anims = entity.anims?.filter(([anim]) => !anim(entity, cappedDelta));
+        if (entity.transient && entity.lastUpdated < tick - 1) {
+          entity.dead = 1;
+        }
+        entity.lastUpdated = tick;
+  
+        if (entity.dead) {
+          removeEntity(entity);
+        } else if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
+          // render
+          renderedEntities[renderId] = 1;
+          const { 
+            body,
+            xRotation,
+            yRotation,
+            zRotation,
+          } = entity;
+  
+  
+          body && appendRender(
+            entity,
+            entity.lastTile.resolution,
+            body,
+            entity.pos,
+            matrix4Multiply(
+              matrix4RotateZXY(xRotation, yRotation, zRotation),
+              entity['at'],
+            ),              
+          );
         }
       }
     });
@@ -2917,37 +2986,19 @@ window.onload = async () => {
     //
     // render
     //
-    const targetCameraPosition = vectorNScaleThenAdd(player.pos, [0, 0, 1]);
 
-    if (FLAG_SLOW_CAMERA) {
-      const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, cameraPosition, -1);
-      const targetCameraDistance = vectorNLength(deltaCameraPosition);
-      // turning up or down speeds up the camera 
-      const cameraVelocity = targetCameraDistance * .01 / (Math.cos(cameraXRotation)+1);
-
-      cameraPosition = vectorNScaleThenAdd(
-        cameraPosition,
-        deltaCameraPosition,
-        cameraVelocity * cappedDelta,
-      );
-    } else {
-      cameraPosition = targetCameraPosition;
-    }
     const cameraPositionAndRotationMatrix = matrix4Multiply(
-      matrix4Translate(...cameraPosition),
-      cameraZRotationMatrix,
-      matrix4Rotate(cameraXRotation, 1, 0, 0),
-      matrix4Translate(0, cameraZoom, 0),
+      matrix4Translate(...camera.pos),
+      cameraRotateMatrix,
     );
     const cameraPositionAndProjectionMatrix = matrix4Multiply(
       projectionMatrix,
       matrix4Invert(cameraPositionAndRotationMatrix),
     );
-    zoomedCameraPosition = vector3TransformMatrix4(cameraPositionAndRotationMatrix, 0, 0, 0);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
-    gl.uniform3fv(uCameraPosition, zoomedCameraPosition as any);
+    gl.uniform3fv(uCameraPosition, camera.pos as any);
     gl.uniform3fv(uFocusPosition, player.pos as any);
     gl.uniform4fv(
       uShadows,

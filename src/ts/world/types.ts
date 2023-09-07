@@ -8,6 +8,7 @@ const ENTITY_TYPE_PARTICLE = 4;
 const ENTITY_TYPE_TERRAIN = 5;
 const ENTITY_TYPE_FIRE = 7;
 const ENTITY_TYPE_INTELLIGENT = 8;
+const ENTITY_TYPE_CAMERA = 9;
 
 type EntityTypeDragon = typeof ENTITY_TYPE_PLAYER_CONTROLLED;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
@@ -16,6 +17,7 @@ type EntityTypeParticle = typeof ENTITY_TYPE_PARTICLE;
 type EntityTypeTerrain = typeof ENTITY_TYPE_TERRAIN;
 type EntityTypeFire = typeof ENTITY_TYPE_FIRE;
 type EntityTypeIntelligent = typeof ENTITY_TYPE_INTELLIGENT;
+type EntityTypeCamera = typeof ENTITY_TYPE_CAMERA;
 
 type EntityType =
   | EntityTypeDragon
@@ -23,6 +25,8 @@ type EntityType =
   | EntityTypeFireball
   | EntityTypeParticle
   | EntityTypeFire
+  | EntityTypeIntelligent
+  | EntityTypeCamera
   ;
 
 // nothing collides with this
@@ -85,6 +89,7 @@ type Entity<PartId extends number = number> =
   | DragonEntity<PartId>
   | FireEntity<PartId>
   | IntelligentEntity<PartId>
+  | CameraEntity<PartId>
   ;
 
 // return true when done
@@ -142,9 +147,11 @@ type BaseEntity<PartId extends number = number> = {
   // animation transform
   ['at']?: ReadonlyMatrix4,
   anims?: [EntityAnimation, ActionId?][],
-    // the tick that this entity was last updated
+  // the tick that this entity was last updated
   // used to cull zombie transient entities
   lastUpdated?: number,
+  // the tile that this entity was updated against
+  lastTile?: Tile,
 };
 
 type PlaneMetadata = {
@@ -225,6 +232,13 @@ type FireEntity<PartId extends number = number> = {
   lastSpawnedParticle?: number,
   lastCollisionTick?: number,
   xRotation?: undefined,
+  yRotation?: undefined,
+} & BaseDynamicEntity<PartId>;
+
+type CameraEntity<PartId extends number = number> = {
+  readonly entityType: EntityTypeCamera,
+  xRotation: number,
+  zRotation: number,
   yRotation?: undefined,
 } & BaseDynamicEntity<PartId>;
 

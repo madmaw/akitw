@@ -213,6 +213,11 @@ module.exports = function (grunt) {
                 from: ".flat(1)", 
                 to: ".flat()"
               },
+              // forEach can be replaced with map with some performance downside
+              { 
+                from: ".forEach(", 
+                to: ".map("
+              },
               {
                 from: "'use strict';",
                 to:""
