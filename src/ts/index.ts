@@ -280,8 +280,6 @@ window.onload = async () => {
     }
   });
 
-  console.log(depths);
-
   for (let i=0; i<DEPTH_RESOLUTIONS; i++) {
     const chunkDimension = Math.pow(2, DEPTH_RESOLUTIONS - i);
     const chunkCount = DEPTH_DIMENSION / chunkDimension;
@@ -327,7 +325,47 @@ window.onload = async () => {
     }
   }
 
-  const terrain = weightedAverageTerrainFactory(depths);
+  function terrain(wx: number, wy: number) {
+    const tx = wx * DEPTH_DIMENSION;
+    const ty = wy * DEPTH_DIMENSION;
+    const dcx = wx * 2 - 1;
+    const dcy = wy * 2 - 1;
+    //const sampleRadius = worldSampleRadius * DEPTH_DIMENSION;
+    const sampleRadius = 3;
+    const sampleRadiusSquared = sampleRadius * sampleRadius;
+    const roundedSampleRadius = sampleRadius | 0;
+    let totalWeight = 0;
+    let totalWeightedDepth = 0;
+
+    //const sharpness = Math.max(0, depths[tx | 0][ty | 0]/9);
+    const sharpness = Math.pow(1 - (dcx * dcx + dcy * dcy), 4) * 3;
+
+    for (let x = tx - roundedSampleRadius | 0; x < tx + sampleRadius; x++) {
+      for (let y = ty - roundedSampleRadius | 0; y < ty + sampleRadius; y++) {
+        const dx = tx - x;
+        const dy = ty - y;
+        const distanceSquared = dx * dx + dy * dy;
+        
+        if (sampleRadiusSquared > distanceSquared) {
+          const sharpWeight = Math.pow(1 - Math.sqrt(distanceSquared)/sampleRadius, sharpness);
+          const smoothWeight = Math.cos((Math.sqrt(distanceSquared)/sampleRadius) * Math.PI/2);
+          const weight = sharpWeight * Math.min(1, sharpness) + smoothWeight * Math.max(0, 1 - sharpness);
+
+          const depth = x < 0
+            || y < 0
+            || x >= DEPTH_DIMENSION
+            || y >= DEPTH_DIMENSION
+            ? -2
+            : depths[x][y];
+          totalWeightedDepth += weight * depth;
+          totalWeight += weight;
+        }
+      }
+    }
+    return totalWeight > 0
+      ? totalWeightedDepth/totalWeight * WORLD_DEPTH_SCALE
+      : 0;
+  };
 
   function terrainNormal(scaledWorldPoint: ReadonlyVector3 | ReadonlyVector2) {
     const offsets: ReadonlyVector2[] = [
@@ -519,50 +557,15 @@ window.onload = async () => {
           }
           const [
             _,
-            entityPrototype,
-            choiceScale,
+            entityFactory,
           ] = choices[choiceIndex];
-          if (choiceScale) {
+          if (entityFactory) {
             const biomeScale = biomes[biome];
-            const scale = choiceScale * biomeScale;
+            const entity = entityFactory(Math.sqrt(biomeScale));
 
-            const radius = scale/2;
-            const resolutions = new Array(
-              Math.min(
-                Math.sqrt(scale * 2) + 2
-                  // boost entities that can move
-                  + (entityPrototype.inverseMass ? 1 : 0) | 0,
-                  RESOLUTIONS - 2,
-                )
-            )
-              .fill(0)
-              .map((_, i) => i);
-
-            const bounds = rect3FromRadius(radius);
             const z = terrain(x / WORLD_DIMENSION, y/WORLD_DIMENSION);
-            const position: Vector3 = [x, y, z + radius * .8];
-            const entity: DynamicEntity = {
-              ...entityPrototype as any,
-              bounds,
-              collisionRadius: radius,
-              id: nextEntityId++,
-              pos: position,
-              renderGroupId: nextRenderGroupId++,
-              resolutions,
-              velocity: [0, 0, 0],
-              modelVariant: VARIANT_SYMBOLS,
-              body: {
-                modelId: MODEL_ID_BILLBOARD,
-              },
-              transform: matrix4Scale(scale),
-              gravity: entityPrototype.inverseMass ? DEFAULT_GRAVITY : 0,
-              xRotation: 0,
-              yRotation: 0,
-              zRotation: 0,
-              maximumLateralVelocity: .005,
-              maximumLateralAcceleration: .00001,
-              inverseFriction: 1,
-            };
+            const position: Vector3 = [x, y, z + entity.collisionRadius * (entity.inverseMass ? 1.1 : .8)];
+            entity.pos = position;
             // don't overlap with anything
             if (
               (entity.health || !destructiblesOnly)
@@ -772,7 +775,7 @@ window.onload = async () => {
           id,
           renderGroupId,
           renderTile: tile,
-          body: {
+          entityBody: {
             modelId,
           },
           modelVariant: VARIANT_TERRAIN,
@@ -1066,14 +1069,13 @@ window.onload = async () => {
 
   const [
     skyCylinderModel,
-    cubeModel,
-    sphereModel,
-    billboardModel,
   ] = ([
     SKY_CYLINDER_FACES,
     CUBE_FACES_BODY,
     SPHERE_FACES_BODY,
     BILLBOARD_FACES,
+    BILLBOARD_FLIPPED_FACES,
+    BILLBOARD_TWO_SIDED_FACES,
     DRAGON_FACES_BODY,
     DRAGON_FACES_NECK,
     DRAGON_FACES_HEAD,
@@ -1235,8 +1237,7 @@ window.onload = async () => {
     ],
     ...[
       // TEXTURE_SYMBOL_MAP
-      //0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5 6 7
-      '🌴🌳🌲🌵🌿🌼🌻🍖🐐🐄🐇🛖🏠⛪🕌🏦🏰🥚',
+      SYMBOLS,
       // TEXTURE_SYMBOL_BRIGHT_MAP
       '🔥',
     ].map<[number, ...Material[][]]>(s => {
@@ -1400,7 +1401,7 @@ window.onload = async () => {
 
   materialCanvases.forEach(([materialCanvas, dimension = MATERIAL_TERRAIN_TEXTURE_DIMENSION, frames = 1]) => {
     // need mipmap and non-mipmap versions of some textures (so we do all textures)
-    new Array(2).fill(0).forEach((_, i) => {
+    [0, 0].forEach((_, i) => {
       gl.activeTexture(textureId++);
       const texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
@@ -1437,7 +1438,7 @@ window.onload = async () => {
 
   if (FLAG_ENFORCE_BOUNDARY) {
     // add in the walls
-    new Array(4).fill(0).forEach((_, i) => {
+    [0, 0, 0, 0].forEach((_, i) => {
       const zRotationMatrix = matrix4Rotate(i * Math.PI/2, 0, 0, 1);
       const polygons: ConvexPolygon[] = [[
         [WORLD_DIMENSION_MINUS_1/2, WORLD_DIMENSION_MINUS_1/2, 0],
@@ -1551,7 +1552,7 @@ window.onload = async () => {
   const player: DragonEntity<DragonPartIds> = {
     entityType: ENTITY_TYPE_PLAYER_CONTROLLED,
     resolutions: [0, 1],
-    body: DRAGON_PART,
+    entityBody: DRAGON_PART,
     joints: {
       [DRAGON_PART_ID_BODY]: {},
       [DRAGON_PART_ID_NECK]: {},
@@ -1591,7 +1592,7 @@ window.onload = async () => {
       | COLLISION_GROUP_ITEMS,
     inverseMass: 2,
     shadows: 1,
-    modelVariant: VARIANT_DRAGON_BODY,
+    modelVariant: VARIANT_DRAGON,
   };
   addEntity(player);
   const camera: CameraEntity = {
@@ -1611,7 +1612,52 @@ window.onload = async () => {
   };
   addEntity(camera);
 
-  new Array(3).fill(0).map(() => {
+  [0, 0, 0].map(() => {
+    const babyRadius = .2;
+    const babyDragon: IntelligentEntity = {
+      entityType: ENTITY_TYPE_INTELLIGENT,
+      resolutions: [0, 1, 2, 3],
+      entityBody: DRAGON_PART,
+      joints: {
+        [DRAGON_PART_ID_BODY]: {},
+        [DRAGON_PART_ID_NECK]: {},
+        [DRAGON_PART_ID_HEAD]: {},
+        [DRAGON_PART_ID_TAIL]: {},
+        [DRAGON_PART_ID_QUAD_RIGHT]: {},
+        [DRAGON_PART_ID_QUAD_LEFT]: {},
+        [DRAGON_PART_ID_SHIN_RIGHT]: {},
+        [DRAGON_PART_ID_SHIN_LEFT]: {},
+        [DRAGON_PART_ID_WING_1_RIGHT]: {},
+        [DRAGON_PART_ID_WING_2_RIGHT]: {},
+        [DRAGON_PART_ID_WING_3_RIGHT]: {},
+        [DRAGON_PART_ID_CLAW_RIGHT]: {},
+      },
+      bounds: rect3FromRadius(playerRadius),
+      // collision radius must fit within the bounds, so the model render radius will almost certainly
+      // be larger than that
+      collisionRadius: babyRadius,
+      id: nextEntityId++,
+      pos: VECTOR3_EMPTY,
+      renderGroupId: nextRenderGroupId++,
+      xRotation: 0,
+      yRotation: 0,
+      zRotation: 0,
+      velocity: [0, 0, 0],
+      maximumLateralVelocity: .005,
+      maximumLateralAcceleration: .00001,
+      gravity: DEFAULT_GRAVITY,
+      bodyTransform: matrix4Scale(babyRadius*2),
+      collisionGroup: COLLISION_GROUP_PLAYER,
+      collisionMask: COLLISION_GROUP_PLAYER
+        | COLLISION_GROUP_TERRAIN
+        | COLLISION_GROUP_SCENERY
+        | COLLISION_GROUP_ENEMY
+        | COLLISION_GROUP_ITEMS,
+      inverseMass: 8,
+      shadows: 1,
+      inverseFriction: 1,
+      modelVariant: VARIANT_DRAGON_BABY,
+    };
     // add in eggs
     const egg: DynamicEntity = {
       entityType: ENTITY_TYPE_SCENERY,
@@ -1630,9 +1676,10 @@ window.onload = async () => {
       resolutions: [0, 1, 2],
       modelAtlasIndex: 17,
       modelVariant: VARIANT_SYMBOLS,
-      body: {
+      entityBody: {
         modelId: MODEL_ID_BILLBOARD,
       },
+      contained: [babyDragon],
     };
     addEntity(egg);
   });
@@ -1741,7 +1788,7 @@ window.onload = async () => {
         preRotationOffset,
         preRotation,
         postRotation,
-        children,
+        childParts: children,
       }: BodyPart,
       position: ReadonlyVector3,
       transform: ReadonlyMatrix4,
@@ -1798,16 +1845,16 @@ window.onload = async () => {
           ]);
         }
         children?.forEach(child => appendRender(entity, resolution, child, offsetPosition, rotation));
-        if (held && held.body) {
+        if (held && held.entityBody) {
           appendRender(
             held,
             resolution,
-            held.body,
+            held.entityBody,
             offsetPosition,
             matrix4Multiply(
               rotation,
               // TODO untransform the holder
-              held.transform,
+              held.bodyTransform,
             )
           );
         }
@@ -1823,7 +1870,7 @@ window.onload = async () => {
     // operate off the previous camera position
     const previousCameraWorldPosition: Vector2 = vectorNScale(camera.pos.slice(0, 2), 1/WORLD_DIMENSION) as any;
     const cameraZNormal = vector3TransformMatrix4(cameraZRotationMatrix, 0, 1, 0);
-    const visionConeThreshold = Math.max(-Math.sin(camera.xRotation), 0);
+    const visionConeThreshold = Math.max(-Math.sin(camera.xRotation), .01);
 
     // TODO get all the appropriate tiles at the correct resolutions for the entity
     const offsets: ReadonlyVector2[] = [[0, 0], [0, 1], [1, 0], [1, 1]];
@@ -2049,12 +2096,17 @@ window.onload = async () => {
                   && readInput(INPUT_FIRE)
               ) {
                 setJointAnimations(entity, DRAGON_ANIMATION_SHOOT);
-                entity.lastFired = time;
-                entity.fireReservior -= 99;
+                if (entity.contained?.length) {
+                  entity.lastFired = time + 999;
+                  entity.fireReservior = 0;
+                } else {
+                  entity.lastFired = time;
+                  entity.fireReservior -= 99;  
+                }
                 // use exact player transform chain
-                const body = entity.body as BodyPart<DragonPartIds>;
-                const neck = body.children[0];
-                const head = neck.children[0];
+                const body = entity.entityBody as BodyPart<DragonPartIds>;
+                const neck = body.childParts[0];
+                const head = neck.childParts[0];
                 const headPositionTransforms = [body, neck, head].map(part => {
                   const joint = entity.joints[part.id];
                   return [
@@ -2107,39 +2159,45 @@ window.onload = async () => {
                 );
   
                 const collisionRadius = .1;
+
+                const projectile: Entity = entity.contained?.length
+                  ? entity.contained.pop() as ItemEntity
+                  : {
+                    entityType: ENTITY_TYPE_FIREBALL,
+                    entityBody: {
+                      modelId: MODEL_ID_SPHERE,
+                    },
+                    resolutions: [0, 1],
+                    bounds: rect3FromRadius(collisionRadius),
+                    id: nextEntityId++,
+                    collisionRadius,
+                    collisionGroup: COLLISION_GROUP_PLAYER,
+                    collisionMask: COLLISION_GROUP_ENEMY
+                      | COLLISION_GROUP_SCENERY
+                      | COLLISION_GROUP_TERRAIN,
+                    pos: headPosition,
+                    velocity,
+                    renderGroupId: nextRenderGroupId++,
+                    inverseMass: 9,
+                    transient: 1,
+                    modelVariant: VARIANT_FIRE,
+                    anims: [[
+                      createAttributeAnimation(
+                        999 * (Math.random()+entity.fireReservior/9999),
+                        'at',
+                        EASING_QUAD_IN,
+                        createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
+                        e => e.dead = 1,
+                      )
+                    ]]
+                  };
+                projectile.pos = headPosition;
+                projectile.velocity = velocity;
+                // stop transient objects from being immediately removed
+                projectile.lastUpdated = tick;
+                (projectile as any as ItemEntity).lastSpatOut = time;
   
-                // fire a ball 
-                const ball: DynamicEntity = {
-                  entityType: ENTITY_TYPE_FIREBALL,
-                  body: {
-                    modelId: MODEL_ID_SPHERE,
-                  },
-                  resolutions: [0, 1],
-                  bounds: rect3FromRadius(collisionRadius),
-                  id: nextEntityId++,
-                  collisionRadius,
-                  collisionGroup: COLLISION_GROUP_PLAYER,
-                  collisionMask: COLLISION_GROUP_ENEMY
-                    | COLLISION_GROUP_SCENERY
-                    | COLLISION_GROUP_TERRAIN,
-                  pos: headPosition,
-                  velocity,
-                  renderGroupId: nextRenderGroupId++,
-                  inverseMass: 9,
-                  transient: 1,
-                  modelVariant: VARIANT_FIRE,
-                  anims: [[
-                    createAttributeAnimation(
-                      999 * (Math.random()+entity.fireReservior/9999),
-                      'at',
-                      EASING_QUAD_IN,
-                      createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
-                      e => e.dead = 1,
-                    )
-                  ]]
-                };
-  
-                addEntity(ball);
+                addEntity(projectile);
               }                
               // drop when not pushing forward or on the ground
               if (!entity.grabbing || onGround) {
@@ -2152,6 +2210,11 @@ window.onload = async () => {
                     onGround ? 0 : -entity.collisionRadius,
                   );
                   held.velocity = entity.velocity;
+                  if (held.entityType == ENTITY_TYPE_INTELLIGENT) {
+                    // stun it
+                    held.lastDecision = time + 999;
+                    held.impulses = [];
+                  }
                   addEntity(held);
                 }
               }
@@ -2162,6 +2225,22 @@ window.onload = async () => {
               // randomness ensures that everything in the tile doesn't make its next decision simultaneously
               // TODO (awareness per entity)
               if ((entity.lastDecision || 0) + 999 < time && Math.random() > .9) {
+                entity.homePosition = entity.homePosition || entity.pos;
+                if (!entity.impulses?.length) {
+                  entity.impulses = [{
+                    intensity: 1,
+                    impulseTarget: {
+                      // TODO make milling range configurable
+                      pos: vectorNScaleThenAdd(
+                        entity.homePosition,
+                        [Math.random() - .5, Math.random() - .5, 0],
+                        9,
+                      ),
+                    }
+                  }];
+                  entity.targetUrgency = .1;
+                }
+  
                 entity.lastDecision = time;
                 const newImpulses: Impulse[] = [];
                 iterateEntityBoundsEntities({
@@ -2174,13 +2253,13 @@ window.onload = async () => {
                     // TODO don't just run away from everything
                     newImpulses.push({
                       intensity: -9,
-                      target: seen,
+                      impulseTarget: seen,
                     });
                   }
                 });
                 entity.impulses = entity.impulses?.filter(v => {
                   v.intensity = v.intensity * .9 | 0;
-                  return v.intensity && !newImpulses.some(i => i.target == v.target);
+                  return v.intensity && !newImpulses.some(i => i.impulseTarget == v.impulseTarget);
                 }) || [];
                 entity.impulses.push(...newImpulses);
                 
@@ -2189,29 +2268,14 @@ window.onload = async () => {
                   entity.impulses.reduce((acc, impulse) => {
                     return acc + Math.abs(impulse.intensity)/9;
                   }, 0)
-                );  
-              }
-              entity.homePosition = entity.homePosition || entity.pos;
-              if (!entity.impulses?.length) {
-                entity.impulses = [{
-                  intensity: 1,
-                  target: {
-                    // TODO make milling range configurable
-                    pos: vectorNScaleThenAdd(
-                      entity.homePosition,
-                      [Math.random() - .5, Math.random() - .5, 0],
-                      9,
-                    ),
-                  }
-                }];
-                entity.targetUrgency = .1;
+                );
               }
   
   
-              const deltaPosition = entity.impulses.reduce<Vector3>(
+              const deltaPosition = entity.impulses?.reduce<ReadonlyVector3>(
                 (acc, impulse) => {
                   const delta = vectorNScaleThenAdd(
-                    impulse.target.pos,
+                    impulse.impulseTarget.pos,
                     entity.pos,
                     -1,
                   );
@@ -2221,9 +2285,9 @@ window.onload = async () => {
                     impulse.intensity/(vectorNLength(delta) + 1),
                   );
                 },
-                [0, 0, 0],
+                entity.pos,
               );
-              entity.targetLateralPosition = vectorNScaleThenAdd(entity.pos, deltaPosition);
+              entity.targetLateralPosition = deltaPosition;
             }
             const targetLateralPosition = entity.targetLateralPosition || entity.pos;
             let targetYRotation = 0;
@@ -2767,14 +2831,14 @@ window.onload = async () => {
               );
             }
           
-            let checkInvincible = check.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE);
+            let checkInvincible = hasEntityAnimation(entity, ACTION_ID_TAKE_DAMAGE) || !(entity.health > 0);
             let checkDamaged: Booleanish;
           
             switch (entity.entityType) {
               case ENTITY_TYPE_FIREBALL:
                 entity.dead = 1;
                 addEntity({
-                  body: {
+                  entityBody: {
                     modelId: MODEL_ID_SPHERE,
                   },
                   bounds: rect3FromRadius(.3),
@@ -2796,7 +2860,7 @@ window.onload = async () => {
                         createMatrixUpdate(matrix4Scale),
                         e => {
                           // turn it into a flame so we can see fires at distance
-                          e.body = {
+                          e.entityBody = {
                             modelId: MODEL_ID_BILLBOARD,
                           };
                           // TODO feel like setting all these should be one operation
@@ -2858,6 +2922,10 @@ window.onload = async () => {
                       ),
                       1/(1/check.inverseMass + 1/entity.inverseMass),
                     );
+                  } else if (check.entityType == ENTITY_TYPE_ITEM && (check.lastSpatOut || 0) + 99 < time) {
+                    // eat it
+                    entity.contained = [...(entity.contained || []), check as BaseDynamicEntity];
+                    removeEntity(check);
                   }
                 }
                 break;
@@ -2885,8 +2953,8 @@ window.onload = async () => {
             // burn
             if ((entity.lastSpawnedParticle || 0) + 99 < time) {
               addEntity({
-                body: BILLBOARD_PART,
-                transform: matrix4Scale(.4),
+                entityBody: BILLBOARD_PART,
+                bodyTransform: matrix4Scale(.4),
                 modelVariant: VARIANT_SYMBOLS_BRIGHT,
                 modelAtlasIndex: VARIANT_SYMBOLS_BRIGHT_TEXTURE_ATLAS_INDEX_FIRE,
                 bounds: rect3FromRadius(.2),
@@ -2896,7 +2964,7 @@ window.onload = async () => {
                 id: nextEntityId++,
                 pos: vectorNScaleThenAdd(
                   entity.pos,
-                  new Array(3).fill(0).map(() => Math.pow(Math.random() * 2 - 1, 3)),
+                  [0, 0, 0].map(() => Math.pow(Math.random() * 2 - 1, 3)),
                   entity.collisionRadius,
                 ),
                 velocity: [0, 0, .001],
@@ -2927,19 +2995,11 @@ window.onload = async () => {
               entity.health--;
               entity.lastSpawnedParticle = time;
             }
-            lookAtCamera = 1;
-            break;
           case ENTITY_TYPE_PARTICLE:
-            // not required? particles are now treated like other entities
-            // entity.position = vectorNScaleThenAdd(
-            //   entity.position,
-            //   entity.velocity,
-            //   cappedDelta,
-            // );
-            // fall through
           case ENTITY_TYPE_INTELLIGENT:
           case ENTITY_TYPE_SCENERY:
-            lookAtCamera = 1;
+          case ENTITY_TYPE_ITEM:
+            lookAtCamera = !(entity.health <= 0);
             break;
         }
         if( lookAtCamera) {
@@ -2958,7 +3018,8 @@ window.onload = async () => {
   
         const pendingDamage = entity.pendingDamage;
         if (
-          !entity.anims?.some(([_, actionId]) => actionId == ACTION_ID_TAKE_DAMAGE)
+          !hasEntityAnimation(entity,  ACTION_ID_TAKE_DAMAGE)
+          && !hasEntityAnimation(entity,  ACTION_ID_DIE)
           && pendingDamage
           && entity.health
         ) {
@@ -2967,31 +3028,70 @@ window.onload = async () => {
           entity.pendingDamage = 0;
   
           const pendingDamageScale = Math.sqrt(pendingDamage) * .1;
-          entity.anims = [
-            ...(entity.anims || []),
-            [
-              createAttributeAnimation(
-                300 + 99 * Math.random(),
-                'at',
-                EASING_BOUNCE,
-                createMatrixUpdate(p => matrix4Scale(
-                  1 - p * pendingDamageScale,
-                  1 - p * pendingDamageScale,
-                  1 + p * pendingDamageScale
-                )),
-                e => e.health -= pendingDamage,
-              ),
-              ACTION_ID_TAKE_DAMAGE
-            ],
-          ];
-          // TODO drop some blood
-          // TODO drop appropriate items
-          // drop a body
+          addEntityAnimation(
+            entity,
+            createAttributeAnimation(
+              300 + 99 * Math.random(),
+              'at',
+              EASING_BOUNCE,
+              createMatrixUpdate(p => matrix4Scale(
+                1 - p * pendingDamageScale,
+                1 - p * pendingDamageScale,
+                1 + p * pendingDamageScale
+              )),
+              e => e.health -= pendingDamage,
+            ),
+            ACTION_ID_TAKE_DAMAGE,
+          );
+          // drop some blood
+          [0, 0, 0].forEach(() => {
+            const radius = Math.random()/4 + .1;
+            addEntity({
+              entityType: ENTITY_TYPE_PARTICLE,
+              bounds: rect3FromRadius(radius),
+              collisionGroup: COLLISION_GROUP_NONE,
+              collisionRadius: radius,
+              id: nextEntityId++,
+              pos: entity.pos,
+              renderGroupId: nextRenderGroupId++,
+              resolutions: [0, 1],
+              velocity: [0, 0, 0].map(() => (Math.random()-.5)*.01) as Vector3,
+              gravity: DEFAULT_GRAVITY,
+              inverseMass: 9,
+              transient: 1,
+              entityBody: {
+                modelId: MODEL_ID_SPHERE,
+              },
+              bodyTransform: matrix4Scale(radius*2),
+              anims: [
+                [
+                  createAttributeAnimation(
+                    300,
+                    'at',
+                    EASING_QUAD_IN,
+                    createMatrixUpdate(p => matrix4Scale(1 - p)),
+                    e => e.dead = 1.
+                  ),
+                ],
+              ],
+            }, tiles);  
+          });
         }
   
         if (entity.health <= 0) {
-  
-          entity.dead = 1;
+          addEntityAnimation(
+            entity,
+            createAttributeAnimation(
+              200,
+              'at',
+              EASING_QUAD_IN,
+              createMatrixUpdate(p => {
+                return matrix4Scale(1 - p);
+              }),
+              e => e.dead = 1,
+            ),
+            ACTION_ID_DIE,
+          );
         }
         if (entity.transient) {
           let found: Booleanish;
@@ -3002,7 +3102,7 @@ window.onload = async () => {
         }
   
         // update any animations
-        entity['at'] = entity.transform;
+        entity['at'] = entity.bodyTransform;
         entity.anims = entity.anims?.filter(([anim]) => !anim(entity, cappedDelta));
         if (entity.transient && entity.lastUpdated < tick - 1) {
           entity.dead = 1;
@@ -3011,11 +3111,19 @@ window.onload = async () => {
   
         if (entity.dead) {
           removeEntity(entity);
+          // release anything contained inside
+          if (entity.contained) {
+            entity.contained.forEach(contained => {
+              contained.pos = entity.pos;
+              addEntity(contained as Entity);
+            });
+          }
+
         } else if (!renderedEntities[renderId] && (!renderTile || tiles.has(renderTile)) ) {
           // render
           renderedEntities[renderId] = 1;
           const { 
-            body,
+            entityBody: body,
             xRotation,
             yRotation,
             zRotation,

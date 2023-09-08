@@ -8,7 +8,8 @@ const ENTITY_TYPE_PARTICLE = 4;
 const ENTITY_TYPE_TERRAIN = 5;
 const ENTITY_TYPE_FIRE = 7;
 const ENTITY_TYPE_INTELLIGENT = 8;
-const ENTITY_TYPE_CAMERA = 9;
+const ENTITY_TYPE_ITEM = 9;
+const ENTITY_TYPE_CAMERA = 10;
 
 type EntityTypeDragon = typeof ENTITY_TYPE_PLAYER_CONTROLLED;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
@@ -17,6 +18,7 @@ type EntityTypeParticle = typeof ENTITY_TYPE_PARTICLE;
 type EntityTypeTerrain = typeof ENTITY_TYPE_TERRAIN;
 type EntityTypeFire = typeof ENTITY_TYPE_FIRE;
 type EntityTypeIntelligent = typeof ENTITY_TYPE_INTELLIGENT;
+type EntityTypeItem = typeof ENTITY_TYPE_ITEM;
 type EntityTypeCamera = typeof ENTITY_TYPE_CAMERA;
 
 type EntityType =
@@ -26,6 +28,7 @@ type EntityType =
   | EntityTypeParticle
   | EntityTypeFire
   | EntityTypeIntelligent
+  | EntityTypeItem
   | EntityTypeCamera
   ;
 
@@ -57,6 +60,7 @@ const ACTION_ID_FLAP = 32;
 const ACTION_ID_SHOOT = 64;
 const ACTION_ID_CANCEL = 512;
 const ACTION_ID_TAKE_DAMAGE = 1024;
+const ACTION_ID_DIE = 2048;
 
 type ActionId = 
     | typeof ACTION_ID_IDLE 
@@ -68,6 +72,7 @@ type ActionId =
     | typeof ACTION_ID_SHOOT
     | typeof ACTION_ID_CANCEL
     | typeof ACTION_ID_TAKE_DAMAGE
+    | typeof ACTION_ID_DIE
     ;
 
 type World = Grid[];
@@ -90,6 +95,7 @@ type Entity<PartId extends number = number> =
   | FireEntity<PartId>
   | IntelligentEntity<PartId>
   | CameraEntity<PartId>
+  | ItemEntity<PartId>
   ;
 
 // return true when done
@@ -102,7 +108,7 @@ type BodyPart<PartId extends number = number> = {
   readonly preRotation?: ReadonlyVector3,
   readonly postRotation?: ReadonlyVector3,
   readonly preRotationOffset?: ReadonlyVector3,
-  readonly children?: readonly BodyPart<PartId>[],
+  readonly childParts?: readonly BodyPart<PartId>[],
 };
 
 type Joint = {
@@ -125,7 +131,7 @@ type BaseEntity<PartId extends number = number> = {
   logs?: any[][];
 
   readonly joints?: Record<PartId, Joint>,
-  body?: BodyPart<PartId> | Falsey,
+  entityBody?: BodyPart<PartId> | Falsey,
   holding?: Partial<Record<PartId, Entity>>,
   // reference to textures/colours/etc...
   modelVariant?: VariantId;
@@ -142,7 +148,7 @@ type BaseEntity<PartId extends number = number> = {
   // indicates that the entity dies when it goes out of view
   transient?: Booleanish,
   // persistent transform applied to the body
-  transform?: ReadonlyMatrix4;
+  bodyTransform?: ReadonlyMatrix4;
   // temporary attribute used to pass info between animations
   // animation transform
   ['at']?: ReadonlyMatrix4,
@@ -170,12 +176,15 @@ type StaticEntity<PartId extends number = number> = {
   readonly renderTile?: Tile,
   velocity?: undefined,
   readonly inverseMass?: undefined,
+  inverseFriction?: undefined,
   xRotation?: undefined,
   yRotation?: undefined,
   zRotation?: undefined,
   shadows?: Falsey,
   gravity?: undefined,
   collisionVelocityLoss?: undefined,
+  contained?: undefined,
+
 } & BaseEntity<PartId>;
 
 type BaseDynamicEntity<PartId extends number = number> = {
@@ -195,6 +204,8 @@ type BaseDynamicEntity<PartId extends number = number> = {
   // the tptal amount of velocity that was removed through collisions
   collisionVelocityLoss?: number,
   shadows?: Booleanish,
+  // released on death
+  contained?: BaseDynamicEntity[],
 } & BaseEntity<PartId>;
 
 type DynamicEntity<PartId extends number = number> = {
@@ -205,6 +216,15 @@ type DynamicEntity<PartId extends number = number> = {
   ,
   xRotation?: undefined,
   yRotation?: undefined,
+} & BaseDynamicEntity<PartId>;
+
+type ItemEntity<PartId extends number = number> = {
+  entityType: 
+    | EntityTypeItem
+  ,
+  xRotation?: undefined,
+  yRotation?: undefined,
+  lastSpatOut?: number,
 } & BaseDynamicEntity<PartId>;
 
 type ActiveEntity<PartId extends number = number> = {
@@ -243,7 +263,7 @@ type CameraEntity<PartId extends number = number> = {
 } & BaseDynamicEntity<PartId>;
 
 type Impulse = {
-  target: Entity | Pick<Entity, 'pos'>,
+  impulseTarget: Entity | Pick<Entity, 'pos'>,
   // negative indicates wants to run away
   intensity: number,
 }
@@ -256,3 +276,13 @@ type IntelligentEntity<PartId extends number = number> = {
   // the last time we made a decision
   lastDecision?: number,
 } & ActiveEntity<PartId>;
+
+function addEntityAnimation(entity: Entity, anim: Anim<Entity>, actionId?: ActionId) {
+  if (!actionId || !hasEntityAnimation(entity, actionId)) {
+    entity.anims = [...(entity.anims || []), [anim, actionId]];
+  }
+}
+
+function hasEntityAnimation(entity: Entity, actionId: ActionId) {
+  return entity.anims?.some(([_, existingActionId]) => actionId == existingActionId);
+}

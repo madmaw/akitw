@@ -5,7 +5,7 @@ function synthesizeOppositeBodyPart<PartId extends number>(
     postRotation,
     preRotationOffset,
     preRotation,
-    children
+    childParts: children
   }: BodyPart<PartId>,
 ): BodyPart<PartId> {
   const flipXVector: ReadonlyVector3 = [-1, 1, 1];
@@ -22,7 +22,7 @@ function synthesizeOppositeBodyPart<PartId extends number>(
   });
   return {
     id: (id && -id) as PartId,
-    children: synthesizedChildren,
+    childParts: synthesizedChildren,
     modelId: modelId && (modelId + 1),
     postRotation: newPostRotation,
     preRotationOffset: preRotationOffset && vectorNMultiply(preRotationOffset, flipXVector),

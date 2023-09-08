@@ -329,13 +329,13 @@ const DRAGON_WING_RIGHT: BodyPart<DragonPartIds> = {
   //preRotationOffset: [.3, .11, .28],
   preRotation: [Math.PI * .1, 0, 0],
   //preRotationTransform: MATRIX4_IDENTITY,
-  children: [{
+  childParts: [{
     id: DRAGON_PART_ID_WING_2_RIGHT,
     modelId: MODEL_ID_DRAGON_WING_2_RIGHT,
     //postRotationTransform: matrix4Rotate(Math.atan2(.3, -.3), 0, 0, 1),
     postRotation: vectorNScale(DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR, -1),
     preRotationOffset: [.1, 0, 0],
-    children: [{
+    childParts: [{
       id: DRAGON_PART_ID_WING_3_RIGHT,
       modelId: MODEL_ID_DRAGON_WING_3_RIGHT,  
       preRotationOffset: vector3TransformMatrix4(
@@ -360,12 +360,12 @@ const DRAGON_LEG_RIGHT: BodyPart<DragonPartIds> = {
   modelId: MODEL_ID_DRAGON_QUAD_RIGHT,
   preRotationOffset: [.11, 0, .1],
   preRotation: [-Math.PI/6, 0, 0],
-  children: [{
+  childParts: [{
     id: DRAGON_PART_ID_SHIN_RIGHT,
     modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
     preRotationOffset: [.01, -.05, -.11],
     preRotation: [Math.PI/3, 0, 0],
-    children: [{
+    childParts: [{
       id: DRAGON_PART_ID_CLAW_RIGHT,
       preRotationOffset: [-.1, 0, -.22],
       postRotation: [0, -Math.PI/4, -Math.PI/2],
@@ -378,12 +378,12 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
   id: DRAGON_PART_ID_BODY,
   modelId: MODEL_ID_DRAGON_BODY,
   preRotationOffset: [0, 0, -.17],
-  children: [
+  childParts: [
     {
       id: DRAGON_PART_ID_NECK,
       modelId: MODEL_ID_DRAGON_NECK,
       preRotationOffset: [0, .19, .29],
-      children: [{
+      childParts: [{
         id: DRAGON_PART_ID_HEAD,
         modelId: MODEL_ID_DRAGON_HEAD,
         preRotationOffset: [0, .15, .05],

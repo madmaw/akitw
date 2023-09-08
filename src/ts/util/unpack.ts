@@ -197,6 +197,10 @@ const packVector3Points = packArrayBuilder(packVector3Point);
 
 const packUnsignedIntegerArray3 = packArrayBuilder(packArrayBuilder(packArrayBuilder(packUnsignedInteger)));
 
+// const packJointAnimationSequence: Packer<JointAnimationSequence<number>> = (sequeunce: JointAnimationSequence<number>) => {
+  
+// }
+
 const packFaces: Packer<readonly Face<PlaneMetadata>[]> = (faces: Face<PlaneMetadata>[]) => {
   // find all the unique, transformed points
   const uniquePoints: ReadonlyVector3[] = [];

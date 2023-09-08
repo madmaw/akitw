@@ -7,7 +7,7 @@ type BillboardPartIds =
   ;
 
 const BILLBOARD_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(Math.PI/2, 0, 1, 0);
-const BILLBOARD_FACES: Face<PlaneMetadata>[] = [{
+const BILLBOARD_FACE: Face<PlaneMetadata> = {
   rotateToModelCoordinates: BILLBOARD_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: BILLBOARD_ROTATE_TO_MODEL_COORDINATES,
   polygons: [
@@ -29,7 +29,12 @@ const BILLBOARD_FACES: Face<PlaneMetadata>[] = [{
       matrix4Rotate(-Math.PI/2, 0, 1, 0),
     ),
   }
-}];
+};
+const BILLBOARD_FACE_FLIPPED = flipFace(BILLBOARD_FACE, [-1, 1, 1]);
+
+const BILLBOARD_FACES: Face<PlaneMetadata>[] = [BILLBOARD_FACE];
+const BILLBOARD_FLIPPED_FACES: Face<PlaneMetadata>[] = [BILLBOARD_FACE_FLIPPED];
+const BILLBOARD_TWO_SIDED_FACES: Face<PlaneMetadata>[] = [BILLBOARD_FACE, BILLBOARD_FACE_FLIPPED];
 
 const BILLBOARD_PART: BodyPart<BillboardPartIds> = {
   modelId: MODEL_ID_BILLBOARD,

@@ -2,15 +2,17 @@ const VARIANT_NULL = 0;
 const VARIANT_TERRAIN = 1;
 const VARIANT_SYMBOLS = 2;
 const VARIANT_SYMBOLS_BRIGHT = 3;
-const VARIANT_DRAGON_BODY = 4;
-const VARIANT_FIRE = 5;
+const VARIANT_DRAGON = 4;
+const VARIANT_DRAGON_BABY = 5;
+const VARIANT_FIRE = 6;
 
 type VariantId = 
   | typeof VARIANT_NULL
   | typeof VARIANT_TERRAIN
   | typeof VARIANT_SYMBOLS
   | typeof VARIANT_SYMBOLS_BRIGHT
-  | typeof VARIANT_DRAGON_BODY
+  | typeof VARIANT_DRAGON
+  | typeof VARIANT_DRAGON_BABY
   | typeof VARIANT_FIRE
   ;
 
@@ -89,12 +91,20 @@ const VARIANTS: Record<VariantId, Variant> = {
       0, 0, 1, 0,
     ],
   },
-  [VARIANT_DRAGON_BODY]: {
+  [VARIANT_DRAGON]: {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
     materialTextureId: TEXTURE_DRAGON_BODY_MATERIAL,
     materialTextureColors: [
-      .8, 0, 0, 1,
-      1, .1, 0, 1,
+      .6, 0, 0, 1,
+      .8, .1, 0, 1,
+    ],
+  },
+  [VARIANT_DRAGON_BABY]: {
+    atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
+    materialTextureId: TEXTURE_DRAGON_BODY_MATERIAL,
+    materialTextureColors: [
+      1, 1, 0, .5,
+      .5, .8, 0, 1,
     ],
   },
   [VARIANT_FIRE]: {
