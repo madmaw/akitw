@@ -68,7 +68,7 @@ const DRAGON_SHAPES_BODY: ConvexShape<PlaneMetadata> = [
 
 const DRAGON_SHAPES_NECK_TRANSFORM = matrix4Multiply(
   matrix4Translate(0, .1, 0),
-  matrix4Rotate(Math.PI/6, 1, 0, 0),
+  matrix4Rotate(PI_01666_1DP, 1, 0, 0),
 );
 const DRAGON_SHAPES_NECK: ConvexShape<PlaneMetadata> = transformConvexShape([
   // top
@@ -97,7 +97,7 @@ const DRAGON_SHAPES_NECK: ConvexShape<PlaneMetadata> = transformConvexShape([
 const DRAGON_SHAPES_HEAD_TRANSFORM = matrix4Multiply(
   DRAGON_SHAPES_NECK_TRANSFORM,
   matrix4Translate(0, .1, -.1),
-  matrix4Rotate(-Math.PI/4, 1, 0, 0),
+  matrix4Rotate(-PI_025_1DP, 1, 0, 0),
 );
 const DRAGON_SHAPES_HEAD: ConvexShape<PlaneMetadata> = transformConvexShape([
   // top
@@ -191,11 +191,11 @@ const DRAGON_FACES_BODY = safeUnpackFaces(
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_BODY, []]]),
 );
 const DRAGON_FACES_NECK = safeUnpackFaces(
-  [...':ECIKCIIRNGRNEUMBEFNEFKUMKI>EI>GUHIUHBHAEVKNHAKVKKVMEVM3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.))'],
+  [...':EDLKDLISLGSLEVKBDINDIKVKKF@EF@GUFIUFBFCEVHNFCKVHKWJEWJ3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.))'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_NECK, []]]),
 );
 const DRAGON_FACES_HEAD = safeUnpackFaces(
-  [...'7H^EDPNLPNLTFHQFDTFNMHKHIHGIEHIBMHMNMCNMEHKKHK2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154)'],
+  [...'7H\\@DRMLRMLSDHPFDSDNNIKHKHHKEHKBNIMPMCPMEJMKJM2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154)'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_HEAD, []]]),
 );
 const DRAGON_FACES_TAIL = safeUnpackFaces(
@@ -245,12 +245,13 @@ const DRAGON_FACE_WING_1_RIGHT: Face<PlaneMetadata> = {
 const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR: ReadonlyVector3 = [
   0,
   0,
-  Math.atan2(
-    // (A1 - B1).x
-    -.1,
-    // (A1 - B1).y
-    .2
-  ),
+  -.46
+  // Math.atan2(
+  //   // (A1 - B1).x
+  //   -.1,
+  //   // (A1 - B1).y
+  //   .2
+  // ),
 ];
 const DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES = matrix4RotateZXY(...DRAGON_FACES_WING_2_ROTATE_TO_MODEL_COORDINATES_VECTOR);
 
@@ -277,12 +278,13 @@ const DRAGON_FACE_WING_2_RIGHT: Face<PlaneMetadata> = {
 const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES_VECTOR: ReadonlyVector3 = [
   0,
   0,
-  Math.atan2(
-    // (A2 - B2).x
-    .15,
-    // (A2 - B2).y
-    .4
-  ),
+  .36
+  // Math.atan2(
+  //   // (A2 - B2).x
+  //   .15,
+  //   // (A2 - B2).y
+  //   .4
+  // ),
 ];
 const DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES = matrix4RotateZXY(...DRAGON_FACES_WING_3_ROTATE_TO_MODEL_COORDINATES_VECTOR);
 const DRAGON_FACE_WING_3_RIGHT: Face<PlaneMetadata> = {
@@ -359,16 +361,16 @@ const DRAGON_LEG_RIGHT: BodyPart<DragonPartIds> = {
   id: DRAGON_PART_ID_QUAD_RIGHT,
   modelId: MODEL_ID_DRAGON_QUAD_RIGHT,
   preRotationOffset: [.11, 0, .1],
-  preRotation: [-Math.PI/6, 0, 0],
+  preRotation: [-PI_01666_1DP, 0, 0],
   childParts: [{
     id: DRAGON_PART_ID_SHIN_RIGHT,
     modelId: MODEL_ID_DRAGON_SHIN_RIGHT,
     preRotationOffset: [.01, -.05, -.11],
-    preRotation: [Math.PI/3, 0, 0],
+    preRotation: [PI_0333_0DP, 0, 0],
     childParts: [{
       id: DRAGON_PART_ID_CLAW_RIGHT,
       preRotationOffset: [-.1, 0, -.22],
-      postRotation: [0, -Math.PI/4, -Math.PI/2],
+      postRotation: [0, -PI_025_1DP, -PI_05_1DP],
     }]
   }],
 };
@@ -386,7 +388,7 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
       childParts: [{
         id: DRAGON_PART_ID_HEAD,
         modelId: MODEL_ID_DRAGON_HEAD,
-        preRotationOffset: [0, .15, .05],
+        preRotationOffset: [0, .15, .01],
       }],
     },
     {
@@ -396,19 +398,6 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
     },
     DRAGON_LEG_RIGHT,
     DRAGON_LEG_LEFT,
-    // {
-    //   id: DRAGON_PART_ID_QUAD_LEFT,
-    //   modelId: MODEL_ID_DRAGON_QUAD_LEFT,
-    //   preRotationOffset: [-.11, 0, .1],
-    //   preRotationTransform: matrix4Rotate(-Math.PI/6, 1, 0, 0),
-    //   oppositeAnimationScaling: [1, 1, 1],
-    //   children: [{
-    //     id: DRAGON_PART_ID_SHIN_LEFT,
-    //     modelId: MODEL_ID_DRAGON_SHIN_LEFT,
-    //     preRotationOffset: [0, -.05, -.11],
-    //     preRotationTransform: matrix4Rotate(Math.PI/3, 1, 0, 0),
-    //   }]
-    // },
     DRAGON_WING_RIGHT,
     DRAGON_WING_LEFT,
   ],

@@ -10,6 +10,7 @@ const ENTITY_TYPE_FIRE = 7;
 const ENTITY_TYPE_INTELLIGENT = 8;
 const ENTITY_TYPE_ITEM = 9;
 const ENTITY_TYPE_CAMERA = 10;
+const ENTITY_TYPE_BABY_DRAGON = 11;
 
 type EntityTypeDragon = typeof ENTITY_TYPE_PLAYER_CONTROLLED;
 type EntityTypeScenery = typeof ENTITY_TYPE_SCENERY;
@@ -20,6 +21,7 @@ type EntityTypeFire = typeof ENTITY_TYPE_FIRE;
 type EntityTypeIntelligent = typeof ENTITY_TYPE_INTELLIGENT;
 type EntityTypeItem = typeof ENTITY_TYPE_ITEM;
 type EntityTypeCamera = typeof ENTITY_TYPE_CAMERA;
+type EntityTypeBabyDragon = typeof ENTITY_TYPE_BABY_DRAGON;
 
 type EntityType =
   | EntityTypeDragon
@@ -30,6 +32,7 @@ type EntityType =
   | EntityTypeIntelligent
   | EntityTypeItem
   | EntityTypeCamera
+  | EntityTypeBabyDragon
   ;
 
 // nothing collides with this
@@ -96,6 +99,7 @@ type Entity<PartId extends number = number> =
   | IntelligentEntity<PartId>
   | CameraEntity<PartId>
   | ItemEntity<PartId>
+  //| BabyDragonEntity<PartId>
   ;
 
 // return true when done
@@ -270,7 +274,8 @@ type Impulse = {
 
 type IntelligentEntity<PartId extends number = number> = {
   readonly entityType:
-    | EntityTypeIntelligent,
+    | EntityTypeIntelligent
+    | EntityTypeBabyDragon,
   homePosition?: ReadonlyVector3,
   impulses?: Impulse[],
   // the last time we made a decision

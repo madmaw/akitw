@@ -63,7 +63,7 @@ function clusteredDistributionFactory(
     // add in more
     if (step) {
       clusters.push(...new Array(minChildren + Math.random() * dChildren | 0).fill(0).map<[number, number, number, number]>(() => {
-        const a = Math.random() * Math.PI * 2;
+        const a = Math.random() * PI_1_0DP;
         const cos = Math.cos(a);
         const sin = Math.sin(a);
         const d = minDistance + Math.random() * dDistance;

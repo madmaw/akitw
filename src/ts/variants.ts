@@ -103,9 +103,10 @@ const VARIANTS: Record<VariantId, Variant> = {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
     materialTextureId: TEXTURE_DRAGON_BODY_MATERIAL,
     materialTextureColors: [
-      1, 1, 0, .5,
-      .5, .8, 0, 1,
+      .7, 0, 0, 1,
+      1, .2, 0, 1,
     ],
+    materialTextureScale: .5,
   },
   [VARIANT_FIRE]: {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,

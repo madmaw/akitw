@@ -1,4 +1,5 @@
 /// <reference path="./types.ts"/>
+/// <reference path="../util/pi.ts"/>
 
 const BILLBOARD_PART_ID_BODY = 0;
 
@@ -6,7 +7,7 @@ type BillboardPartIds =
   | typeof BILLBOARD_PART_ID_BODY
   ;
 
-const BILLBOARD_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(Math.PI/2, 0, 1, 0);
+const BILLBOARD_ROTATE_TO_MODEL_COORDINATES = matrix4Rotate(PI_05_1DP, 0, 1, 0);
 const BILLBOARD_FACE: Face<PlaneMetadata> = {
   rotateToModelCoordinates: BILLBOARD_ROTATE_TO_MODEL_COORDINATES,
   toModelCoordinates: BILLBOARD_ROTATE_TO_MODEL_COORDINATES,
@@ -24,9 +25,9 @@ const BILLBOARD_FACE: Face<PlaneMetadata> = {
       // map -.5, -.5 to 0, 0
       matrix4Translate(.5, -.5, 0),
       // rotate so y, x -> x, y
-      matrix4Rotate(Math.PI/2, 0, 0, 1),
+      matrix4Rotate(PI_05_1DP, 0, 0, 1),
       // flip so z -> x (invert our model transformation)
-      matrix4Rotate(-Math.PI/2, 0, 1, 0),
+      matrix4Rotate(-PI_05_1DP, 0, 1, 0),
     ),
   }
 };

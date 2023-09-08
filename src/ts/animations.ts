@@ -1,7 +1,7 @@
 type Easing = (t: number) => number;
 
 function EASING_BOUNCE(t: number) {
-  return Math.sin(Math.pow(t, 2) * Math.PI*2) * (1 - Math.pow(t, 2));
+  return Math.sin(Math.pow(t, 2) * PI_2_0DP) * (1 - Math.pow(t, 2));
 }
 function EASING_BACK_IN (t) {
   return t * t * (9 * t - 8);
@@ -10,7 +10,7 @@ const EASING_QUAD_IN: Easing = t => t * t;
 const EASING_QUAD_OUT: Easing = t => 1 - Math.pow(1 - t, 2);
 const EASING_QUAD_IN_OUT: Easing = t => t <= .5 ? t * t * 2 : 1 - Math.pow(t-1, 2) * 2;
 const EASING_LINEAR: Easing = t => t;
-const EASING_SINUSOIDAL: Easing = t => Math.sin(t*Math.PI);
+const EASING_SINUSOIDAL: Easing = t => Math.sin(t*PI_1_0DP);
 
 const EASINGS = [
   EASING_BOUNCE,

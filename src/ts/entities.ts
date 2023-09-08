@@ -1,7 +1,7 @@
 /// <reference path="./world/types.ts"/>
 
-//                0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5 6 7  8
-const SYMBOLS = '🌴🌳🌲🌵🌿🌼🌻🍖🐐🐄🐇🛖🏠⛪🕌🏦🏰🥚🦌';
+//                0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5 6 7  8  9
+const SYMBOLS = '🌴🌳🌲🌵🌿🌼🍖🐐🐄🐇🦌🛖🥚🧚💎';
 
 const SYMBOL_INDEX_PALM_TREE = 0;
 const SYMBOL_INDEX_DECIDUOUS_TREE = 1;
@@ -9,14 +9,15 @@ const SYMBOL_INDEX_PINE_TREE = 2;
 const SYMBOL_INDEX_CACTUS = 3;
 const SYMBOL_INDEX_HERB = 4;
 const SYMBOL_INDEX_FLOWER = 5;
-const SYMBOL_INDEX_SUNFLOWER = 6;
-const SYMBOL_INDEX_MEAT = 7;
-const SYMBOL_INDEX_GOAT = 8;
-const SYMBOL_INDEX_COW = 9;
-const SYMBOL_INDEX_RABBIT = 10;
+const SYMBOL_INDEX_MEAT = 6;
+const SYMBOL_INDEX_GOAT = 7;
+const SYMBOL_INDEX_COW = 8;
+const SYMBOL_INDEX_RABBIT = 9;
+const SYMBOL_INDEX_DEER = 10;
 const SYMBOL_INDEX_HUT = 11;
-const SYMBOL_INDEX_EGG = 17;
-const SYMBOL_INDEX_DEER = 18;
+const SYMBOL_INDEX_EGG = 12;
+const SYMBOL_INDEX_FAIRY = 13;
+const SYMBOL_INDEX_GEM = 14;
 
 // bit flags
 const BIOME_ROAD = 0;
@@ -108,6 +109,17 @@ const meatFactory = prototypeEntityFactoryProvider({
   collisionMask: COLLISION_GROUP_TERRAIN,
   modelAtlasIndex: SYMBOL_INDEX_MEAT,
   inverseMass: 4,
+  inverseFriction: .1,
+  health: 9,
+  transient: 1,
+}, .5);
+
+const gemFactory = prototypeEntityFactoryProvider({
+  entityType: ENTITY_TYPE_ITEM,
+  collisionGroup: COLLISION_GROUP_ITEMS,
+  collisionMask: COLLISION_GROUP_TERRAIN,
+  modelAtlasIndex: SYMBOL_INDEX_GEM,
+  inverseMass: 4,
   health: 9,
   transient: 1,
 }, .5);
@@ -138,6 +150,7 @@ const BIOME_LOOKUP_TABLE: ([
           health: 9,
         },
         4,
+        [gemFactory]
       ),
     ],
     // cow
@@ -149,6 +162,24 @@ const BIOME_LOOKUP_TABLE: ([
           collisionGroup: COLLISION_GROUP_ENEMY,
           collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
           modelAtlasIndex: SYMBOL_INDEX_COW,
+          health: 4,
+          inverseMass: .5,
+          inverseFriction: 1,
+          shadows: 1,
+        },
+        2,
+        [meatFactory],
+      ),
+    ],
+    // fairy
+    [
+      1,
+      prototypeEntityFactoryProvider(
+        {
+          entityType: ENTITY_TYPE_INTELLIGENT,
+          collisionGroup: COLLISION_GROUP_ENEMY,
+          collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
+          modelAtlasIndex: SYMBOL_INDEX_FAIRY,
           health: 4,
           inverseMass: .5,
           inverseFriction: 1,
@@ -187,7 +218,7 @@ const BIOME_LOOKUP_TABLE: ([
           entityType: ENTITY_TYPE_SCENERY, 
           collisionGroup: COLLISION_GROUP_SCENERY,
           modelAtlasIndex: SYMBOL_INDEX_PALM_TREE,
-          health: 9,
+          health: 99,
           shadows: 1,
         }, 
         5,  
@@ -199,19 +230,19 @@ const BIOME_LOOKUP_TABLE: ([
     [1e4],
     // flower
     [
-      9,
+      99,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_SCENERY,
           collisionGroup: COLLISION_GROUP_NONE,
           modelAtlasIndex: SYMBOL_INDEX_FLOWER,
         },
-        .2,  
+        .2,
       ),
     ],
     // rabbit
     [
-      9,
+      3,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
@@ -228,7 +259,7 @@ const BIOME_LOOKUP_TABLE: ([
     ],
     // deer
     [
-      5,
+      1,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
@@ -256,7 +287,7 @@ const BIOME_LOOKUP_TABLE: ([
           entityType: ENTITY_TYPE_SCENERY,
           collisionGroup: COLLISION_GROUP_SCENERY,
           modelAtlasIndex: SYMBOL_INDEX_DECIDUOUS_TREE,
-          health: 9,
+          health: 99,
           shadows: 1,
         },
         6,  
@@ -273,7 +304,7 @@ const BIOME_LOOKUP_TABLE: ([
           entityType: ENTITY_TYPE_SCENERY,
           collisionGroup: COLLISION_GROUP_SCENERY,
           modelAtlasIndex: SYMBOL_INDEX_PINE_TREE,
-          health: 9,
+          health: 99,
           shadows: 1,
         },
         5,  
@@ -282,22 +313,22 @@ const BIOME_LOOKUP_TABLE: ([
   ],
   // mountains
   [
-    [1e4],
+    [1e3],
     // herb
     [
-      9,
+      99,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_SCENERY,
           collisionGroup: COLLISION_GROUP_NONE,
           modelAtlasIndex: SYMBOL_INDEX_HERB,
         },
-        .4,  
+        .4,
       ),
     ],
     // goat
     [
-      2,
+      1,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,

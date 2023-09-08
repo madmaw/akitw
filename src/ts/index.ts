@@ -254,7 +254,7 @@ const FRAGMENT_SHADER = `#version 300 es
       min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
       // 
     );
-    ${O_COLOR} = vec4(sqrt(fc), 1);
+    ${O_COLOR} = vec4(pow(fc, vec3(.6)), 1);
   }
 `;
 
@@ -348,7 +348,7 @@ window.onload = async () => {
         
         if (sampleRadiusSquared > distanceSquared) {
           const sharpWeight = Math.pow(1 - Math.sqrt(distanceSquared)/sampleRadius, sharpness);
-          const smoothWeight = Math.cos((Math.sqrt(distanceSquared)/sampleRadius) * Math.PI/2);
+          const smoothWeight = Math.cos((Math.sqrt(distanceSquared)/sampleRadius) * PI_05_1DP);
           const weight = sharpWeight * Math.min(1, sharpness) + smoothWeight * Math.max(0, 1 - sharpness);
 
           const depth = x < 0
@@ -464,7 +464,7 @@ window.onload = async () => {
     ],
     [
       BIOME_BROADLEAF_FOREST,
-      1e4,
+      2e4,
       clusteredDistributionFactory(
         9,
         9,
@@ -496,7 +496,7 @@ window.onload = async () => {
     ],
     [
       BIOME_CIVILISATION,
-      1e3,
+      3e3,
       clusteredDistributionFactory(
         9,
         9,
@@ -800,13 +800,13 @@ window.onload = async () => {
     gl.viewport(0, 0, Z.clientWidth, Z.clientHeight);
     projectionMatrix = matrix4Multiply(
       matrix4Perspective(
-        Math.PI/4,
+        PI_025_2DP,
         Z.clientWidth/Z.clientHeight,
         MIN_FOCAL_LENGTH,
         HORIZON,
       ),
       matrix4Rotate(
-        -Math.PI/2,
+        -PI_05_1DP,
         1,
         0,
         0,
@@ -1298,7 +1298,7 @@ window.onload = async () => {
                   MATERIAL_TERRAIN_TEXTURE_DIMENSION,
                   r,
                   0,
-                  Math.PI * 2
+                  PI_2_0DP
                 );
                 ctx.fill();
     
@@ -1443,7 +1443,7 @@ window.onload = async () => {
   if (FLAG_ENFORCE_BOUNDARY) {
     // add in the walls
     [0, 0, 0, 0].forEach((_, i) => {
-      const zRotationMatrix = matrix4Rotate(i * Math.PI/2, 0, 0, 1);
+      const zRotationMatrix = matrix4Rotate(i * PI_05_2DP, 0, 0, 1);
       const polygons: ConvexPolygon[] = [[
         [WORLD_DIMENSION_MINUS_1/2, WORLD_DIMENSION_MINUS_1/2, 0],
         [WORLD_DIMENSION_MINUS_1/2, -WORLD_DIMENSION_MINUS_1/2, 0],
@@ -1452,7 +1452,7 @@ window.onload = async () => {
       ]];
       const rotateToModelCoordinates = matrix4Multiply(
         zRotationMatrix,
-        matrix4Rotate(-Math.PI/2, 0, 1, 0),
+        matrix4Rotate(-PI_05_2DP, 0, 1, 0),
       );
       const toModelCoordinates = matrix4Multiply(
         matrix4Translate(WORLD_DIMENSION/2, WORLD_DIMENSION/2, 0),
@@ -1578,8 +1578,8 @@ window.onload = async () => {
     id: nextEntityId++,
     pos: [
       WORLD_DIMENSION*.5,
-      WORLD_DIMENSION*.5,
-      terrain(.5, .5) + playerRadius + .1,
+      WORLD_DIMENSION*.48,
+      terrain(.5, .48) + playerRadius + .1,
     ],
     renderGroupId: nextRenderGroupId++,
     xRotation: 0,
@@ -1616,10 +1616,11 @@ window.onload = async () => {
   };
   addEntity(camera);
 
-  [0, 0, 0].map(() => {
-    const babyRadius = .2;
+  [0, 0, 0].map((_, i) => {
+    const a = PI_2_0DP * i / 3;
+    const babyRadius = .3;
     const babyDragon: IntelligentEntity = {
-      entityType: ENTITY_TYPE_INTELLIGENT,
+      entityType: ENTITY_TYPE_BABY_DRAGON,
       resolutions: [0, 1, 2, 3],
       entityBody: DRAGON_PART,
       joints: {
@@ -1643,24 +1644,20 @@ window.onload = async () => {
       id: nextEntityId++,
       pos: VECTOR3_EMPTY,
       renderGroupId: nextRenderGroupId++,
-      xRotation: 0,
+      xRotation: PI_01_1DP,
       yRotation: 0,
-      zRotation: 0,
+      zRotation: a - PI_05_1DP,
       velocity: [0, 0, 0],
-      maximumLateralVelocity: .005,
-      maximumLateralAcceleration: .00001,
       gravity: DEFAULT_GRAVITY,
       bodyTransform: matrix4Scale(babyRadius*2),
       collisionGroup: COLLISION_GROUP_PLAYER,
-      collisionMask: COLLISION_GROUP_PLAYER
-        | COLLISION_GROUP_TERRAIN
-        | COLLISION_GROUP_SCENERY
-        | COLLISION_GROUP_ENEMY
+      collisionMask: COLLISION_GROUP_TERRAIN
         | COLLISION_GROUP_ITEMS,
-      inverseMass: 8,
       shadows: 1,
-      inverseFriction: 1,
       modelVariant: VARIANT_DRAGON_BABY,
+      maximumLateralAcceleration: .0001,
+      maximumLateralVelocity: .001,
+      inverseFriction: 1,
     };
     // add in eggs
     const egg: DynamicEntity = {
@@ -1671,14 +1668,14 @@ window.onload = async () => {
       health: 1,
       id: nextEntityId++,
       pos: [
-        WORLD_DIMENSION*.5  + Math.random() - .5,
-        WORLD_DIMENSION*.5 + Math.random() - .5,
-        terrain(.5, .5) + .5,
+        WORLD_DIMENSION*.5 + Math.cos(a),
+        WORLD_DIMENSION*.5 + Math.sin(a),
+        terrain(.5, .5) + .7,
       ],
       velocity: [0, 0, 0],
       renderGroupId: nextRenderGroupId++,
       resolutions: [0, 1, 2],
-      modelAtlasIndex: 17,
+      modelAtlasIndex: SYMBOL_INDEX_EGG,
       modelVariant: VARIANT_SYMBOLS,
       entityBody: {
         modelId: MODEL_ID_BILLBOARD,
@@ -1708,9 +1705,9 @@ window.onload = async () => {
     if (rotation > EPSILON) {
       camera.zRotation -= movement[0]/399;
       camera.xRotation = Math.max(
-        -Math.PI/2,
+        -PI_05_1DP,
         Math.min(
-          Math.PI/6,
+          PI_02_1DP,
           camera.xRotation - movement[1]/199,
         ),
       );
@@ -1766,6 +1763,7 @@ window.onload = async () => {
     //const cappedDelta = 20;
     const cappedDelta = Math.min(delta, 40);
     time += cappedDelta;
+    let particleCount = 0;
     
     if (FLAG_SHOW_FPS) {
       lastFrameTimes.push(delta);
@@ -1942,7 +1940,11 @@ window.onload = async () => {
         } = entity;
   
         if (!face) {
-          if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED || entityType == ENTITY_TYPE_INTELLIGENT) {
+          if (
+            entityType == ENTITY_TYPE_PLAYER_CONTROLLED
+            || entityType == ENTITY_TYPE_INTELLIGENT
+            || entityType == ENTITY_TYPE_BABY_DRAGON
+          ) {
             const onGround = entity.lastOnGroundTime + 99 > time && entity.lastOnGroundNormal;
             // do AI stuff
             const entityLateralVelocity = entity.velocity.slice(0, 2) as Vector2;
@@ -1970,7 +1972,7 @@ window.onload = async () => {
                   entity.lastOnGroundNormal,
                 );
                 
-                targetXRotation = Math.acos(cosXRotation) - Math.PI/2;
+                targetXRotation = Math.acos(cosXRotation) - PI_05_1DP;
   
                 if (someLateralInputsWereUnreadOrNonZero) {
                   // turn nicely
@@ -1986,17 +1988,17 @@ window.onload = async () => {
                 }, [0, 0])
               } else {
                 targetXRotation = someLateralInputsWereUnreadOrNonZero && (gliding || flapping)
-                  ? camera.xRotation + Math.PI*.1
+                  ? camera.xRotation + PI_01_1DP
                   : entity.xRotation;
-                targetZRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - Math.PI/2;
+                targetZRotation = Math.atan2(entity.velocity[1], entity.velocity[0]) - PI_05_1DP;
                 
                 if (readInput(INPUT_UP)) {
                   targetUnrotatedLateralOffset = [0, 1];
                 } else {
                   // preemptively undo the rotation below so we continue on in the same direction
                   targetUnrotatedLateralOffset = [
-                    Math.cos(entity.zRotation - camera.zRotation + Math.PI/2),
-                    Math.sin(entity.zRotation - camera.zRotation + Math.PI/2),
+                    Math.cos(entity.zRotation - camera.zRotation + PI_05_1DP),
+                    Math.sin(entity.zRotation - camera.zRotation + PI_05_1DP),
                   ];
                 }
               }
@@ -2052,7 +2054,7 @@ window.onload = async () => {
               const jointAnimation = (someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > .001) && onGround
                 ? targetUnrotatedLateralOffset[1] < 0
                   ? DRAGON_ANIMATION_WALK_BACKWARD
-                  : running || totalEntityLateralVelocity >= entity.maximumLateralVelocity
+                  : running && targetUnrotatedLateralOffset[1] || totalEntityLateralVelocity >= entity.maximumLateralVelocity
                     ? DRAGON_ANIMATION_RUN
                     : DRAGON_ANIMATION_WALK
                 : onGround
@@ -2063,21 +2065,11 @@ window.onload = async () => {
               // align the neck/head with the camera rotation
               let deltaZRotation = mathAngleDiff(entity.zRotation || 0, camera.zRotation);
               deltaZRotation = deltaZRotation > 0
-                ? Math.min(deltaZRotation, Math.PI/2)
-                : Math.max(deltaZRotation, -Math.PI/2);
-              // const neckAndHeadTransform = matrix4Multiply(
-              //   matrix4Rotate(deltaZRotation/2, 0, 0, 1),
-              //   matrix4Rotate(cameraXRotation/2, 1, 0, 0),
-              // );
-              // player.joints[DRAGON_PART_ID_NECK].transform = neckAndHeadTransform;
-              // player.joints[DRAGON_PART_ID_HEAD].transform = matrix4Multiply(
-              //   matrix4Invert(neckAndHeadTransform),
-              //   matrix4Rotate(deltaZRotation, 0, 0, 1),
-              //   matrix4Rotate(cameraXRotation, 1, 0, 0),
-              // );
+                ? Math.min(deltaZRotation, PI_04_1DP)
+                : Math.max(deltaZRotation, -PI_04_1DP);
               // TODO the cumulative rotations applied to the head will make it so there is some x/z rotation
               // from the neck bleeding into the z/x rotation of the head. It's not really noticable though
-              const targetRotation: ReadonlyVector3 = [camera.xRotation/2 + Math.PI/99, 0, deltaZRotation/2];
+              const targetRotation: ReadonlyVector3 = [camera.xRotation/2 + PI_001_2DP, 0, deltaZRotation/2];
               let headAndNeckRotation: ReadonlyVector3;
               if (FLAG_SLOW_HEAD_TURN) {
                 const existingRotation = entity.joints[DRAGON_PART_ID_NECK]['r'] || VECTOR3_EMPTY;
@@ -2152,10 +2144,6 @@ window.onload = async () => {
                   )
                 );
   
-                // const playerTransform = matrix4Multiply(
-                //   matrix4Rotate(cameraZRotation + Math.random()*.2-.1, 0, 0, 1),
-                //   matrix4Rotate(cameraXRotation + Math.PI/20 + Math.random()*.2-.1, 1, 0, 0),
-                // );
                 const velocity: Vector3 = vectorNScaleThenAdd(
                   entity.velocity,
                   headDirection,
@@ -2215,38 +2203,23 @@ window.onload = async () => {
                   );
                   held.velocity = entity.velocity;
                   if (held.entityType == ENTITY_TYPE_INTELLIGENT) {
-                    // stun it
-                    held.lastDecision = time + 1e3;
+                    // stun itss
+                    held.lastDecision = time + 1e4;
                     held.impulses = [];
                   }
                   addEntity(held);
                 }
               }
-  
             } else {
               // AI
               // maybe consider situation
               // randomness ensures that everything in the tile doesn't make its next decision simultaneously
               // TODO (awareness per entity)
-              if ((entity.lastDecision || 0) + 1e3 < time && Math.random() > .9) {
+              if ((entity.lastDecision || 0) + 3e3 < time && Math.random() > .9) {
                 entity.homePosition = entity.homePosition || entity.pos;
-                if (!entity.impulses?.length) {
-                  entity.impulses = [{
-                    intensity: 1,
-                    impulseTarget: {
-                      // TODO make milling range configurable
-                      pos: vectorNScaleThenAdd(
-                        entity.homePosition,
-                        [Math.random() - .5, Math.random() - .5, 0],
-                        9,
-                      ),
-                    }
-                  }];
-                  entity.targetUrgency = .1;
-                }
+                const newImpulses: Impulse[] = [];
   
                 entity.lastDecision = time;
-                const newImpulses: Impulse[] = [];
                 iterateEntityBoundsEntities({
                   // TODO vision per entity
                   bounds: rect3FromRadius(9),
@@ -2265,14 +2238,30 @@ window.onload = async () => {
                   v.intensity = v.intensity * .9 | 0;
                   return v.intensity && !newImpulses.some(i => i.impulseTarget == v.impulseTarget);
                 }) || [];
+
                 entity.impulses.push(...newImpulses);
-                
                 entity.targetUrgency = Math.min(
                   1,
                   entity.impulses.reduce((acc, impulse) => {
                     return acc + Math.abs(impulse.intensity)/9;
                   }, 0)
                 );
+
+                // TODO configure mill liklihood
+                if (!entity.impulses.length && Math.random() > .5) {
+                  entity.impulses.push({
+                    intensity: 1,
+                    impulseTarget: {
+                      // TODO make milling range configurable
+                      pos: vectorNScaleThenAdd(
+                        entity.homePosition,
+                        [Math.random() - .5, Math.random() - .5, 0],
+                        5,
+                      ),
+                    }
+                  });
+                  entity.targetUrgency = .4;
+                }
               }
   
   
@@ -2305,6 +2294,22 @@ window.onload = async () => {
               const angle = length > EPSILON
                 ? Math.atan2(targetLateralDelta[1], targetLateralDelta[0])
                 : 0;
+              if(entity.entityType == ENTITY_TYPE_BABY_DRAGON) {
+                setJointAnimations(
+                  entity,
+                  length > EPSILON
+                    ? entity.targetUrgency > 1
+                      ? DRAGON_ANIMATION_RUN
+                      : DRAGON_ANIMATION_WALK
+                    : Math.random() < .01
+                      ? DRAGON_ANIMATION_FLAP
+                      : DRAGON_ANIMATION_IDLE
+                );
+                if (length > EPSILON) {
+                  entity.zRotation = angle - PI_05_1DP;
+                }
+              }
+                
               const totalTargetVelocity = Math.min(
                 entity.maximumLateralVelocity * (entity.targetUrgency || 1),
                 length/cappedDelta,
@@ -2344,7 +2349,7 @@ window.onload = async () => {
                     : entity.velocity
                 );
                 const velocityNormal = vectorNNormalize(entity.velocity);
-                const targetLateralAngle = Math.atan2(targetLateralNormal[1], targetLateralNormal[0]) - Math.PI/2;
+                const targetLateralAngle = Math.atan2(targetLateralNormal[1], targetLateralNormal[0]) - PI_05_1DP;
                 // tilt up or down to match the x rotation
                 const targetVelocityNormal = vector3TransformMatrix4(
                   matrix4Rotate(xRotation, Math.cos(targetLateralAngle), Math.sin(targetLateralAngle), 0),
@@ -2835,7 +2840,9 @@ window.onload = async () => {
               );
             }
           
-            let checkInvincible = hasEntityAnimation(entity, ACTION_ID_TAKE_DAMAGE) || !(entity.health > 0);
+            let checkInvincible = hasEntityAnimation(entity, ACTION_ID_TAKE_DAMAGE)
+              || !(entity.health > 0)
+              || check.pendingDamage;
             let checkDamaged: Booleanish;
           
             switch (entity.entityType) {
@@ -2884,7 +2891,7 @@ window.onload = async () => {
                       ),
                     ]
                   ],
-                  transient: 1,
+                  //transient: 1,
                   inverseFriction: 0,
                   modelVariant: VARIANT_FIRE,
                   health: 9,
@@ -2901,7 +2908,7 @@ window.onload = async () => {
                   // do damage to thing
                   checkDamaged = 1;
                   // gain some health
-                  entity.health += 9;
+                  entity.health++
                 }
                 break;
               case ENTITY_TYPE_PLAYER_CONTROLLED:
@@ -2945,6 +2952,7 @@ window.onload = async () => {
         }
         // update any passive behaviours
         let lookAtCamera: Booleanish;
+
         switch (entity.entityType) {
           case ENTITY_TYPE_FIRE:
             // only fall down if not burning something
@@ -2955,7 +2963,7 @@ window.onload = async () => {
               entity.gravity = DEFAULT_GRAVITY;
             }
             // burn
-            if ((entity.lastSpawnedParticle || 0) + 99 < time) {
+            if ((entity.lastSpawnedParticle || 0) + 300 < time) {
               addEntity({
                 entityBody: BILLBOARD_PART,
                 bodyTransform: matrix4Scale(.4),
@@ -2999,19 +3007,27 @@ window.onload = async () => {
               entity.health--;
               entity.lastSpawnedParticle = time;
             }
+            lookAtCamera = 1;
+            break;
           case ENTITY_TYPE_PARTICLE:
-          case ENTITY_TYPE_INTELLIGENT:
+            particleCount++;
+            if (particleCount > 99) {
+              entity.dead = 1;
+            }
+            // fall through
           case ENTITY_TYPE_SCENERY:
+          case ENTITY_TYPE_INTELLIGENT:
           case ENTITY_TYPE_ITEM:
             lookAtCamera = !(entity.health <= 0);
             break;
         }
         if( lookAtCamera) {
-          // rotate to look at camera
-          entity.zRotation = Math.atan2(
+          const cameraAngle = Math.atan2(
             camera.pos[1] - entity.pos[1],
             camera.pos[0] - entity.pos[0],
-          );
+          );  
+          // rotate to look at camera
+          entity.zRotation = cameraAngle;
         }
   
         if (entity.collisionVelocityLoss && entity.inverseMass) {

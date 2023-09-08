@@ -67,7 +67,7 @@ function synthesizeFromOppositeJointAnimationSequences<PartId extends number>(
     if (synthesized) {
       //const synthesizedRotations = rotations.map(rotation => vectorNMultiply(rotation, animationScaling));
       const synthesizedRotations = rotations.map(
-        rotation => vectorNScaleThenAdd<ReadonlyVector3>([Math.PI, Math.PI, Math.PI], rotation, -1)
+        rotation => vectorNScaleThenAdd<ReadonlyVector3>([PI_1_2DP, PI_1_2DP, PI_1_2DP], rotation, -1)
       );
       if (alternate) {
         synthesizedRotations.push(...synthesizedRotations.splice(0, synthesizedRotations.length/2 | 0));
