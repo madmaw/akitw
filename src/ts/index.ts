@@ -223,7 +223,7 @@ const FRAGMENT_SHADER = `#version 300 es
     ${L_BASE_COLOR} = ${L_MAX_COLOR} * il + ${L_BASE_COLOR} * (1. - il);
 
     vec3 ${L_WATER_DISTANCE} = ${L_CAMERA_DELTA}
-      * (1. - max(0., sin(${U_TIME}/1999.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
+      * (1. - max(0., sin(${U_TIME}/2000.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
     float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
     // lighting
     float ${L_LIGHTING} = max(
@@ -448,7 +448,7 @@ window.onload = async () => {
   ([
     [
       BIOME_TROPICAL,
-      9999,
+      1e4,
       clusteredDistributionFactory(
         3,
         3,
@@ -464,7 +464,7 @@ window.onload = async () => {
     ],
     [
       BIOME_BROADLEAF_FOREST,
-      9999,
+      1e4,
       clusteredDistributionFactory(
         9,
         9,
@@ -480,7 +480,7 @@ window.onload = async () => {
     ],
     [
       BIOME_CONIFEROUS_FOREST,
-      9999,
+      1e4,
       clusteredDistributionFactory(
         6,
         6,
@@ -496,7 +496,7 @@ window.onload = async () => {
     ],
     [
       BIOME_CIVILISATION,
-      999,
+      1e3,
       clusteredDistributionFactory(
         9,
         9,
@@ -1248,8 +1248,12 @@ window.onload = async () => {
             (ctx, y) => {
               ctx.font = `${MATERIAL_SYMBOL_TEXTURE_DIMENSION*.8 | 0}px serif`;
               ctx.textAlign = 'center';
-              ctx.textBaseline = 'bottom';
-              ctx.fillText(c, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
+              if (FLAG_EXPLICIT_TEXT_BASELINE) {
+                ctx.textBaseline = 'bottom';                
+                ctx.fillText(c, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION);
+              } else {
+                ctx.fillText(c, MATERIAL_SYMBOL_TEXTURE_DIMENSION/2, y + MATERIAL_SYMBOL_TEXTURE_DIMENSION * .8);
+              }
             },
           ];   
         }),
@@ -1284,7 +1288,7 @@ window.onload = async () => {
           if (FLAG_CLOUDS) {
             const distribution = clusteredDistributionFactory(9, 9, 1, 2, .8, 5);
             ctx.fillStyle = '#00F';
-            for (let i=0; i<999; i++) {
+            for (let i=0; i<1e3; i++) {
               const [x, y, scale] = distribution(MATERIAL_TERRAIN_TEXTURE_DIMENSION)
               const r = 9 * scale;
               if (x < MATERIAL_TERRAIN_TEXTURE_DIMENSION - r) {
@@ -1316,7 +1320,7 @@ window.onload = async () => {
         featureMaterial(
           staticFeature,
           16,
-          999,
+          1e3,
           randomDistributionFactory(.5, 2),
         ),  
         featureMaterial(
@@ -1345,13 +1349,13 @@ window.onload = async () => {
         featureMaterial(
           staticFeature,
           16,
-          999,
+          1e3,
           randomDistributionFactory(1, 2),
         ),  
         featureMaterial(
           riverStonesFeatureFactory(1),
           48,
-          999,
+          1e3,
           clusteredDistributionFactory(9, 24, 2, 1, .5, 2),
         ),  
       ],
@@ -1364,7 +1368,7 @@ window.onload = async () => {
         featureMaterial(
           riverStonesFeatureFactory(.8),
           16,
-          9999,
+          1e4,
           randomDistributionFactory(0, 0),
         ),  
       ],
@@ -1715,7 +1719,7 @@ window.onload = async () => {
   if (FLAG_ALLOW_ZOOM || FLAG_PREVENT_DEFAULT) {
     const cb = (e: WheelEvent) => {
       if (FLAG_ALLOW_ZOOM) {
-        const v = e.deltaY/999;
+        const v = e.deltaY/1e3;
         if (Math.abs(cameraZoom) < 1) {
           cameraZoom = Math.min(cameraZoom - v, -2);
         } else {
@@ -2089,7 +2093,7 @@ window.onload = async () => {
               entity.joints[DRAGON_PART_ID_NECK]['r'] = headAndNeckRotation;
               entity.joints[DRAGON_PART_ID_HEAD]['r'] = headAndNeckRotation;
   
-              entity.fireReservior = Math.min((entity.fireReservior || 0) + cappedDelta, 9999);
+              entity.fireReservior = Math.min((entity.fireReservior || 0) + cappedDelta, 1e4);
   
               if (
                 (entity.lastFired || 0) + 50 - Math.sqrt(entity.fireReservior) < time
@@ -2097,7 +2101,7 @@ window.onload = async () => {
               ) {
                 setJointAnimations(entity, DRAGON_ANIMATION_SHOOT);
                 if (entity.contained?.length) {
-                  entity.lastFired = time + 999;
+                  entity.lastFired = time + 1e3;
                   entity.fireReservior = 0;
                 } else {
                   entity.lastFired = time;
@@ -2183,7 +2187,7 @@ window.onload = async () => {
                     modelVariant: VARIANT_FIRE,
                     anims: [[
                       createAttributeAnimation(
-                        999 * (Math.random()+entity.fireReservior/9999),
+                        1e3 * (Math.random()+entity.fireReservior/1e4),
                         'at',
                         EASING_QUAD_IN,
                         createMatrixUpdate(p => matrix4Scale(p + collisionRadius)),
@@ -2212,7 +2216,7 @@ window.onload = async () => {
                   held.velocity = entity.velocity;
                   if (held.entityType == ENTITY_TYPE_INTELLIGENT) {
                     // stun it
-                    held.lastDecision = time + 999;
+                    held.lastDecision = time + 1e3;
                     held.impulses = [];
                   }
                   addEntity(held);
@@ -2224,7 +2228,7 @@ window.onload = async () => {
               // maybe consider situation
               // randomness ensures that everything in the tile doesn't make its next decision simultaneously
               // TODO (awareness per entity)
-              if ((entity.lastDecision || 0) + 999 < time && Math.random() > .9) {
+              if ((entity.lastDecision || 0) + 1e3 < time && Math.random() > .9) {
                 entity.homePosition = entity.homePosition || entity.pos;
                 if (!entity.impulses?.length) {
                   entity.impulses = [{
@@ -2818,7 +2822,7 @@ window.onload = async () => {
                 + (check as DynamicEntity).collisionRadius
                 - entityDistance;
           
-              const divisor = 1999*(inverseMass + (check.inverseMass || 0));
+              const divisor = 2e3*(inverseMass + (check.inverseMass || 0));
               entity.velocity = entity.velocity && vectorNScaleThenAdd(
                 entity.velocity,
                 entityDelta,
@@ -2873,7 +2877,7 @@ window.onload = async () => {
                     ],
                     [
                       createAttributeAnimation(
-                        -999,
+                        -1e3,
                         'at',
                         EASING_QUAD_IN_OUT,
                         createMatrixUpdate(p => matrix4Scale(p/5 + .9))
@@ -2974,7 +2978,7 @@ window.onload = async () => {
                 anims: [
                   [
                     createAttributeAnimation(
-                      999 + Math.random() * 999,
+                      1e3 + Math.random() * 1e3,
                       'at',
                       EASING_QUAD_IN,
                       createMatrixUpdate(p => matrix4Scale(1 - p)),

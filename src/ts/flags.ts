@@ -22,3 +22,4 @@ const FLAG_ALLOW_ZOOM = ENVIRONMENT == 'test';
 const FLAG_REPOPULATE = true;
 const FLAG_SLOW_HEAD_TURN = ENVIRONMENT != 'ultra';
 const FLAG_SLOW_CAMERA = true;
+const FLAG_EXPLICIT_TEXT_BASELINE = false;
