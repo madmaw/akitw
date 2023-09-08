@@ -12,6 +12,16 @@ const EASING_QUAD_IN_OUT: Easing = t => t <= .5 ? t * t * 2 : 1 - Math.pow(t-1, 
 const EASING_LINEAR: Easing = t => t;
 const EASING_SINUSOIDAL: Easing = t => Math.sin(t*Math.PI);
 
+const EASINGS = [
+  EASING_BOUNCE,
+  EASING_BACK_IN,
+  EASING_QUAD_IN,
+  EASING_QUAD_OUT,
+  EASING_QUAD_IN_OUT,
+  EASING_LINEAR,
+  EASING_SINUSOIDAL,
+];
+
 type Anim<T> = (e: T, delta: number) => Booleanish;
 
 function createAttributeAnimation<E, K extends keyof E>(

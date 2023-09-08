@@ -415,384 +415,412 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
 };
 
 const DRAGON_ANIMATION_GLIDE_FRAME_DURATION = 400;
+const DRAGON_ANIMATION_GLIDE_SEQUENCES: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [Math.PI*.1, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_QUAD_RIGHT,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_SHIN_RIGHT,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+    EASING_QUAD_IN,
+    [-Math.PI*.2, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_1_RIGHT,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+    [0, -Math.PI*.02, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_2_RIGHT,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.1, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_3_RIGHT,
+    DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+  ],
+];
 const DRAGON_ANIMATION_GLIDE: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_GLIDE,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [Math.PI*.1, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_QUAD_RIGHT,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_SHIN_RIGHT,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
-        EASING_QUAD_IN,
-        [-Math.PI*.2, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_1_RIGHT,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-        [0, -Math.PI*.02, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.1, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_GLIDE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-      ],
-    ],
+    safeUnpackJointAnimationSequences(
+      ['(5,)HHH+C,)KHH,5,)HHH-5*)BHH.5,*HHHHGH/5,)HKH05,)HHH'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_GLIDE_SEQUENCES,
+    ) as JointAnimationSequences<DragonPartIds>,
   ),
 ];
 
 const DRAGON_ANIMATION_FLAP_FRAME_DURATION = 400;
+const DRAGON_ANIMATION_FLAP_SEQUENCES: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+    EASING_QUAD_IN,
+    [0, 0, 0],
+    [-Math.PI*.1, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_QUAD_RIGHT,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+    [Math.PI*.2, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_SHIN_RIGHT,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION*2,
+    EASING_QUAD_IN,
+    [-Math.PI*.2, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+    [Math.PI*.2, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_1_RIGHT,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [-Math.PI*.1, -Math.PI*.4, 0],
+    [-Math.PI*.2, Math.PI*.4, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_2_RIGHT,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.2, 0],
+    [0, Math.PI*.1, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_3_RIGHT,
+    DRAGON_ANIMATION_FLAP_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.3, 0],
+    [0, -Math.PI*.1, 0],
+  ],
+];
 const DRAGON_ANIMATION_FLAP: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_FLAP,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
-        EASING_QUAD_IN,
-        [0, 0, 0],
-        [-Math.PI*.1, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_QUAD_RIGHT,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-        [Math.PI*.2, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_SHIN_RIGHT,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION*2,
-        EASING_QUAD_IN,
-        [-Math.PI*.2, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-        [Math.PI*.2, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_1_RIGHT,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [-Math.PI*.1, -Math.PI*.4, 0],
-        [-Math.PI*.2, Math.PI*.4, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.2, 0],
-        [0, Math.PI*.1, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_FLAP_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.3, 0],
-        [0, -Math.PI*.1, 0],
-      ],
-    ],
+    safeUnpackJointAnimationSequences(
+      ['(5**HHHEHH,5,*HHHNHH-C*)BHH+5,*HHHNHH.5,*E;HBUH/5,*HBHHKH05,*HRHHEH'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_FLAP_SEQUENCES,
+    ) as JointAnimationSequences<DragonPartIds>,
   ),
 ];
 
   
 const DRAGON_ANIMATION_RUN_FRAME_DURATION = 200;
+const DRAGON_ANIMATION_RUN_SEQUENCE: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_QUAD_RIGHT,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [Math.PI*.5, 0, 0],
+    [-Math.PI*.3, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_SHIN_RIGHT,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION,
+    EASING_QUAD_IN,
+    [-Math.PI*.3, 0, 0],
+    [-Math.PI*.5, 0, 0],
+    [Math.PI*.4, 0, 0],
+    [-Math.PI*.5, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [-Math.PI*.05, Math.PI*.05, 0],
+    [-Math.PI*.05, -Math.PI*.05, 0],
+    [-Math.PI*.1, Math.PI*.05, 0],
+    [-Math.PI*.1, -Math.PI*.05, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION * .8,
+    EASING_QUAD_IN_OUT,
+    [0, 0, Math.PI*.05],
+    [0, 0, -Math.PI*.05],
+  ],
+  [
+    DRAGON_PART_ID_WING_1_RIGHT,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.2, 0],
+    [0, -Math.PI*.1, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_2_RIGHT,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.3, 0],
+    [0, -Math.PI*.2, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_3_RIGHT,
+    DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.3, 0],
+    [0, Math.PI*.4, 0],
+  ],
+];
 const DRAGON_ANIMATION_RUN: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_RUN,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_QUAD_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [Math.PI*.5, 0, 0],
-        [-Math.PI*.3, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_SHIN_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION,
-        EASING_QUAD_IN,
-        [-Math.PI*.3, 0, 0],
-        [-Math.PI*.5, 0, 0],
-        [Math.PI*.4, 0, 0],
-        [-Math.PI*.5, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [-Math.PI*.05, Math.PI*.05, 0],
-        [-Math.PI*.05, -Math.PI*.05, 0],
-        [-Math.PI*.1, Math.PI*.05, 0],
-        [-Math.PI*.1, -Math.PI*.05, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * .8,
-        EASING_QUAD_IN_OUT,
-        [0, 0, Math.PI*.05],
-        [0, 0, -Math.PI*.05],
-      ],
-      [
-        DRAGON_PART_ID_WING_1_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.2, 0],
-        [0, -Math.PI*.1, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.3, 0],
-        [0, -Math.PI*.2, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_RUN_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.3, 0],
-        [0, Math.PI*.4, 0],
-      ],
-    ],
+    safeUnpackJointAnimationSequences(
+      [',5,*XHH>HH-/*,>HH8HHUHH8HH(/,,FJHFFHEJHEFH+-,*HHJHHF.5,*HBHHEH/5,*H>HHBH05,*HRHHUH'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_RUN_SEQUENCE,
+    ) as JointAnimationSequences<DragonPartIds>,
     1,
   ),
 ];
 
 const DRAGON_ANIMATION_WALK_FRAME_DURATION = 300;
+const DRAGON_ANIMATION_WALK_SEQUENCE: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_QUAD_RIGHT,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [Math.PI*.3, 0, 0],
+    [-Math.PI*.1, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_SHIN_RIGHT,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION,
+    EASING_QUAD_IN,
+    [0, 0, 0],
+    [-Math.PI*.2, 0, 0],
+    [Math.PI*.1, 0, 0],
+    [-Math.PI*.2, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.05, 0],
+    [0, -Math.PI*.05, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, 0, Math.PI*.05],
+    [0, 0, -Math.PI*.05],
+  ],
+  [
+    DRAGON_PART_ID_WING_1_RIGHT,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.2, 0],
+    [0, Math.PI*.1, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_2_RIGHT,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.6, 0],
+    [0, -Math.PI*.4, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_3_RIGHT,
+    DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.4, 0],
+    [0, Math.PI*.6, 0],
+  ],
+];
 const DRAGON_ANIMATION_WALK: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_WALK,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_QUAD_RIGHT,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [Math.PI*.3, 0, 0],
-        [-Math.PI*.1, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_SHIN_RIGHT,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION,
-        EASING_QUAD_IN,
-        [0, 0, 0],
-        [-Math.PI*.2, 0, 0],
-        [Math.PI*.1, 0, 0],
-        [-Math.PI*.2, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.05, 0],
-        [0, -Math.PI*.05, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, 0, Math.PI*.05],
-        [0, 0, -Math.PI*.05],
-      ],
-      [
-        DRAGON_PART_ID_WING_1_RIGHT,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.2, 0],
-        [0, Math.PI*.1, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.6, 0],
-        [0, -Math.PI*.4, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_WALK_FRAME_DURATION * 2,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.4, 0],
-        [0, Math.PI*.6, 0],
-      ],
-    ],
+    safeUnpackJointAnimationSequences(
+      [',<,*RHHEHH-2*,HHHBHHKHHBHH(<,*HJHHFH+<,*HHJHHF.<,*HNHHKH/<,*H5HH;H0<,*HUHH[H'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_WALK_SEQUENCE,
+    ) as JointAnimationSequences<DragonPartIds>,
     1,
   ),
 ];
 
+const DRAGON_ANIMATION_WALK_BACKWARD_SEQUENCE: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_QUAD_RIGHT,
+    300,
+    EASING_QUAD_IN,
+    [-Math.PI/4, 0, 0],
+    [Math.PI/2, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_SHIN_RIGHT,
+    300,
+    EASING_QUAD_IN_OUT,
+    [-Math.PI/3, 0, 0],
+    [Math.PI/4, 0, 0],
+  ],    
+];
 const DRAGON_ANIMATION_WALK_BACKWARD: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_WALK_BACKWARD,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_QUAD_RIGHT,
-        300,
-        EASING_QUAD_IN,
-        [-Math.PI/4, 0, 0],
-        [Math.PI/2, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_SHIN_RIGHT,
-        300,
-        EASING_QUAD_IN_OUT,
-        [-Math.PI/3, 0, 0],
-        [Math.PI/4, 0, 0],
-      ],    
-    ]
+    safeUnpackJointAnimationSequences(
+      [',2**@HHXHH-2,*=HHPHH'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_WALK_BACKWARD_SEQUENCE,
+    ) as JointAnimationSequences<DragonPartIds>,
+    1,
   ),
 ];
 
 const DRAGON_ANIMATION_IDLE_FRAME_DURATION = 999;
+const DRAGON_ANIMATION_IDLE_SEQUENCE: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_QUAD_RIGHT,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+    [Math.PI*.01, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_SHIN_RIGHT,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+    [-Math.PI*.01, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_1_RIGHT,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [-Math.PI*.01, Math.PI*.3, 0],
+    [0, Math.PI*.29, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_2_RIGHT,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.8, 0],
+    //[0, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_3_RIGHT,
+    DRAGON_ANIMATION_IDLE_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, Math.PI*.8, 0],
+    //[0, 0, 0],
+  ],
+];
 const DRAGON_ANIMATION_IDLE: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_IDLE,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_QUAD_RIGHT,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-        [Math.PI*.01, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_SHIN_RIGHT,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-        [-Math.PI*.01, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_1_RIGHT,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [-Math.PI*.01, Math.PI*.3, 0],
-        [0, Math.PI*.29, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.8, 0],
-        //[0, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_IDLE_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, Math.PI*.8, 0],
-        //[0, 0, 0],
-      ],
-
-    ]
+    safeUnpackJointAnimationSequences(
+      [',I,*HHHHHH-I,)HHH(I,*HHHHHH+I,)HHH.I,*HRHHQH/I,)H.H0I,)HbH'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_IDLE_SEQUENCE,
+    ) as JointAnimationSequences<DragonPartIds>,
   )
 ];
   
 const DRAGON_ANIMATION_FALL_FRAME_DURATION = 999;
+const DRAGON_ANIMATION_FALL_SEQUENCE: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_FALL_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_FALL_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [-Math.PI * .3, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_1_RIGHT,
+    DRAGON_ANIMATION_FALL_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.3, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_2_RIGHT,
+    DRAGON_ANIMATION_FALL_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.1, 0],
+  ],
+  [
+    DRAGON_PART_ID_WING_3_RIGHT,
+    DRAGON_ANIMATION_FALL_FRAME_DURATION,
+    EASING_QUAD_IN_OUT,
+    [0, -Math.PI*.1, 0],
+  ],
+];
 const DRAGON_ANIMATION_FALL: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_IDLE,
   ...synthesizeFromOppositeJointAnimationSequences(
     DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_FALL_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_FALL_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [-Math.PI * .3, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_1_RIGHT,
-        DRAGON_ANIMATION_FALL_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.3, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_2_RIGHT,
-        DRAGON_ANIMATION_FALL_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.1, 0],
-      ],
-      [
-        DRAGON_PART_ID_WING_3_RIGHT,
-        DRAGON_ANIMATION_FALL_FRAME_DURATION,
-        EASING_QUAD_IN_OUT,
-        [0, -Math.PI*.1, 0],
-      ],
-
-    ]
-  )
+    safeUnpackJointAnimationSequences(
+      ['(I,)HHH+I,)>HH.I,)H>H/I,)HEH0I,)HEH'],
+      FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_FALL_SEQUENCE,
+    ) as JointAnimationSequences<DragonPartIds>,    
+  ),
 ];
 
 const DRAGON_ANIMATION_SHOOT_FRAME_DURATION = 200;
+const DRAGON_ANIMATION_SHOOT_SEQUENCE: JointAnimationSequences<DragonPartIds> = [
+  [
+    DRAGON_PART_ID_BODY,
+    DRAGON_ANIMATION_SHOOT_FRAME_DURATION,
+    EASING_QUAD_IN,
+    [-Math.PI*.1, 0, 0],
+  ],
+  [
+    DRAGON_PART_ID_TAIL,
+    DRAGON_ANIMATION_SHOOT_FRAME_DURATION,
+    EASING_QUAD_IN,
+    [-Math.PI * .1, 0, 0],
+  ],
+];
+// NOTE no need to symthesize as the parts aren't symmetrical
 const DRAGON_ANIMATION_SHOOT: ActionJointAnimationSequences<DragonPartIds> = [
   ACTION_ID_SHOOT,
-  ...synthesizeFromOppositeJointAnimationSequences(
-    DRAGON_PART,
-    [
-      [
-        DRAGON_PART_ID_BODY,
-        DRAGON_ANIMATION_SHOOT_FRAME_DURATION,
-        EASING_QUAD_IN,
-        [-Math.PI*.1, 0, 0],
-      ],
-      [
-        DRAGON_PART_ID_TAIL,
-        DRAGON_ANIMATION_SHOOT_FRAME_DURATION,
-        EASING_QUAD_IN,
-        [-Math.PI * .1, 0, 0],
-      ],
-    ],
-    1,
-  ),
+  ...safeUnpackJointAnimationSequences(
+    ['(/*)EHH+/*)EHH'],
+    FLAG_UNPACK_USE_ORIGINALS && DRAGON_ANIMATION_SHOOT_SEQUENCE,
+  ) as JointAnimationSequences<DragonPartIds>,
 ];

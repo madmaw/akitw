@@ -2,7 +2,7 @@ const ENVIRONMENT: 'test' | 'small' | 'ultra' = 'test' as any;
 
 const FLAG_SHOW_GL_ERRORS = ENVIRONMENT == 'test';
 const FLAG_SHOW_FPS = ENVIRONMENT == 'test';
-const FLAG_DEBUG_SHORTENED_METHODS = ENVIRONMENT == 'test';
+const FLAG_DEBUG_SHORTENED_METHODS = ENVIRONMENT == 'test' && false;
 const FLAG_QUICK_COLLISIONS = ENVIRONMENT != 'ultra';
 const FLAG_CHECK_STARTS_OVERLAPPING = ENVIRONMENT == 'test';
 const FLAG_LOW_POLY_TERRAIN = true;

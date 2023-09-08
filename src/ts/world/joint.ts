@@ -4,7 +4,7 @@ type JointAnimationSequence<PartId extends number> = readonly [
   Easing,
   ...readonly ReadonlyVector3[],
 ];
-type JointAnimationSequences<PartId extends number> = JointAnimationSequence<PartId>[];
+type JointAnimationSequences<PartId extends number> = readonly JointAnimationSequence<PartId>[];
 // partid to animate, duration for each transition, easing to use, angles to transition to in order
 type ActionJointAnimationSequences<PartId extends number> = readonly [
   ActionId,

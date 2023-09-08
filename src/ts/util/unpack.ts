@@ -42,7 +42,7 @@ const unpackNumberBuilder = (scale: number, offset: number): Unpacker<number> =>
   };
 }
 
-const unpackAngle = unpackNumberBuilder(Math.PI, -Math.PI);
+const unpackAngle = unpackNumberBuilder(Math.PI*2, -Math.PI);
 // 0 to 64 (TODO should be 0..63)
 const unpackUnsignedInteger = unpackNumberBuilder(64, 0);
 // goes from -2 to 2
@@ -70,7 +70,7 @@ const unpackRecordBuilder = <Key extends string | number, Value>(
   };
 };
 
-const unpackVector3Rotations = unpackArrayBuilder(unpackArrayBuilder<ReadonlyVector3>(unpackAngle, 3), -1);
+const unpackVector3Rotations = unpackArrayBuilder(unpackArrayBuilder<ReadonlyVector3>(unpackAngle, 3));
 const unpackVector3Normal = unpackArrayBuilder<ReadonlyVector3>(unpackFloat1, 3);
 const unpackVector3Point = unpackArrayBuilder<ReadonlyVector3>(unpackFloatHalf, 3);
 const unpackVector4RGBA: Unpacker<ReadonlyVector4> = unpackArrayBuilder(unpackColorComponent, 4);
@@ -83,6 +83,20 @@ const unpackVector3Points = unpackArrayBuilder(unpackVector3Point);
 
 const unpackPolygon = unpackArrayBuilder(unpackVector3Normal);
 const unpackPolygons = unpackArrayBuilder(unpackPolygon);
+
+const unpackJointAnimationSequence: Unpacker<JointAnimationSequence<number>> = (c: string[]) => {
+  const partId = unpackUnsignedInteger(c);
+  const duration = unpackUnsignedInteger(c) * 30;
+  const easing = EASINGS[unpackUnsignedInteger(c)];
+  const rotations = unpackVector3Rotations(c);
+  return [
+    partId,
+    duration,
+    easing,
+    ...rotations,
+  ];
+};
+const unpackJointAnimationsSequences = unpackArrayBuilder(unpackJointAnimationSequence, -1);
 
 const unpackFaces: Unpacker<readonly Face<PlaneMetadata>[]> = (c: string[]) => {
   const points = unpackVector3Points(c);
@@ -149,7 +163,7 @@ const packNumberBuilder = (scale: number, offset: number): Packer<number> => {
 };
 
 // -PI..PI
-const packAngle = packNumberBuilder(Math.PI, -Math.PI);
+const packAngle = packNumberBuilder(Math.PI * 2, -Math.PI);
 // 0..64 (TODO should be 0..63)
 const packUnsignedInteger = packNumberBuilder(64, 0);
 // -2..2
@@ -183,7 +197,7 @@ const packRecordBuilder = <Key extends string | number, Value>(keyPacker: Packer
   };
 };
 
-const packVector3Rotations = packArrayBuilder(packArrayBuilder<ReadonlyVector3>(packAngle, 3), -1);
+const packVector3Rotations = packArrayBuilder(packArrayBuilder<ReadonlyVector3>(packAngle, 3));
 const packVector3Normal = packArrayBuilder<ReadonlyVector3>(packFloat1, 3)
 const packVector3Point = packArrayBuilder<ReadonlyVector3>(packFloatPoint5, 3)
 const packVector4RGBA = packArrayBuilder(packColorComponent, 4);
@@ -197,9 +211,21 @@ const packVector3Points = packArrayBuilder(packVector3Point);
 
 const packUnsignedIntegerArray3 = packArrayBuilder(packArrayBuilder(packArrayBuilder(packUnsignedInteger)));
 
-// const packJointAnimationSequence: Packer<JointAnimationSequence<number>> = (sequeunce: JointAnimationSequence<number>) => {
-  
-// }
+const packJointAnimationSequence: Packer<JointAnimationSequence<number>> = ([
+  partId,
+  duration,
+  easing,
+  ...rotations
+]: JointAnimationSequence<number>) => {
+  return [
+    ...packUnsignedInteger(partId),
+    ...packUnsignedInteger(duration/30),
+    ...packUnsignedInteger(EASINGS.indexOf(easing)),
+    ...packVector3Rotations(rotations),
+  ];
+}
+
+const packJointAnimationsSequences = packArrayBuilder(packJointAnimationSequence, -1);
 
 const packFaces: Packer<readonly Face<PlaneMetadata>[]> = (faces: Face<PlaneMetadata>[]) => {
   // find all the unique, transformed points
@@ -341,3 +367,10 @@ const safeUnpackFaces = FLAG_UNPACK_CHECK_ORIGINALS
       FLAG_UNPACK_CHECK_ORIGINALS && packFaces,
     )
     : unpackFaces;
+
+const safeUnpackJointAnimationSequences = FLAG_UNPACK_CHECK_ORIGINALS
+    ? safeUnpackerBuilder<JointAnimationSequences<number>>(
+      unpackJointAnimationsSequences,
+      FLAG_UNPACK_CHECK_ORIGINALS && packJointAnimationsSequences,
+    )
+    : unpackJointAnimationsSequences;
