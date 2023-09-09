@@ -193,10 +193,23 @@ module.exports = function (grunt) {
             overwrite: true,
             replacements: [
               // convert from back ticks as regex ignores stuff in backticks?!
+              // backticks add bytes apparently
               {
                 from: "`",
                 to:"\""
               },
+            ]
+          },
+          js00: {
+            src: ['dist/out.min.js'],
+            overwrite: true,
+            replacements: [
+              /* GLSL // comments */ 
+              // note if double quotes are used by CC, \n becomes \\n
+              {
+                from: /\/\/([^\\])*\\n/g,
+                to:""
+              },              
             ]
           },
           js1: {
@@ -226,11 +239,6 @@ module.exports = function (grunt) {
                 from: "window.",
                 to:""
               },
-              /* GLSL // comments */ 
-              {
-                from: /\/\/([^\n])*\n/g,
-                to:""
-              }, 
               // GLSL /* */ comments
               // interferes with packing, just don't use this comment style
               // {
@@ -298,14 +306,14 @@ module.exports = function (grunt) {
                 to:" "
               },
               // everything back to back ticks
-              {
-                from: "\"",
-                to:"`"
-              },
+              // {
+              //   from: "\"",
+              //   to:"`"
+              // },
               // GLSL demands a new line here
               {
                 from: "#version 300 es",
-                to:"#version 300 es\n"
+                to:"#version 300 es\\n"
               },
               // turn lets to vars, black hat, look here if you get weird behaviour
               // {
@@ -362,6 +370,11 @@ module.exports = function (grunt) {
             // undefined params can just be left off
             {
               from: ",undefined)",
+              to: ")",
+            },
+            // false (CC turns into !1) can be left off
+            {
+              from: ",!1)",
               to: ")",
             }
           ]
@@ -446,15 +459,14 @@ module.exports = function (grunt) {
     'copy',
     'cssmin', 
     'replace:html', 
-    'replace:js0',
+    //'replace:js0',
+    'replace:js00',
     'replace:js1',
     'replace:js2',
     'replace:js3',
     'exec:roadroller',
-    //'replace:js', 'replace:js2', 'replace:js2', 
     'inline', 
     'htmlmin',
-    /* 'replace:html2',*/
     'exec:zip',
     'exec:dir',
   ]);

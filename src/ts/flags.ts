@@ -16,6 +16,8 @@ const FLAG_ENFORCE_BOUNDARY = false;
 const FLAG_SHORT_GLSL_VARIABLE_NAMES = true;
 const FLAG_UNPACK_CHECK_ORIGINALS = ENVIRONMENT == 'test';
 const FLAG_UNPACK_USE_ORIGINALS = ENVIRONMENT == 'test';
+// doesn't seem to help, also CC bugs out on the animation unpacker for some reason
+const FLAG_UNPACK_ANIMATIONS = false;
 const FLAG_CLEAR_COLOR = false;
 const FLAG_PREVENT_DEFAULT = ENVIRONMENT != 'ultra';
 const FLAG_ALLOW_ZOOM = ENVIRONMENT == 'test';
@@ -23,3 +25,4 @@ const FLAG_REPOPULATE = true;
 const FLAG_SLOW_HEAD_TURN = ENVIRONMENT != 'ultra';
 const FLAG_SLOW_CAMERA = true;
 const FLAG_EXPLICIT_TEXT_BASELINE = false;
+const FLAG_HARD_CODE_CONSTANTS = true;

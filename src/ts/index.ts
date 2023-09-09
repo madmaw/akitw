@@ -4,13 +4,12 @@ const U_WORLD_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'a' : 'uWorldPosition'
 const U_WORLD_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'b' : 'uWorldRotation';
 const U_PROJECTION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'c' : 'uProjection';
 const U_CAMERA_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'd' : 'uCameraPosition';
-const U_FOCUS_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'e' : 'uFocusPosition';
+const U_FOCUS_POSITION_AND_WATER_LEVEL = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'e' : 'uFocusPosition';
 const U_MATERIAL_ATLAS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'f' : 'uMaterialAtlas';
 const U_MATERIAL_TEXTURE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'g' : 'uMaterialTexture';
 const U_MATERIAL_COLORS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'h' : 'uMaterialColors';
-const U_TIME = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'i' : 'uTime';
-const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'j' : 'uAtlasTextureIndex';
-const U_SHADOWS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'k' : 'uShadows';
+const U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'i' : 'uAtlasTextureIndex';
+const U_SHADOWS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'j' : 'uShadows';
 
 const A_VERTEX_MODEL_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'z' : "aVertexModelPosition";
 const A_VERTEX_MODEL_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'y' : 'aVertexModelRotation';
@@ -102,11 +101,10 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform vec3 ${U_CAMERA_POSITION};
   uniform vec4 ${U_WORLD_POSITION};
-  uniform vec3 ${U_FOCUS_POSITION};
+  uniform vec4 ${U_FOCUS_POSITION_AND_WATER_LEVEL};
   uniform lowp sampler2DArray ${U_MATERIAL_ATLAS};
   uniform lowp sampler2DArray ${U_MATERIAL_TEXTURE};
   uniform vec4 ${U_MATERIAL_COLORS}[${MAX_MATERIAL_TEXTURE_COUNT * 2}];
-  uniform float ${U_TIME};
   uniform vec3 ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH};
   uniform vec4 ${U_SHADOWS}[${MAX_SHADOWS}];
 
@@ -117,7 +115,7 @@ const FRAGMENT_SHADER = `#version 300 es
     vec4 ${L_SURFACE_CAMERA_DIRECTION} = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(${L_CAMERA_DELTA}), 1);
     // NOTE: surface scaling will be positive for camera facing surfaces
     float ${L_SURFACE_SCALING} = dot(${V_WORLD_PLANE_NORMAL}.xyz, ${L_SURFACE_CAMERA_DIRECTION}.xyz);
-    float il = max(1. - pow(length(${U_FOCUS_POSITION} - ${V_WORLD_POSITION}.xyz)/4., 2.), 0.);
+    float il = max(1. - pow(length(${U_FOCUS_POSITION_AND_WATER_LEVEL}.xyz - ${V_WORLD_POSITION}.xyz)/4., 2.), 0.);
     float ${L_MAX_DEPTH} = -1.;
     vec4 ${L_MAX_PIXEL};
     vec4 ${L_MAX_COLOR};
@@ -129,7 +127,6 @@ const FRAGMENT_SHADER = `#version 300 es
     );
     if (${L_MATERIALNESS}.w < .5) {
       discard;
-      return;
     }
     vec4 ${L_BASE_COLOR} = (
       ${U_MATERIAL_COLORS}[0]*${L_MATERIALNESS}.x
@@ -223,14 +220,14 @@ const FRAGMENT_SHADER = `#version 300 es
     ${L_BASE_COLOR} = ${L_MAX_COLOR} * il + ${L_BASE_COLOR} * (1. - il);
 
     vec3 ${L_WATER_DISTANCE} = ${L_CAMERA_DELTA}
-      * (1. - max(0., sin(${U_TIME}/2000.)/9.-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
+      * (1. - max(0., ${U_FOCUS_POSITION_AND_WATER_LEVEL}.w-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
     float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
     // lighting
     float ${L_LIGHTING} = max(
       .3, 
-      // TODO pre normalise
-      1. - (1. - dot(m, normalize(vec3(1, 2, 3)))) * ${L_BASE_COLOR}.w
+      1. - (1. - dot(m, vec3(.3, .5, .8))) * ${L_BASE_COLOR}.w
     );
+    // shadows
     for (int ii=0; ii<${MAX_SHADOWS}; ii++) {
       vec3 ${L_CAMERA_DELTA} = (${V_WORLD_POSITION} - ${U_SHADOWS}[ii]).xyz;
       ${L_LIGHTING} = min(
@@ -242,19 +239,24 @@ const FRAGMENT_SHADER = `#version 300 es
         )
       );
     }
-    vec3 fc = mix(
-      // water
-      mix(
-        ${L_BASE_COLOR}.xyz * max(${L_LIGHTING}, 1. - ${L_BASE_COLOR}.w),
-        mix(vec3(${SHORE.join()}), vec3(${WATER.join()}), pow(min(1., ${L_WATERINESS}), 2.)),
-        ${L_WATERINESS}  
+    ${O_COLOR} = vec4(
+      pow(
+        mix(
+          // water
+          mix(
+            ${L_BASE_COLOR}.xyz * max(${L_LIGHTING}, 1. - ${L_BASE_COLOR}.w),
+            mix(vec3(${SHORE_STRING}), vec3(${WATER_STRING}), pow(min(1., ${L_WATERINESS}), 2.)),
+            ${L_WATERINESS}  
+          ),
+          // fog
+          vec3(${SKY_LOW_STRING}),
+          min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
+          // 
+        ),
+        vec3(.6)
       ),
-      // fog
-      vec3(${SKY_LOW.join()}),
-      min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
-      // 
+      1
     );
-    ${O_COLOR} = vec4(pow(fc, vec3(.6)), 1);
   }
 `;
 
@@ -852,24 +854,22 @@ window.onload = async () => {
     uWorldRotationMatrix,
     uProjectionMatrix,
     uCameraPosition,
-    uFocusPosition,
+    uFocusPositionAndWaterLevel,
     uMaterialAtlas,
     uMaterialTexture,
     uMaterialColors,
     uAtlasTextureIndexAndMaterialTextureScaleAndDepth,
-    uTime,
     uShadows,
   ] = [
     U_WORLD_POSITION,
     U_WORLD_ROTATION_MATRIX,
     U_PROJECTION_MATRIX,
     U_CAMERA_POSITION,
-    U_FOCUS_POSITION,
+    U_FOCUS_POSITION_AND_WATER_LEVEL,
     U_MATERIAL_ATLAS,
     U_MATERIAL_TEXTURE,
     U_MATERIAL_COLORS,
     U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH,
-    U_TIME,
     U_SHADOWS,
   ].map(
     uniform => gl.getUniformLocation(program, uniform)
@@ -1494,62 +1494,8 @@ window.onload = async () => {
     });
   }
 
-  // add in some trees
+  // add in some stuff
   populate([[0, 0], [WORLD_DIMENSION, WORLD_DIMENSION]]);
-  // const treeDistribution = clusteredDistributionFactory(
-  //   1/WORLD_DIMENSION,
-  //   5/WORLD_DIMENSION,
-  //   2,
-  //   2,
-  //   .3,
-  //   3,
-  // );
-  // new Array(WORLD_DIMENSION*4).fill(0).forEach(() => {
-
-  //   const [x, y, scale] = treeDistribution(1);
-
-  //   const scaledCoordinates: Vector2 = [x, y];
-  //   const z = terrain(...scaledCoordinates);
-  //   const terrainNormalZ = terrainNormal(scaledCoordinates)[2];
-  //   if (z > .5 && terrainNormalZ > .9) {
-  //     const atlasIndex = (z + 7 + Math.random())/9 | 0;
-      
-  //     const adjustedScale = Math.pow((terrainNormalZ - .9) * 9, 2) * scale;
-  //     const {
-  //       maximalInternalRadius: minimalInternalRadius,
-  //       bounds,
-  //     } = billboardModel;
-
-  //     const modelScale = (adjustedScale + .5) * MAX_TREE_HEIGHT;
-  //     const collisionRadius = minimalInternalRadius * modelScale;
-  
-  //     const renderGroupId = nextRenderGroupId++;
-  //     const position: Vector3 = [
-  //       ...vectorNScale(scaledCoordinates, WORLD_DIMENSION),
-  //       z + collisionRadius*.8,
-  //     ] as Vector3;
-  
-  //     const entity: DynamicEntity<BillboardPartIds> = {
-  //       entityType: ENTITY_TYPE_SCENERY,
-  //       resolutions: new Array(adjustedScale * 4 + 3 + 2 * Math.random() | 0).fill(0).map((_, i) => i),
-  //       position,
-  //       id: nextEntityId++,
-  //       bounds,
-  //       renderGroupId,
-  //       gravity: 0,
-  //       collisionRadius: collisionRadius,
-  //       body: BILLBOARD_PART,
-  //       transform: matrix4Scale(modelScale),
-  //       modelVariant: VARIANT_SYMBOLS,
-  //       modelAtlasIndex: atlasIndex,
-  //       velocity: [0, 0, 0],
-  //       collisionGroup: COLLISION_GROUP_SCENERY,
-  //       health: (adjustedScale+1) * 9,
-  //       shadows: 1,
-  //     };
-  //     addEntity(entity);
-  //   }
-  // });
 
   const playerRadius = .3;
   // add in a "player"
@@ -3187,7 +3133,7 @@ window.onload = async () => {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, camera.pos as any);
-    gl.uniform3fv(uFocusPosition, player.pos as any);
+    gl.uniform4f(uFocusPositionAndWaterLevel, ...player.pos, Math.sin(time/2e3)/9);
     gl.uniform4fv(
       uShadows,
       [
@@ -3195,7 +3141,6 @@ window.onload = async () => {
         ...new Array((MAX_SHADOWS - orderedShadows.length)*4).fill(0),
       ],
     );
-    gl.uniform1f(uTime, now);
 
     //
     // draw the sky cylinder
