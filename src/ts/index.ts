@@ -128,11 +128,12 @@ const FRAGMENT_SHADER = `#version 300 es
     if (${L_MATERIALNESS}.w < .5) {
       discard;
     }
-    vec4 ${L_BASE_COLOR} = (
+    vec4 ${L_BASE_COLOR} = min(
       ${U_MATERIAL_COLORS}[0]*${L_MATERIALNESS}.x
         + ${U_MATERIAL_COLORS}[2]*${L_MATERIALNESS}.y
-        + ${U_MATERIAL_COLORS}[4]*${L_MATERIALNESS}.z
-    )/(${L_MATERIALNESS}.x + ${L_MATERIALNESS}.y + ${L_MATERIALNESS}.z);
+        + ${U_MATERIAL_COLORS}[4]*${L_MATERIALNESS}.z,
+      vec4(1)
+    );
 
     for (
       int ${L_TEXTURE_INDEX}=0;
@@ -1666,7 +1667,7 @@ window.onload = () => {
         ),
       );
     }
-    if (FLAG_PREVENT_DEFAULT_ON_MOUSE) {
+    if (FLAG_PREVENT_DEFAULT_ON_MOUSE || FLAG_PREVENT_DEFAULT) {
       e.preventDefault();
     }
   };
