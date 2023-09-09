@@ -266,6 +266,7 @@ type CameraEntity<PartId extends number = number> = {
   xRotation: number,
   zRotation: number,
   yRotation?: undefined,
+  previousPlayerPositions?: [number, ReadonlyVector3][],
 } & BaseDynamicEntity<PartId>;
 
 type Impulse = {

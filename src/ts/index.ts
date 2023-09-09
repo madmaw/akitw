@@ -1071,7 +1071,6 @@ window.onload = () => {
     skyCylinderModel,
   ] = ([
     SKY_CYLINDER_FACES,
-    CUBE_FACES_BODY,
     SPHERE_FACES_BODY,
     BILLBOARD_FACES,
     BILLBOARD_FLIPPED_FACES,
@@ -1667,8 +1666,11 @@ window.onload = () => {
         ),
       );
     }
+    if (FLAG_PREVENT_DEFAULT_ON_MOUSE) {
+      e.preventDefault();
+    }
   };
-  if (FLAG_ALLOW_ZOOM || FLAG_PREVENT_DEFAULT) {
+  if (FLAG_ALLOW_ZOOM) {
     const cb = (e: WheelEvent) => {
       if (FLAG_ALLOW_ZOOM) {
         const v = e.deltaY/1e3;
@@ -2355,29 +2357,33 @@ window.onload = () => {
           }
           if (entity.entityType == ENTITY_TYPE_CAMERA) {
             if (FLAG_SLOW_CAMERA) {
-              const totalPlayerVelocity = vectorNLength(player.velocity);
-              const playerTurn = Math.sin(mathAngleDiff(camera.zRotation, player.zRotation));
+              camera.previousPlayerPositions ||= [];
+              let previous: [number, ReadonlyVector3] = [time, player.pos];
+              camera.previousPlayerPositions.push(previous);
+              const targetTime = time - 99;
+              while (camera.previousPlayerPositions[0][0] < targetTime) {
+                previous = camera.previousPlayerPositions.shift();
+              }
+              const current = camera.previousPlayerPositions[0];
+
+              const targetPlayerPos = vectorNScaleThenAdd(
+                previous[1],
+                vectorNScaleThenAdd(current[1], previous[1], -1),
+                (targetTime - previous[0])/(current[0] - previous[0])
+              );
               const targetCameraPosition = vectorNScaleThenAdd(
-                vectorNScaleThenAdd(player.pos, [0, 0, 1.3]),
+                vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3]),
                 vector3TransformMatrix4(
                   cameraRotateMatrix,
-                  playerTurn,
-                  cameraZoom - totalPlayerVelocity * 99,
+                  0,
+                  cameraZoom,
                   0,
                 ),
               );
               const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, camera.pos, -1);
-              
-              camera.velocity = vectorNMultiply(
+              camera.velocity = vectorNScale(
                 deltaCameraPosition,
-                [
-                  1/cappedDelta,
-                  1/cappedDelta,
-                  Math.pow(
-                    1 - Math.cos(camera.xRotation) * .9,
-                    1/(Math.abs(deltaCameraPosition[2])+1)
-                  )/cappedDelta,
-                ],
+                1/cappedDelta,
               ) as any;
             } else {
               const targetCameraPosition = vectorNScaleThenAdd(

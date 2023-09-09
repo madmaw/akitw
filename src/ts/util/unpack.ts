@@ -42,7 +42,7 @@ const unpackNumberBuilder = (scale: number, offset: number): Unpacker<number> =>
   };
 }
 
-const unpackAngle = unpackNumberBuilder(Math.PI*2, -Math.PI);
+const unpackAngle = unpackNumberBuilder(PI_2_2DP, -PI_1_2DP);
 // 0 to 64 (TODO should be 0..63)
 const unpackUnsignedInteger = unpackNumberBuilder(64, 0);
 // goes from -2 to 2

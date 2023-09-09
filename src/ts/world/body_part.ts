@@ -14,9 +14,9 @@ function synthesizeOppositeBodyPart<PartId extends number>(
   const [newPostRotation, newPreRotation] = [postRotation, preRotation].map<ReadonlyVector3>(rotation => {
     if (rotation) {
       const [x, y, z] = rotation;
-      const newY = Math.PI - y;
-      const newX = Math.PI - x;
-      const newZ = Math.PI - z;
+      const newY = PI_1_1DP - y;
+      const newX = PI_1_1DP - x;
+      const newZ = PI_1_1DP - z;
       return [newX, newY, newZ];  
     }
   });
