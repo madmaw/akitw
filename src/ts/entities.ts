@@ -1,7 +1,7 @@
 /// <reference path="./world/types.ts"/>
 
 //                0  1 2 3  4 5 6  7 8  9 0  1 2  3  4 5 6 7  8  9
-const SYMBOLS = '🌴🌳🌲🌵🌿🌼🍖🐐🐄🐇🦌🛖🥚🧚💎';
+const SYMBOLS = '🌴🌳🌲🌵🌿🌼🍖🐐🐄🐇🦌🐅🧍🛖🥚💎🦴';
 
 const SYMBOL_INDEX_PALM_TREE = 0;
 const SYMBOL_INDEX_DECIDUOUS_TREE = 1;
@@ -14,10 +14,12 @@ const SYMBOL_INDEX_GOAT = 7;
 const SYMBOL_INDEX_COW = 8;
 const SYMBOL_INDEX_RABBIT = 9;
 const SYMBOL_INDEX_DEER = 10;
-const SYMBOL_INDEX_HUT = 11;
-const SYMBOL_INDEX_EGG = 12;
-const SYMBOL_INDEX_FAIRY = 13;
-const SYMBOL_INDEX_GEM = 14;
+const SYMBOL_INDEX_LEOPARD = 11;
+const SYMBOL_INDEX_HUMAN = 12;
+const SYMBOL_INDEX_HUT = 13;
+const SYMBOL_INDEX_EGG = 14;
+const SYMBOL_INDEX_GEM = 15;
+const SYMBOL_INDEX_BONE = 16;
 
 // bit flags
 const BIOME_ROAD = 0;
@@ -43,6 +45,14 @@ type Biome =
 
 type EntityFactory = (scale: number) => DynamicEntity;
 
+const standardAttractions: Partial<Record<EntityType, number>> = {
+  // will attempt to kill baby dragons
+  [ENTITY_TYPE_BABY_DRAGON]: -3,
+  [ENTITY_TYPE_PLAYER_CONTROLLED]: -9,
+  [ENTITY_TYPE_FIRE]: -4,
+  [ENTITY_TYPE_FIREBALL]: -8,
+};
+
 function prototypeEntityFactoryProvider(
   entityPrototype: Pick<
     Entity,
@@ -55,6 +65,12 @@ function prototypeEntityFactoryProvider(
     | 'inverseMass'
     | 'inverseFriction'
     | 'transient'
+  >
+  & Pick<
+    IntelligentEntity,
+    | 'roaming'
+    | 'attraction'
+    | 'foodChain'
   >,
   baseRadius: number,
   contained?: EntityFactory[],
@@ -110,7 +126,7 @@ const meatFactory = prototypeEntityFactoryProvider({
   modelAtlasIndex: SYMBOL_INDEX_MEAT,
   inverseMass: 4,
   inverseFriction: .1,
-  health: 9,
+  health: 2,
   transient: 1,
 }, .5);
 
@@ -121,6 +137,16 @@ const gemFactory = prototypeEntityFactoryProvider({
   modelAtlasIndex: SYMBOL_INDEX_GEM,
   inverseMass: 4,
   health: 9,
+  transient: 1,
+}, .5);
+
+const boneFactory = prototypeEntityFactoryProvider({
+  entityType: ENTITY_TYPE_SCENERY,
+  collisionGroup: COLLISION_GROUP_NONE,
+  collisionMask: COLLISION_GROUP_TERRAIN,
+  modelAtlasIndex: SYMBOL_INDEX_BONE,
+  inverseMass: 4,
+  health: 1,
   transient: 1,
 }, .5);
 
@@ -160,42 +186,51 @@ const BIOME_LOOKUP_TABLE: ([
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
           collisionGroup: COLLISION_GROUP_ENEMY,
-          collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
+          collisionMask: COLLISION_GROUP_SCENERY
+            | COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_TERRAIN,
           modelAtlasIndex: SYMBOL_INDEX_COW,
-          health: 4,
+          health: 9,
           inverseMass: .5,
           inverseFriction: 1,
           shadows: 1,
+          attraction: standardAttractions,
         },
         2,
         [meatFactory],
       ),
     ],
-    // fairy
+    // human
     [
       1,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
           collisionGroup: COLLISION_GROUP_ENEMY,
-          collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
-          modelAtlasIndex: SYMBOL_INDEX_FAIRY,
-          health: 4,
+          collisionMask: COLLISION_GROUP_SCENERY
+            | COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_TERRAIN,
+          modelAtlasIndex: SYMBOL_INDEX_HUMAN,
+          health: 7,
           inverseMass: .5,
           inverseFriction: 1,
           shadows: 1,
+          foodChain: 1,
+          attraction: {
+            ...standardAttractions,
+            [ENTITY_TYPE_PLAYER_CONTROLLED]: 3,
+          },
         },
         2,
-        [meatFactory],
       ),
     ],
   ],
   // desert
   [
-    [99],
+    [1e3],
     // cactus
     [
-      1,
+      9,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_SCENERY, 
@@ -207,6 +242,35 @@ const BIOME_LOOKUP_TABLE: ([
         3,  
       ),
     ],
+    // leopard
+    [
+      1,
+      prototypeEntityFactoryProvider(
+        {
+          entityType: ENTITY_TYPE_INTELLIGENT,
+          collisionGroup: COLLISION_GROUP_ENEMY,
+          collisionMask: COLLISION_GROUP_SCENERY
+            | COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_TERRAIN
+            | COLLISION_GROUP_ENEMY,
+          modelAtlasIndex: SYMBOL_INDEX_LEOPARD,
+          health: 9,
+          inverseMass: 1,
+          inverseFriction: 1,
+          shadows: 1,
+          roaming: 15,
+          attraction: {
+            ...standardAttractions,
+            [ENTITY_TYPE_PLAYER_CONTROLLED]: -1,
+            [ENTITY_TYPE_BABY_DRAGON]: 8,
+            [ENTITY_TYPE_INTELLIGENT]: 8,
+          },
+          foodChain: 2,
+        },
+        2,
+        [boneFactory],
+      ),
+    ],    
   ],
   // tropical
   [
@@ -242,34 +306,41 @@ const BIOME_LOOKUP_TABLE: ([
     ],
     // rabbit
     [
-      3,
+      9,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
           collisionGroup: COLLISION_GROUP_ENEMY,
-          collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
+          collisionMask: COLLISION_GROUP_SCENERY
+            | COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_TERRAIN,
           modelAtlasIndex: SYMBOL_INDEX_RABBIT,
-          health: 1,
+          health: 4,
           inverseMass: 6,
           inverseFriction: 1,
           shadows: 1,
+          attraction: standardAttractions,
         },
-        1,  
+        1,
+        [boneFactory],
       ),
     ],
     // deer
     [
-      1,
+      2,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
           collisionGroup: COLLISION_GROUP_ENEMY,
-          collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
+          collisionMask: COLLISION_GROUP_SCENERY
+            | COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_TERRAIN,
           modelAtlasIndex: SYMBOL_INDEX_DEER,
-          health: 4,
+          health: 9,
           inverseMass: .8,
           inverseFriction: 1,
           shadows: 1,
+          attraction: standardAttractions,
         },
         2,
         [meatFactory],
@@ -328,19 +399,23 @@ const BIOME_LOOKUP_TABLE: ([
     ],
     // goat
     [
-      1,
+      3,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,
           collisionGroup: COLLISION_GROUP_ENEMY,
-          collisionMask: COLLISION_GROUP_SCENERY | COLLISION_GROUP_PLAYER | COLLISION_GROUP_TERRAIN,
+          collisionMask: COLLISION_GROUP_SCENERY
+            | COLLISION_GROUP_PLAYER
+            | COLLISION_GROUP_TERRAIN,
           modelAtlasIndex: SYMBOL_INDEX_GOAT,
-          health: 4,
+          health: 6,
           inverseMass: 1,
           inverseFriction: 1,
           shadows: 1,
+          attraction: standardAttractions,
         },
         1.5,  
+        [boneFactory],
       ),
     ],
   ],

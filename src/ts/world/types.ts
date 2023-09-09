@@ -267,7 +267,7 @@ type CameraEntity<PartId extends number = number> = {
 } & BaseDynamicEntity<PartId>;
 
 type Impulse = {
-  impulseTarget: Entity | Pick<Entity, 'pos'>,
+  impulseTarget: Entity | Pick<Entity, 'pos' | 'dead'>,
   // negative indicates wants to run away
   intensity: number,
 }
@@ -280,6 +280,12 @@ type IntelligentEntity<PartId extends number = number> = {
   impulses?: Impulse[],
   // the last time we made a decision
   lastDecision?: number,
+  // how far it will go from home and how far it can see
+  roaming?: number,
+  // how appealing various things are
+  attraction?: Partial<Record<EntityType, number>>,
+  // eats things lower down
+  foodChain?: number,
 } & ActiveEntity<PartId>;
 
 function addEntityAnimation(entity: Entity, anim: Anim<Entity>, actionId?: ActionId) {

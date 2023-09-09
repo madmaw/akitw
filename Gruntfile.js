@@ -172,6 +172,9 @@ module.exports = function (grunt) {
             }, {
               from: "<body>",
               to: ""
+            }, {
+              from: "<div id=\"fps\"></div>",
+              to: ""
             }]
           },
           html2: {

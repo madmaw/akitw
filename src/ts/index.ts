@@ -1531,6 +1531,7 @@ window.onload = async () => {
     xRotation: 0,
     yRotation: 0,
     zRotation: 0,
+    health: 9,
     velocity: [0, 0, 0],
     maximumLateralVelocity: .01,
     maximumLateralAcceleration: .00001,
@@ -1583,6 +1584,13 @@ window.onload = async () => {
         [DRAGON_PART_ID_WING_3_RIGHT]: {},
         [DRAGON_PART_ID_CLAW_RIGHT]: {},
       },
+      attraction: {
+        [ENTITY_TYPE_PLAYER_CONTROLLED]: .5,
+        [ENTITY_TYPE_INTELLIGENT]: 4,
+        [ENTITY_TYPE_ITEM]: 9,
+      },
+      roaming: 4,
+      foodChain: 1,
       bounds: rect3FromRadius(playerRadius),
       // collision radius must fit within the bounds, so the model render radius will almost certainly
       // be larger than that
@@ -1594,15 +1602,17 @@ window.onload = async () => {
       yRotation: 0,
       zRotation: a - PI_05_1DP,
       velocity: [0, 0, 0],
+      health: 9,
       gravity: DEFAULT_GRAVITY,
       bodyTransform: matrix4Scale(babyRadius*2),
       collisionGroup: COLLISION_GROUP_PLAYER,
       collisionMask: COLLISION_GROUP_TERRAIN
-        | COLLISION_GROUP_ITEMS,
+        | COLLISION_GROUP_ITEMS
+        | COLLISION_GROUP_ENEMY,
       shadows: 1,
       modelVariant: VARIANT_DRAGON_BABY,
       maximumLateralAcceleration: .0001,
-      maximumLateralVelocity: .001,
+      maximumLateralVelocity: .002,
       inverseFriction: 1,
     };
     // add in eggs
@@ -1710,6 +1720,7 @@ window.onload = async () => {
     const cappedDelta = Math.min(delta, 40);
     time += cappedDelta;
     let particleCount = 0;
+    let intelligentEntityCount = 0;
     
     if (FLAG_SHOW_FPS) {
       lastFrameTimes.push(delta);
@@ -2149,7 +2160,7 @@ window.onload = async () => {
                   );
                   held.velocity = entity.velocity;
                   if (held.entityType == ENTITY_TYPE_INTELLIGENT) {
-                    // stun itss
+                    // stun it
                     held.lastDecision = time + 1e4;
                     held.impulses = [];
                   }
@@ -2167,15 +2178,14 @@ window.onload = async () => {
   
                 entity.lastDecision = time;
                 iterateEntityBoundsEntities({
-                  // TODO vision per entity
-                  bounds: rect3FromRadius(9),
+                  bounds: rect3FromRadius(entity.roaming || 9),
                   pos: entity.pos,
                   resolutions: [0],
                 }, seen => {
-                  if (!seen.face && (seen.collisionMask & entity.collisionGroup)) {
-                    // TODO don't just run away from everything
+                  const attraction = entity.attraction?.[seen.entityType];
+                  if (attraction) {
                     newImpulses.push({
-                      intensity: -9,
+                      intensity: attraction,
                       impulseTarget: seen,
                     });
                   }
@@ -2198,26 +2208,28 @@ window.onload = async () => {
                   entity.impulses.push({
                     intensity: 1,
                     impulseTarget: {
-                      // TODO make milling range configurable
                       pos: vectorNScaleThenAdd(
                         entity.homePosition,
                         [Math.random() - .5, Math.random() - .5, 0],
-                        5,
+                        entity.roaming || 9,
                       ),
                     }
                   });
-                  entity.targetUrgency = .4;
+                  entity.targetUrgency = .1;
                 }
               }
   
-  
-              const deltaPosition = entity.impulses?.reduce<ReadonlyVector3>(
+              const targetLateralPosition = entity.impulses?.reduce<ReadonlyVector3>(
                 (acc, impulse) => {
                   const delta = vectorNScaleThenAdd(
                     impulse.impulseTarget.pos,
                     entity.pos,
                     -1,
                   );
+                  if (impulse.impulseTarget.dead) {
+                    // ignore dead targets
+                    return acc;
+                  }
                   return vectorNScaleThenAdd(
                     acc,
                     delta,
@@ -2226,7 +2238,7 @@ window.onload = async () => {
                 },
                 entity.pos,
               );
-              entity.targetLateralPosition = deltaPosition;
+              entity.targetLateralPosition = targetLateralPosition;
             }
             const targetLateralPosition = entity.targetLateralPosition || entity.pos;
             let targetYRotation = 0;
@@ -2846,10 +2858,15 @@ window.onload = async () => {
                 break;
               case ENTITY_TYPE_FIRE:
                 entity.lastCollisionTick = tick;
+              case ENTITY_TYPE_BABY_DRAGON:
+              case ENTITY_TYPE_INTELLIGENT:
                 if (
                   check
                     && check.health
                     && !checkInvincible
+                    && (entity.entityType == ENTITY_TYPE_FIRE
+                      || entity.foodChain > ((check as IntelligentEntity).foodChain || 0)
+                    )
                 ) {
                   // do damage to thing
                   checkDamaged = 1;
@@ -2893,13 +2910,19 @@ window.onload = async () => {
           });
           addEntity(entity, tiles);
         }
-        if(entity.shadows) {
+        if(entity.shadows && !entity.dead) {
           shadows.push([...entity.pos, (entity as BaseDynamicEntity).collisionRadius]);
         }
         // update any passive behaviours
         let lookAtCamera: Booleanish;
 
         switch (entity.entityType) {
+          case ENTITY_TYPE_CAMERA:
+            if (entity.pos[2] < entity.collisionRadius) {
+              // cheat
+              (entity.pos as Vector3)[2] = entity.collisionRadius;
+            }
+            break;
           case ENTITY_TYPE_FIRE:
             // only fall down if not burning something
             if (entity.lastCollisionTick == tick) {
@@ -2955,6 +2978,12 @@ window.onload = async () => {
             }
             lookAtCamera = 1;
             break;
+          case ENTITY_TYPE_INTELLIGENT:
+            intelligentEntityCount++;
+            if (intelligentEntityCount > 9) {
+              entity.dead = 1;
+            }
+            // fall through
           case ENTITY_TYPE_PARTICLE:
             particleCount++;
             if (particleCount > 99) {
@@ -2962,10 +2991,13 @@ window.onload = async () => {
             }
             // fall through
           case ENTITY_TYPE_SCENERY:
-          case ENTITY_TYPE_INTELLIGENT:
           case ENTITY_TYPE_ITEM:
             lookAtCamera = !(entity.health <= 0);
             break;
+        }
+        // drown
+        if (entity.pos[2] < -(entity as DynamicEntity).collisionRadius && !entity.pendingDamage) {
+          entity.pendingDamage++;
         }
         if( lookAtCamera) {
           const cameraAngle = Math.atan2(
@@ -2990,7 +3022,7 @@ window.onload = async () => {
           && entity.health
         ) {
           // rethink life choices
-          (entity as IntelligentEntity).lastDecision = 0;
+          (entity as IntelligentEntity).lastDecision = ((entity as IntelligentEntity).lastDecision || 0) - 1e3;
           entity.pendingDamage = 0;
   
           const pendingDamageScale = Math.sqrt(pendingDamage) * .1;
