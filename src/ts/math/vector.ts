@@ -250,13 +250,13 @@ const rectNOverlaps =  <T extends readonly number[]>(
   pos2: T,
   bounds2: readonly [T, T],
 ): boolean => {
-  return pos1.every((v1, i) => {
+  return !pos1.some((v1, i) => {
     const v1a = v1 + bounds1[0][i];
     const v1b = v1 + bounds1[1][i];
     const v2 = pos2[i];
     const v2a = v2 + bounds2[0][i];
     const v2b = v2 + bounds2[1][i];
-    return v1b > v2a && v2b > v1a;
+    return v1b < v2a || v2b < v1a;
     //return Math.min(v1b, v2b) - Math.max(v1a, v2a) > 0;
   });
 };

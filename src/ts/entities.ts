@@ -399,7 +399,7 @@ const BIOME_LOOKUP_TABLE: ([
     ],
     // goat
     [
-      3,
+      1,
       prototypeEntityFactoryProvider(
         {
           entityType: ENTITY_TYPE_INTELLIGENT,

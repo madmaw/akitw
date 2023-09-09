@@ -162,6 +162,8 @@ type BaseEntity<PartId extends number = number> = {
   lastUpdated?: number,
   // the tile that this entity was updated against
   lastTile?: Tile,
+  // scale to render at, adjusted so the base is at the bottom of the collision bounds
+  renderScale?: number,
 };
 
 type PlaneMetadata = {

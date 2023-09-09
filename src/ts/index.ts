@@ -260,7 +260,7 @@ const FRAGMENT_SHADER = `#version 300 es
   }
 `;
 
-window.onload = async () => {
+window.onload = () => {
   const depths = create2DArray<number>(DEPTH_DIMENSION + 1, DEPTH_DIMENSION + 1, (x, y) => {
     // pin edges to below sea level
     const dx = DEPTH_DIMENSION/2 - x;
@@ -1377,29 +1377,28 @@ window.onload = async () => {
 
   // make some textures
   
-  const materialCanvases = await Promise.all(
-    proceduralMaterials.map<Promise<[TexImageSource, number?, number?]>>(
-      ([dimension, ...frames]) => {
-        const materialCanvas = document.createElement('canvas');
-        //document.body.appendChild(materialCanvas);
-        materialCanvas.width = dimension;
-        materialCanvas.height = dimension * frames.length; 
-        const ctx = materialCanvas.getContext(
-          '2d',
-          FLAG_FAST_READ_CANVASES
-            ? {
-              willReadFrequently: true,
-            }
-            : undefined
-        );
-        haxShortenMethods(ctx, 'ctx');
-        frames.forEach((frame, i) => {
-          frame.forEach(material => {
-            material(ctx, i * dimension);
-          });
+  const materialCanvases = proceduralMaterials.map<[TexImageSource, number?, number?]>(
+    ([dimension, ...frames]) => {
+      const materialCanvas = document.createElement('canvas');
+      //document.body.appendChild(materialCanvas);
+      materialCanvas.width = dimension;
+      materialCanvas.height = dimension * frames.length; 
+      const ctx = materialCanvas.getContext(
+        '2d',
+        FLAG_FAST_READ_CANVASES
+          ? {
+            willReadFrequently: true,
+          }
+          : undefined
+      );
+      haxShortenMethods(ctx, 'ctx');
+      frames.forEach((frame, i) => {
+        frame.forEach(material => {
+          material(ctx, i * dimension);
         });
-        return Promise.resolve([materialCanvas, dimension, frames.length]);
-      }),
+      });
+      return [materialCanvas, dimension, frames.length];
+    },
   );
   let textureId = gl.TEXTURE0;
 
@@ -1857,7 +1856,7 @@ window.onload = async () => {
             const tile = getAndMaybePopulateTile(gridX | 0, gridY | 0, resolution);
             if (FLAG_REPOPULATE) {
               // secretly refresh this tile
-              if (resolution == 4 && Math.random() < .0001) {
+              if (resolution == 4 && Math.random() < 1E-5) {
                 const gridScale = Math.pow(2, resolution);
                 populate(
                   [
@@ -2871,7 +2870,9 @@ window.onload = async () => {
                   // do damage to thing
                   checkDamaged = 1;
                   // gain some health
-                  entity.health++
+                  entity.health++;
+                  // grow larger
+                  entity.renderScale = (entity.renderScale || 1) * 1.02;
                 }
                 break;
               case ENTITY_TYPE_PLAYER_CONTROLLED:
@@ -3127,15 +3128,20 @@ window.onload = async () => {
             zRotation,
           } = entity;
   
-  
+          const renderScale = entity.renderScale;
+          const renderPosition: ReadonlyVector3 = [
+            ...entity.pos.slice(0, 2),
+            entity.pos[2] - entity.bounds[0][2] * ((renderScale || 1) - 1)
+          ] as any;
           body && appendRender(
             entity,
             entity.lastTile?.resolution || 0,
             body,
-            entity.pos,
+            renderPosition,
             matrix4Multiply(
               matrix4RotateZXY(xRotation, yRotation, zRotation),
               entity['at'],
+              renderScale && matrix4Scale(renderScale),
             ),              
           );
         }
