@@ -80,7 +80,7 @@ const CARDINAL_INPUT_VECTORS: readonly [Input, ReadonlyVector2, number?][] = [
 ];
 
 type InputValue = {
-  read?: Booleanish,
+  isRead?: Booleanish,
   value: number,
 };
 const keyStates: Partial<Record<KeyCode, InputValue>> = {};
@@ -89,7 +89,7 @@ function readInput(input: Input, peeking?: Booleanish): number {
   const value = keyStates[input] || { value: 0 };
   keyStates[input] = value;
   if (!peeking) {
-    value.read = 1;
+    value.isRead = 1;
   }
   return value.value;
 }
@@ -103,6 +103,6 @@ function setKeyState(keyCode: KeyCode, value: number) {
 }
 
 function someInputUnread(input: Input) {
-  return !keyStates[input]?.read;
+  return !keyStates[input]?.isRead;
 }
 
