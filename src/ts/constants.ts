@@ -28,8 +28,8 @@ const MAX_FOG_DEPTH = WORLD_DIMENSION * 2;
 const SKY_LOW: ReadonlyVector3 = [.5, .8, 1];
 const SKY_LOW_STRING = '.5,.8,1';
 const SKY_HIGH: ReadonlyVector3 = [0, .6, .9];
-const WATER: ReadonlyVector3 = [.0, .1, .3];
-const WATER_STRING = '.0,.1,.3';
+const WATER: ReadonlyVector3 = [0, .1, .3];
+const WATER_STRING = '0,.1,.3';
 const SHORE: ReadonlyVector3 = [.1, .5, .5];
 const SHORE_STRING = '.1,.5,.5';
 

@@ -222,7 +222,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
     vec3 ${L_WATER_DISTANCE} = ${L_CAMERA_DELTA}
       * (1. - max(0., ${U_FOCUS_POSITION_AND_WATER_LEVEL}.w-${V_WORLD_POSITION}.z)/max(${L_CAMERA_DELTA}.z + ${L_MAX_DEPTH}, .1));
-    float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z - ${L_MAX_DEPTH}, 0., 1.), 9.);
+    float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z, 0., 1.), 9.);
     // lighting
     float ${L_LIGHTING} = max(
       .3, 
@@ -240,6 +240,7 @@ const FRAGMENT_SHADER = `#version 300 es
         )
       );
     }
+    //${L_WATERINESS} = 0.;
     ${O_COLOR} = vec4(
       pow(
         mix(
@@ -247,7 +248,7 @@ const FRAGMENT_SHADER = `#version 300 es
           mix(
             ${L_BASE_COLOR}.xyz * max(${L_LIGHTING}, 1. - ${L_BASE_COLOR}.w),
             mix(vec3(${SHORE_STRING}), vec3(${WATER_STRING}), pow(min(1., ${L_WATERINESS}), 2.)),
-            ${L_WATERINESS}  
+            ${L_WATERINESS}
           ),
           // fog
           vec3(${SKY_LOW_STRING}),
@@ -414,27 +415,18 @@ window.onload = () => {
     );
     result[BIOME_ROAD] = 1 - Math.abs(MATERIAL_TERRAIN_TEXTURE_DIMENSION*.4 - dc)/2;
     result[BIOME_BEACH] = Math.pow(Math.random(), Math.max(0, depth - .2) * 50);
-    result[BIOME_DESERT] = Math.max(
-      Math.pow(slopeNormal, 9) - Math.pow(Math.random(), Math.pow(depth/14, 16)),
-      1 - Math.sqrt(dc/4)
-    );
-    // result[BIOME_GRASSLAND] = Math.min(
-    //   1 - result[BIOME_ROAD],
-    //   1 - result[BIOME_BEACH],
-    //   1 - result[BIOME_DESERT],
-    //   slopeNormal * Math.pow(Math.random(), Math.pow(Math.abs(depth)/9, 2))
-    // );
+    result[BIOME_DESERT] = Math.pow(slopeNormal, 6) - Math.pow(Math.random(), Math.pow(depth/12, 9));
     
     result = result.map(v => Math.max(0, v, Math.min(1, v))) as ZoneTile;
     result[BIOME_GRASSLAND] = Math.min(
       1 - Math.max(...result),
-      Math.pow(Math.random(), Math.pow(Math.abs(depth)/20, 9))
+      Math.pow(Math.random(), Math.pow(Math.abs(depth)/15, 7))
     );
     result[BIOME_MOUNTAINS] = Math.max(
       // steeper gets rockier
-      (1 - Math.pow(slopeNormal, 2)) * Math.pow(Math.random(), .1),
+      (1 - Math.pow(slopeNormal, 4)),
       // as it gets higher, more rocky
-      1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2) - result[BIOME_DESERT],
+      1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2) - result[BIOME_DESERT] * Math.random(),
     );
 
 
@@ -1204,28 +1196,26 @@ window.onload = () => {
               )
               */
              const biomes = zones[x][y];
-             const grassiness = biomes[BIOME_GRASSLAND] * Math.pow(Math.random(), .1);
-             const sandiness = Math.min(
-                1,
-                biomes[BIOME_BEACH]
-                  + biomes[BIOME_DESERT] * Math.random()
+             const grassiness = biomes[BIOME_GRASSLAND] * (.5 + Math.pow(Math.random(), .1)/2);
+             const sandiness = biomes[BIOME_BEACH]
+                  + biomes[BIOME_DESERT] * (.5 + Math.pow(Math.random(), .1)/2)
                   + biomes[BIOME_CIVILISATION]
-                  + biomes[BIOME_ROAD]
-              );
-              const stoniness = Math.min(
-                1,
-                biomes[BIOME_CIVILISATION] * Math.random()
+                  + biomes[BIOME_ROAD];
+              const stoniness = biomes[BIOME_CIVILISATION] * Math.random()
                   + biomes[BIOME_DESERT] * Math.pow(Math.random(), 9)
-                  + biomes[BIOME_MOUNTAINS]
-              );
+                  + biomes[BIOME_MOUNTAINS];
+
+              const total = grassiness + sandiness + stoniness;
+              const scale = 255;
+              
 
               imageData.data.set([
                 // sandiness
-                sandiness * 255 | 0,
+                sandiness * scale | 0,
                 // grassiness
-                grassiness * 255 | 0,
+                grassiness * scale | 0,
                 // rockiness
-                stoniness * 255 | 0,
+                stoniness * scale | 0,
                 // transparency
                 255,
               ], (y * MATERIAL_TERRAIN_TEXTURE_DIMENSION + x) * 4);

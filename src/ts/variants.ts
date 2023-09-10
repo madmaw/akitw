@@ -28,14 +28,14 @@ type Variant = {
 
 const TERRAIN_COLORS: readonly number[] = [
   // sand
-  .8, .7, .3, 1,
-  .8, .8, .7, 1,
+  .7, .7, .4, 1,
+  .5, .4, .2, 1,
   // grass
-  .2, .6, 0, 1,
-  .1, .7, .1, .8,
+  .2, .5, .1, 1,
+  .1, .7, .2, .8,
   // stone
-  .1, .1, .1, 1,
-  .2, .2, .2, 1,
+  .3, .2, .2, 1,
+  .1, .1, .2, 1,
 ];
 
 const VARIANTS: Record<VariantId, Variant> = {
