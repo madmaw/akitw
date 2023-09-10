@@ -2293,6 +2293,7 @@ window.onload = () => {
             } else {
               // flying/falling
               const gravity = entity.gravity;
+              
               if (gliding && gravity) {
                 const xRotation = entity.xRotation || 0;
                 const targetLateralDirection = vectorNScaleThenAdd(targetLateralPosition, entity.pos, -1);
@@ -2308,6 +2309,12 @@ window.onload = () => {
                   matrix4Rotate(xRotation, Math.cos(targetLateralAngle), Math.sin(targetLateralAngle), 0),
                   ...targetLateralNormal,
                 );
+                const lateralVelocityNormal = vectorNNormalize<ReadonlyVector3>([...velocityNormal.slice(0, 2), 0] as Vector3);
+                const bankCos = vectorNDotProduct<ReadonlyVector3>(
+                  lateralVelocityNormal,
+                  targetLateralNormal,
+                );
+
                 let achievableVelocity = entity.velocity;
                 const cosa = vectorNDotProduct(velocityNormal, targetVelocityNormal);
                 if (cosa < 1 - EPSILON) {
@@ -2319,17 +2326,14 @@ window.onload = () => {
                   const achievableAngle = targetAngle > 0
                     ? Math.min(targetAngle, cappedDelta * TURN_TORQUE)
                     : Math.max(targetAngle, cappedDelta * -TURN_TORQUE);
-                  // TODO maybe rotate on the y axis by the amount missing?
                   achievableVelocity = vector3TransformMatrix4(
                     matrix4Rotate(achievableAngle, ...axis),
-                    ...vectorNScale(achievableVelocity, Math.cos(achievableAngle)),
+                    ...vectorNScale(
+                      achievableVelocity,
+                      1 - (1 - cosa) * vectorNLength(achievableVelocity) * cappedDelta * Math.pow(bankCos, 9)/9
+                    ),
                   );    
                 }
-                const lateralVelocityNormal = vectorNNormalize<ReadonlyVector3>([...velocityNormal.slice(0, 2), 0] as Vector3);
-                const bankCos = vectorNDotProduct<ReadonlyVector3>(
-                  lateralVelocityNormal,
-                  targetLateralNormal,
-                );
                 if (bankCos < 1 - EPSILON) {
                   const bankAxis = vector3CrossProduct(lateralVelocityNormal, targetLateralNormal);
                   const bankAngle = Math.acos(bankCos);
