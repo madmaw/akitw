@@ -253,7 +253,7 @@ const FRAGMENT_SHADER = `#version 300 es
           ),
           // fog
           vec3(${SKY_LOW_STRING}),
-          min(1., length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
+          min(1., sqrt(length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.)) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
           // 
         ),
         vec3(.6)
