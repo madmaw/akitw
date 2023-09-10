@@ -116,7 +116,6 @@ const FRAGMENT_SHADER = `#version 300 es
     // NOTE: surface scaling will be positive for camera facing surfaces
     float ${L_SURFACE_SCALING} = dot(${V_WORLD_PLANE_NORMAL}.xyz, ${L_SURFACE_CAMERA_DIRECTION}.xyz);
     float il = max(1. - pow(length(${U_FOCUS_POSITION_AND_WATER_LEVEL}.xyz - ${V_WORLD_POSITION}.xyz)/4., 2.), 0.);
-    float ${L_MAX_DEPTH} = -1.;
     vec4 ${L_MAX_PIXEL};
     vec4 ${L_MAX_COLOR};
     // TODO look up material based on adjusted position
@@ -125,6 +124,8 @@ const FRAGMENT_SHADER = `#version 300 es
       ${U_MATERIAL_ATLAS},
       vec3((${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} * (${V_WORLD_POSITION} - ${U_WORLD_POSITION})).xy, ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.x)
     );
+    float ${L_MAX_DEPTH} = -max(${L_MATERIALNESS}.x, max(${L_MATERIALNESS}.y, ${L_MATERIALNESS}.z));
+
     if (${L_MATERIALNESS}.w < .5) {
       discard;
     }
@@ -428,6 +429,8 @@ window.onload = () => {
       // as it gets higher, more rocky
       1 - Math.pow(Math.max(0, Math.min(1, (30 - depth)/30)), 2) - result[BIOME_DESERT] * Math.random(),
     );
+    // blacken the center by having no biomes at all (also stop things spawning there)
+    result = result.map((v, i) => Math.min(v, Math.pow(dc/30, 9) + .03)) as ZoneTile;
 
 
     // result[BIOME_GRASSLAND] = Math.max(
@@ -1968,7 +1971,7 @@ window.onload = () => {
               );
               // set the friction so we don't slip around when not moving
               entity.inverseFriction = someLateralInputsWereUnreadOrNonZero || totalEntityLateralVelocity > EPSILON
-                ? 1
+                ? .99
                 : 0;
               entity.targetLateralPosition = vectorNScaleThenAdd(entity.pos, targetLateralOffset);
               const jumpUnread = someInputUnread(INPUT_JUMP);

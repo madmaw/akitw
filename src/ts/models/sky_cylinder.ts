@@ -19,10 +19,16 @@ const SKY_CYLINDER_SHAPE: ConvexShape<PlaneMetadata> = FLAG_UNPACK_USE_ORIGINALS
     const sin = Math.sin(a);
     const cos = Math.cos(a);
     // don't smooth as this is always rendered at maximum lighting anyway
-    return toPlane<PlaneMetadata>(cos, sin, 0, .5, {});
+    return toPlane<PlaneMetadata>(cos, sin, 0, .5, {
+      smoothingFlags: 1,
+    });
   }).concat([
-    toPlane<PlaneMetadata>(0, 0, 1, .5, {}),
-    toPlane<PlaneMetadata>(0, 0, -1, .5, {}),
+    toPlane<PlaneMetadata>(0, 0, 1, .5, {
+      smoothingFlags: 1,
+    }),
+    toPlane<PlaneMetadata>(0, 0, -1, .5, {
+      smoothingFlags: 1,
+    }),
   ])
   : [];
 

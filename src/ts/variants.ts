@@ -32,10 +32,10 @@ const TERRAIN_COLORS: readonly number[] = [
   .5, .4, .2, 1,
   // grass
   .2, .5, .1, 1,
-  .1, .7, .2, .8,
+  .1, .7, .3, .8,
   // stone
-  .3, .2, .2, 1,
-  .1, .1, .2, 1,
+  .2, .2, .2, 1,
+  .1, .1, .1, 1,
 ];
 
 const VARIANTS: Record<VariantId, Variant> = {
@@ -103,8 +103,8 @@ const VARIANTS: Record<VariantId, Variant> = {
     atlasTextureId: TEXTURE_EMPTY_ATLAS_MIPMAP,
     materialTextureId: TEXTURE_DRAGON_BODY_MATERIAL,
     materialTextureColors: [
-      .7, 0, 0, 1,
-      1, .2, 0, 1,
+      .7, .8, 0, 1,
+      1, .7, 0, 1,
     ],
     materialTextureScale: .5,
   },

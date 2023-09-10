@@ -72,6 +72,11 @@ const DRAGON_SHAPES_NECK_TRANSFORM = matrix4Multiply(
   matrix4Rotate(PI_01666_1DP, 1, 0, 0),
 );
 const DRAGON_SHAPES_NECK: ConvexShape<PlaneMetadata> = transformConvexShape([
+  // rear
+  toPlane(0, -1, 0, .15, {
+    ...DRAGON_BODY_SMOOTH_METADATA,
+    smoothingFlags: 0,
+  }),  
   // top
   toPlane(0, .2, 1, .07, DRAGON_BODY_SMOOTH_METADATA),
   // top left
@@ -91,8 +96,6 @@ const DRAGON_SHAPES_NECK: ConvexShape<PlaneMetadata> = transformConvexShape([
   // front
   toPlane(0, 1, 1, .1, DRAGON_BODY_SMOOTH_METADATA),
   toPlane(0, 1, -1, .1, DRAGON_BODY_SMOOTH_METADATA),
-  // rear
-  toPlane(0, -1, 0, .15, DRAGON_BODY_SMOOTH_METADATA),
 ], DRAGON_SHAPES_NECK_TRANSFORM);
 
 const DRAGON_SHAPES_HEAD_TRANSFORM = matrix4Multiply(
@@ -124,6 +127,11 @@ const DRAGON_SHAPES_HEAD: ConvexShape<PlaneMetadata> = transformConvexShape([
 ], DRAGON_SHAPES_HEAD_TRANSFORM);
 
 const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
+  // front
+  toPlane(0, 1, 0, 0, {
+    ...DRAGON_BODY_SMOOTH_METADATA,
+    smoothingFlags: 0,
+  }),    
   // top
   toPlane(0, 0, 1, .05, DRAGON_BODY_SMOOTH_METADATA),
   // top right
@@ -136,8 +144,6 @@ const DRAGON_SHAPES_TAIL: ConvexShape<PlaneMetadata> = [
   toPlane(1, -.1, 0, .05, DRAGON_BODY_SMOOTH_METADATA),
   // left
   toPlane(-1, -.1, 0, .05, DRAGON_BODY_SMOOTH_METADATA),
-  // front
-  toPlane(0, 1, 0, 0, DRAGON_BODY_SMOOTH_METADATA),  
 ];
 
 // , matrix4Multiply(
@@ -188,27 +194,27 @@ const DRAGON_SHAPES_SHIN_RIGHT: ConvexShape<PlaneMetadata> = [
 // const DRAGON_SHAPES_SHIN_LEFT = transformConvexShape(DRAGON_SHAPES_SHIN_RIGHT, matrix4Scale(-1, 1));
 
 const DRAGON_FACES_BODY = safeUnpackFaces(
-  [...'AKQ]HS^EQ]E9YK9YN:VQQX?QXB:V@QMEQHHHHB?QKQHPQMN?QFQHJQHFXOJXOQUS?USHXYBXSNXS8)-()*+,),,-.(),*/0+),1234),3567)-0437-)-28953),98:;)-76<.-)-/=140).)>?=/*).?:821=).(.<@>)).659;@<)-@;:?>),+0-,)'],
+  [...'AKQ]HS^EQ]E9YK9YN:VQQX?QXB:V@QMEQHHHHB?QKQHPQMN?QFQHJQHFXOJXOQUS?USHXYBXSNXS8)-()*+,),,-.(),*/0+),1234),3567)-0437-)-28953),98:;)-76<.-)-/=140).)>?=/*).?:821=).(.<@>)).659;@<)-@;:?>),+0-,'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_BODY, []]]),
 );
 const DRAGON_FACES_NECK = safeUnpackFaces(
-  [...':EDLKDLISLGSLEVKBDINDIKVKKF@EF@GUFIUFBFCEVHNFCKVHKWJEWJ3),()*+),+,-(),)./*),0123),2145),6037)-.678/)-954-,).*/89,+).732598)0(-4106.))'],
+  [...':EDLBDIBFCEF@KF@NFCNDIKDLISLGSLEVKKVKGUFIUFEVHKVHKWJEWJ3)0()*+,-./),/01(),(12)),.30/),+45,),*64+),,57-)--783.)-)296*).389210).698754('],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_NECK, []]]),
 );
 const DRAGON_FACES_HEAD = safeUnpackFaces(
-  [...'7H\\@DRMLRMLSDHPFDSDNNIKHKHHKEHKBNIMPMCPMEJMKJM2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154)'],
+  [...'7H\\@DRMLRMLSDHPFDSDNNIKHKHHKEHKBNIMPMCPMEJMKJM2)+()*),(+,-)-./0,+)-,012-)-*3.+()-(-24)).)4563*)-10/65),6/.3),2154'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_HEAD, []]]),
 );
 const DRAGON_FACES_TAIL = safeUnpackFaces(
-  [...'1F:KH(KJ:KJHKFHKEHJKHJEHEKHE/)-()*+,)+,-()+*.+)+/0)),)0.*),(-/)).+.0/-,)'],
+  [...'1JHKKHJKHEEHEEHJFHKF:KH(KJ:K/).()*+,-)--./0()+,.-)+(0))+*/+),)0/*),+/.,('],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_TAIL, []]]),
 );
 const DRAGON_FACES_QUAD_RIGHT = safeUnpackFaces(
-  [...':JNKJKNJENJBKJBDJMDJNEFNEFG>FD>FBAFBKFENFKNFNKHG>IBAHD>3)/()*+,-.)0/0123456),./6(),(65))--70/.)-+328,),*43+),)54*),1079),2198)-,897-)'],
+  [...':JNKJKNJENJBKJBDJMDJNEFNEFG>FD>FBAFBKFENFKNFNKHG>IBAHD>3)/()*+,-.)0/0123456),./6(),(65))--70/.)-+328,),*43+),)54*),1079),2198)-,897-'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_QUAD_RIGHT, []]])
 );
 const DRAGON_FACES_SHIN_RIGHT = safeUnpackFaces(
-  [...'0HJHHEHHH:HJ9FJ9FH:FEHFJH.),()*+),,-./),+,/(),).-*),(/.)),*-,+)'],
+  [...'0HJHHEHHH:HJ9FJ9FH:FEHFJH.),()*+),,-./),+,/(),).-*),(/.)),*-,+'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[DRAGON_SHAPES_SHIN_RIGHT, []]]),
 );
 
@@ -385,7 +391,7 @@ const DRAGON_PART: BodyPart<DragonPartIds> = {
     {
       id: DRAGON_PART_ID_NECK,
       modelId: MODEL_ID_DRAGON_NECK,
-      preRotationOffset: [0, .19, .29],
+      preRotationOffset: [0, .19, .26],
       childParts: [{
         id: DRAGON_PART_ID_HEAD,
         modelId: MODEL_ID_DRAGON_HEAD,
