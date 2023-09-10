@@ -1560,7 +1560,7 @@ window.onload = () => {
     const babyRadius = .3;
     const babyDragon: IntelligentEntity = {
       entityType: ENTITY_TYPE_BABY_DRAGON,
-      resolutions: [0, 1, 2, 3],
+      resolutions: [0, 1, 2, 3, 4],
       entityBody: DRAGON_PART,
       joints: {
         [DRAGON_PART_ID_BODY]: {},
