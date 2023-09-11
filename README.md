@@ -16,6 +16,8 @@ Controls
 * WASD (on ground): Move 
 * W (while gliding): Turn to match camera
 
+Flapping and gliding take the angle of the wing/body into account. Facing upward will brake, downward will accelerate. Use of a mouse (not a track pad and definitely not touch/mobile) is recommended.
+
 ![Cover](screenshot_big.png)
 
 Playable here https://madmaw.github.io/akitw/
