@@ -47,8 +47,8 @@ const SKY_CYLINDER_FACES: Face<PlaneMetadata>[] = SKY_CYLINDER_FACES_UNTEXTURED.
     const a = PI_2_2DP * i / SKY_CYLINDER_SEGMENTS;
     textureCoordinateTransform = matrix4Multiply(
       matrix4Translate(-i / SKY_CYLINDER_SEGMENTS, 0, 0),
-      matrix4Rotate(PI_05_2DP, 1, 0, 0),
-      matrix4Rotate(SKY_CYLINDER_HALF_ANGLE - a + PI_05_2DP, 0, 0, 1),
+      matrix4RotateZXY(PI_05_2DP, 0, 0),
+      matrix4RotateZXY(0, 0, SKY_CYLINDER_HALF_ANGLE - a + PI_05_2DP),
       matrix4Scale(1/(PI_05_2DP)),
     );
   } else if ( i == SKY_CYLINDER_SEGMENTS) {

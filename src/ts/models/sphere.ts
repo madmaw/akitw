@@ -6,7 +6,7 @@ type SpherePartId =
   | typeof SPHERE_PART_ID_BODY
   ;
 
-  const SPHERE_SEGMENTS_Z = 6;
+  const SPHERE_SEGMENTS_Z = 4;
   const SPHERE_SEGMENTS_Y = 3;
   const SPHERE_RADIUS = .4;
 
@@ -28,7 +28,7 @@ type SpherePartId =
     : [];
 
 const SPHERE_FACES_BODY = safeUnpackFaces(
-  [...'@b9=SB.SN.bW=bWSb9SSNbSBbHT.Hf=HfSHTb=N..W=.WS=Nb=B..9=.9S=BbH*=H<.H*SH<b<),()*+),+,-(),,./-),+*01),+12,),23.,),4510),1562),6732),5489),59:6),:;76),<98=),9<>:),?;:>),<=)(),-><(),-/?>).)=840*).37;?/.'],
+  [...'8b.=S=.SS.bb=b.SbbSSSbS=b=S..b=.bS=Sb..===...S==b6),()*+),,(+-),./,-),*01+),12-+),23.-),4105),4621),2673),45)(),64(,),,/76),)50*),37/.'],
   FLAG_UNPACK_USE_ORIGINALS && decompose([[SPHERE_SHAPES_BODY, []]]),
 );
 

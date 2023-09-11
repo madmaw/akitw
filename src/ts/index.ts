@@ -46,7 +46,7 @@ const VERTEX_SHADER = `#version 300 es
   out mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
   out vec4 ${V_WORLD_PLANE_NORMAL};
 
-  void main(void) {
+  void main() {
     ${V_MODEL_POSITION} = ${A_VERTEX_MODEL_POSITION};
     ${V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX} = ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX} * inverse(${U_WORLD_ROTATION_MATRIX});
     ${V_WORLD_POSITION} = ${U_WORLD_POSITION} + ${U_WORLD_ROTATION_MATRIX} * ${A_VERTEX_MODEL_POSITION};
@@ -110,7 +110,7 @@ const FRAGMENT_SHADER = `#version 300 es
 
   out vec4 ${O_COLOR};
 
-  void main(void) {
+  void main() {
     vec3 ${L_CAMERA_DELTA} = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
     vec4 ${L_SURFACE_CAMERA_DIRECTION} = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(${L_CAMERA_DELTA}), 1);
     // NOTE: surface scaling will be positive for camera facing surfaces
@@ -213,7 +213,7 @@ const FRAGMENT_SHADER = `#version 300 es
         * vec4(
           mix(
             vec3(0, 0, 1),
-            vec3(n, sqrt(1. - n.x*n.x - n.y*n.y)),
+            vec3(n, sqrt(1. - dot(n, n))),
             il
           ),
           1
@@ -226,7 +226,7 @@ const FRAGMENT_SHADER = `#version 300 es
     float ${L_WATERINESS} = 1. - pow(1. - clamp(${L_CAMERA_DELTA}.z - ${L_WATER_DISTANCE}.z, 0., 1.), 9.);
     // lighting
     float ${L_LIGHTING} = max(
-      .3, 
+      .2, 
       1. - (1. - dot(m, vec3(.3, .5, .8))) * ${L_BASE_COLOR}.w
     );
     // shadows
@@ -241,22 +241,19 @@ const FRAGMENT_SHADER = `#version 300 es
         )
       );
     }
-    //${L_WATERINESS} = 0.;
     ${O_COLOR} = vec4(
-      pow(
+      sqrt(
         mix(
           // water
           mix(
             ${L_BASE_COLOR}.xyz * max(${L_LIGHTING}, 1. - ${L_BASE_COLOR}.w),
-            mix(vec3(${SHORE_STRING}), vec3(${WATER_STRING}), pow(min(1., ${L_WATERINESS}), 2.)),
+            mix(vec3(${SHORE_STRING}), vec3(${WATER_STRING}), pow(${L_WATERINESS}, 2.)),
             ${L_WATERINESS}
           ),
           // fog
           vec3(${SKY_LOW_STRING}),
           min(1., sqrt(length(${L_WATER_DISTANCE})/${MAX_FOG_DEPTH}.)) * max(${L_BASE_COLOR}.w, ${L_WATERINESS})
-          // 
-        ),
-        vec3(.6)
+        )
       ),
       1
     );
@@ -277,9 +274,6 @@ window.onload = () => {
       return .2;
     }
     // pin crater in middle
-    // if (dx + dy < 2) {
-    //   return 30 + (dx + dy)*2;
-    // }
     if (r < 4) {
       return 6 + r * (Math.random() + 1)/2;
     }
@@ -803,9 +797,8 @@ window.onload = () => {
         MIN_FOCAL_LENGTH,
         HORIZON,
       ),
-      matrix4Rotate(
+      matrix4RotateZXY(
         -PI_05_1DP,
-        1,
         0,
         0,
       ),
@@ -1069,7 +1062,7 @@ window.onload = () => {
     SKY_CYLINDER_FACES,
     SPHERE_FACES_BODY,
     BILLBOARD_FACES,
-    BILLBOARD_FLIPPED_FACES,
+    //BILLBOARD_FLIPPED_FACES,
     BILLBOARD_TWO_SIDED_FACES,
     DRAGON_FACES_BODY,
     DRAGON_FACES_NECK,
@@ -1435,7 +1428,7 @@ window.onload = () => {
   if (FLAG_ENFORCE_BOUNDARY) {
     // add in the walls
     [0, 0, 0, 0].forEach((_, i) => {
-      const zRotationMatrix = matrix4Rotate(i * PI_05_2DP, 0, 0, 1);
+      const zRotationMatrix = matrix4RotateZXY(0, 0, i * PI_05_2DP);
       const polygons: ConvexPolygon[] = [[
         [WORLD_DIMENSION_MINUS_1/2, WORLD_DIMENSION_MINUS_1/2, 0],
         [WORLD_DIMENSION_MINUS_1/2, -WORLD_DIMENSION_MINUS_1/2, 0],
@@ -1444,7 +1437,7 @@ window.onload = () => {
       ]];
       const rotateToModelCoordinates = matrix4Multiply(
         zRotationMatrix,
-        matrix4Rotate(-PI_05_2DP, 0, 1, 0),
+        matrix4RotateZXY(0, -PI_05_2DP, 0),
       );
       const toModelCoordinates = matrix4Multiply(
         matrix4Translate(WORLD_DIMENSION/2, WORLD_DIMENSION/2, 0),
@@ -1556,7 +1549,7 @@ window.onload = () => {
         | COLLISION_GROUP_ENEMY,
       shadows: 1,
       modelVariant: VARIANT_DRAGON_BABY,
-      maximumLateralAcceleration: .0001,
+      maximumLateralAcceleration: .00001,
       maximumLateralVelocity: .002,
       inverseFriction: 1,
     };
@@ -1819,10 +1812,10 @@ window.onload = () => {
       }
     }
 
-    const cameraZRotationMatrix = matrix4Rotate(camera.zRotation, 0, 0, 1);
+    const cameraZRotationMatrix = matrix4RotateZXY(0, 0, camera.zRotation);
     const cameraRotateMatrix = matrix4Multiply(
       cameraZRotationMatrix,
-      matrix4Rotate(camera.xRotation, 1, 0, 0),
+      matrix4RotateZXY(camera.xRotation, 0, 0),
     );
     
     // operate off the previous camera position
@@ -1910,7 +1903,7 @@ window.onload = () => {
   
             if (entityType == ENTITY_TYPE_PLAYER_CONTROLLED) {
               const entityFacingNormal = vector3TransformMatrix4(
-                matrix4Rotate(entity.zRotation, 0, 0, 1),
+                matrix4RotateZXY(0, 0, entity.zRotation),
                 0, 1, 0,
               );
               const someLateralInputsWereUnreadOrNonZero = CARDINAL_INPUT_VECTORS.some(
@@ -1969,7 +1962,7 @@ window.onload = () => {
 
   
               const targetLateralOffset = vector3TransformMatrix4(
-                matrix4Rotate(camera.zRotation, 0, 0, 1),
+                matrix4RotateZXY(0, 0, camera.zRotation),
                 ...targetUnrotatedLateralOffset,
                 0,
               );
@@ -2218,26 +2211,29 @@ window.onload = () => {
                 }
               }
   
-              const targetLateralPosition = entity.impulses?.reduce<ReadonlyVector3>(
+              const [targetUrgency, targetLateralPosition] = (entity.impulses || []).reduce<[number, ReadonlyVector3]>(
                 (acc, impulse) => {
+                  const [maxIntensity] = acc;
                   const delta = vectorNScaleThenAdd(
                     impulse.impulseTarget.pos,
                     entity.pos,
                     -1,
                   );
-                  if (impulse.impulseTarget.dead) {
-                    // ignore dead targets
-                    return acc;
+                  const intensity = impulse.intensity/(vectorNLength(delta) + 1);
+                  if (!impulse.impulseTarget.dead && Math.abs(intensity) > maxIntensity) {
+                    const targetPosition = vectorNScaleThenAdd(
+                      entity.pos,
+                      delta,
+                      intensity > 0 ? 1 : -1,
+                    );  
+                    return [Math.abs(intensity), targetPosition];
                   }
-                  return vectorNScaleThenAdd(
-                    acc,
-                    delta,
-                    impulse.intensity/(vectorNLength(delta) + 1),
-                  );
+                  return acc;
                 },
-                entity.pos,
+                [0, entity.pos],
               );
               entity.targetLateralPosition = targetLateralPosition;
+              entity.targetUrgency = Math.max(.1, targetUrgency);
             }
             const targetLateralPosition = entity.targetLateralPosition || entity.pos;
             let targetYRotation = 0;
@@ -2334,7 +2330,7 @@ window.onload = () => {
                     matrix4Rotate(achievableAngle, ...axis),
                     ...vectorNScale(
                       achievableVelocity,
-                      1 - (1 - cosa) * vectorNLength(achievableVelocity) * cappedDelta * Math.pow(bankCos, 9)/9
+                      1 - (1 - cosa) * vectorNLength(achievableVelocity) * cappedDelta * Math.pow((bankCos + 1)/2, 99)/9
                     ),
                   );    
                 }
@@ -2377,7 +2373,7 @@ window.onload = () => {
                     (targetTime - previous[0])/det
                   );
                   const targetCameraPosition = vectorNScaleThenAdd(
-                    vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3]),
+                    vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3 * Math.cos(player.xRotation)]),
                     vector3TransformMatrix4(
                       cameraRotateMatrix,
                       0,
