@@ -11,7 +11,7 @@ const FLAG_DEBUG_PHYSICS = ENVIRONMENT == 'test' && false;
 const FLAG_FAST_READ_CANVASES = ENVIRONMENT != 'ultra';
 const FLAG_CLOUDS = true || ENVIRONMENT != 'ultra';
 const FLAG_ENFORCE_BOUNDARY = false;
-const FLAG_SHORT_GLSL_VARIABLE_NAMES = ENVIRONMENT != 'test';;
+const FLAG_SHORT_GLSL_VARIABLE_NAMES = ENVIRONMENT != 'test' || true;
 const FLAG_UNPACK_CHECK_ORIGINALS = ENVIRONMENT == 'test';
 const FLAG_UNPACK_USE_ORIGINALS = ENVIRONMENT == 'test';
 // doesn't seem to help, also CC bugs out on the animation unpacker for some reason

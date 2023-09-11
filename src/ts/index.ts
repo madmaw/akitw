@@ -20,7 +20,7 @@ const V_MODEL_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Z' : 'vModelPosition'
 const V_WORLD_POSITION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Y' : 'vWorldPosition';
 const V_MODEL_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'X' : 'vModelRotation';
 const V_MODEL_SMOOTHING_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'W' : 'vModelSmoothingRotation';
-const V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'V' : 'vInverseModelSmoothingRotation';
+const V_SURFACE_CAMERA_DIRECTION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'V' : 'vInverseModelSmoothingRotation';
 const V_WORLD_PLANE_NORMAL = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'U' : 'vWorldPlaneNormal';
 const V_WORLD_ATLAS_TEXTURE_POSITION_MATRIX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'T' : 'vWorldTexturePosition';
 
@@ -34,6 +34,7 @@ const VERTEX_SHADER = `#version 300 es
   in mat4 ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
   in mat4 ${A_MODEL_ATLAS_TEXTURE_POSITION_MATRIX};
 
+  uniform vec3 ${U_CAMERA_POSITION};
   uniform vec4 ${U_WORLD_POSITION};
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
   uniform mat4 ${U_PROJECTION_MATRIX};
@@ -43,7 +44,7 @@ const VERTEX_SHADER = `#version 300 es
   out vec4 ${V_MODEL_POSITION};
   out mat4 ${V_MODEL_ROTATION_MATRIX};
   out mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
-  out mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
+  out vec3 ${V_SURFACE_CAMERA_DIRECTION};
   out vec4 ${V_WORLD_PLANE_NORMAL};
 
   void main() {
@@ -54,7 +55,10 @@ const VERTEX_SHADER = `#version 300 es
     ${V_WORLD_PLANE_NORMAL} = ${U_WORLD_ROTATION_MATRIX} * ${V_MODEL_ROTATION_MATRIX} * vec4(0,0,1,1);
     
     ${V_MODEL_SMOOTHING_ROTATION_MATRIX} = ${A_VERTEX_MODEL_SMOOTHING_ROTATION_MATRIX};
-    ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} = inverse(${V_MODEL_SMOOTHING_ROTATION_MATRIX});
+    ${V_SURFACE_CAMERA_DIRECTION} = (
+      inverse(${V_MODEL_SMOOTHING_ROTATION_MATRIX})
+        * vec4(normalize(${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz), 1)
+    ).xyz;
 
     gl_Position = ${U_PROJECTION_MATRIX} * ${V_WORLD_POSITION};
   }
@@ -68,24 +72,23 @@ const STEP = .01;
 const MAX_MATERIAL_TEXTURE_COUNT = 3;
 const MAX_SHADOWS = 9;
 
-const L_MAX_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'A' : 'maxDepth';
-const L_CAMERA_DELTA = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'B' : 'cameraDistance';
-const L_SURFACE_CAMERA_DIRECTION = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'C' : 'surfaceCameraDirection';
-const L_SURFACE_SCALING = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'D' : 'surfaceScaling';
-const L_MAX_PIXEL = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'E' : 'maxPixel';
-const L_MAX_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'F' : 'maxColor';
-const L_MATERIALNESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'G' : 'materialness';
-const L_TEXTURE_INDEX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'H' : 'textureIndex';
-const L_BASE_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'I' : 'baseColor';
-const L_DEPTH_ADJUST = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'J' : 'depthAdjust';
-const L_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'K' : 'depth';
-const L_MAX_STEP_COUNT = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'L' : 'maxStepCount';
-const L_STEP_COUNT = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'M' : 'stepCount';
-const L_SURFACE_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'N' : 'surfaceDepth';
-const L_DIVISOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'O' : 'divisor';
-const L_WATERINESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'P' : 'wateriness';
-const L_WATER_DISTANCE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Q' : 'waterDistance';
-const L_LIGHTING = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'R' : 'lighting';
+const L_CAMERA_DELTA = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'A' : 'cameraDistance';
+const L_MAX_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'B' : 'maxDepth';
+const L_SURFACE_SCALING = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'C' : 'surfaceScaling';
+const L_MAX_PIXEL = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'D' : 'maxPixel';
+const L_MAX_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'E' : 'maxColor';
+const L_MATERIALNESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'F' : 'materialness';
+const L_TEXTURE_INDEX = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'G' : 'textureIndex';
+const L_BASE_COLOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'H' : 'baseColor';
+const L_DEPTH_ADJUST = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'I' : 'depthAdjust';
+const L_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'J' : 'depth';
+const L_MAX_STEP_COUNT = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'K' : 'maxStepCount';
+const L_STEP_COUNT = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'L' : 'stepCount';
+const L_SURFACE_DEPTH = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'M' : 'surfaceDepth';
+const L_DIVISOR = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'N' : 'divisor';
+const L_WATERINESS = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'O' : 'wateriness';
+const L_WATER_DISTANCE = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'P' : 'waterDistance';
+const L_LIGHTING = FLAG_SHORT_GLSL_VARIABLE_NAMES ? 'Q' : 'lighting';
 
 const FRAGMENT_SHADER = `#version 300 es
   precision lowp float;
@@ -95,7 +98,7 @@ const FRAGMENT_SHADER = `#version 300 es
   in vec4 ${V_MODEL_POSITION};
   in mat4 ${V_MODEL_ROTATION_MATRIX};
   in mat4 ${V_MODEL_SMOOTHING_ROTATION_MATRIX};
-  in mat4 ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX};
+  in vec3 ${V_SURFACE_CAMERA_DIRECTION};
   in vec4 ${V_WORLD_PLANE_NORMAL};
 
   uniform mat4 ${U_WORLD_ROTATION_MATRIX};
@@ -112,9 +115,8 @@ const FRAGMENT_SHADER = `#version 300 es
 
   void main() {
     vec3 ${L_CAMERA_DELTA} = ${U_CAMERA_POSITION} - ${V_WORLD_POSITION}.xyz;
-    vec4 ${L_SURFACE_CAMERA_DIRECTION} = ${V_INVERSE_MODEL_SMOOTHING_ROTATION_MATRIX} * vec4(normalize(${L_CAMERA_DELTA}), 1);
     // NOTE: surface scaling will be positive for camera facing surfaces
-    float ${L_SURFACE_SCALING} = dot(${V_WORLD_PLANE_NORMAL}.xyz, ${L_SURFACE_CAMERA_DIRECTION}.xyz);
+    float ${L_SURFACE_SCALING} = dot(${V_WORLD_PLANE_NORMAL}.xyz, ${V_SURFACE_CAMERA_DIRECTION});
     float il = max(1. - pow(length(${U_FOCUS_POSITION_AND_WATER_LEVEL}.xyz - ${V_WORLD_POSITION}.xyz)/4., 2.), 0.);
     vec4 ${L_MAX_PIXEL};
     vec4 ${L_MAX_COLOR};
@@ -157,7 +159,7 @@ const FRAGMENT_SHADER = `#version 300 es
       float ${L_MAX_STEP_COUNT} = ${U_ATLAS_TEXTURE_INDEX_AND_MATERIAL_TEXTURE_SCALE_AND_DEPTH}.z * il/${STEP};
       for (float ${L_STEP_COUNT} = 0.; ${L_STEP_COUNT} <= ${L_MAX_STEP_COUNT}; ${L_STEP_COUNT}++) {
         ${L_DEPTH} -= ${STEP};
-        p = vec4(${V_WORLD_POSITION}.xyz + ${L_SURFACE_CAMERA_DIRECTION}.xyz * ${L_DEPTH} / ${L_SURFACE_SCALING}, 1);
+        p = vec4(${V_WORLD_POSITION}.xyz + ${V_SURFACE_CAMERA_DIRECTION} * ${L_DEPTH} / ${L_SURFACE_SCALING}, 1);
 
         vec4 tm1 = texture(
           ${U_MATERIAL_TEXTURE},
@@ -178,7 +180,7 @@ const FRAGMENT_SHADER = `#version 300 es
             float si = s0 * ${STEP}/${L_DIVISOR};
             ${L_DEPTH} += ${STEP} - si;
             p = vec4(
-              ${V_WORLD_POSITION}.xyz + ${L_SURFACE_CAMERA_DIRECTION}.xyz * (d0 - si) / ${L_SURFACE_SCALING},
+              ${V_WORLD_POSITION}.xyz + ${V_SURFACE_CAMERA_DIRECTION} * (d0 - si) / ${L_SURFACE_SCALING},
               1
             );
             ${L_STEP_COUNT} = ${L_MAX_STEP_COUNT};
