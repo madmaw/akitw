@@ -47,10 +47,10 @@ type EntityFactory = (scale: number) => DynamicEntity;
 
 const standardAttractions: Partial<Record<EntityType, number>> = {
   // will attempt to kill baby dragons
-  [ENTITY_TYPE_BABY_DRAGON]: -3,
-  [ENTITY_TYPE_PLAYER_CONTROLLED]: -9,
-  [ENTITY_TYPE_FIRE]: -4,
-  [ENTITY_TYPE_FIREBALL]: -8,
+  [ENTITY_TYPE_BABY_DRAGON]: -2,
+  [ENTITY_TYPE_PLAYER_CONTROLLED]: -3,
+  [ENTITY_TYPE_FIRE]: -3,
+  [ENTITY_TYPE_FIREBALL]: -4,
 };
 
 function prototypeEntityFactoryProvider(
@@ -218,7 +218,7 @@ const BIOME_LOOKUP_TABLE: ([
           foodChain: 1,
           attraction: {
             ...standardAttractions,
-            [ENTITY_TYPE_PLAYER_CONTROLLED]: 3,
+            [ENTITY_TYPE_PLAYER_CONTROLLED]: 2,
           },
         },
         2,
@@ -262,8 +262,8 @@ const BIOME_LOOKUP_TABLE: ([
           attraction: {
             ...standardAttractions,
             [ENTITY_TYPE_PLAYER_CONTROLLED]: 2,
-            [ENTITY_TYPE_BABY_DRAGON]: 8,
-            [ENTITY_TYPE_INTELLIGENT]: 8,
+            [ENTITY_TYPE_BABY_DRAGON]: 3,
+            [ENTITY_TYPE_INTELLIGENT]: 3,
           },
           foodChain: 2,
         },

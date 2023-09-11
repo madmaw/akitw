@@ -1889,6 +1889,8 @@ window.onload = () => {
         } = entity;
   
         if (!face) {
+          removeEntity(entity);
+
           if (
             entityType == ENTITY_TYPE_PLAYER_CONTROLLED
             || entityType == ENTITY_TYPE_INTELLIGENT
@@ -2175,7 +2177,7 @@ window.onload = () => {
                   resolutions: [0],
                 }, seen => {
                   const attraction = entity.attraction?.[seen.entityType];
-                  if (attraction) {
+                  if (attraction && (seen.entityType != ENTITY_TYPE_INTELLIGENT || !(entity.foodChain <= seen.foodChain))) {
                     newImpulses.push({
                       intensity: attraction,
                       impulseTarget: seen,
@@ -2414,7 +2416,6 @@ window.onload = () => {
           if (FLAG_DEBUG_PHYSICS) {
             entity.logs = entity.logs?.slice(-30) || [];
           }
-          removeEntity(entity);
           const collisionEntities = new Set<Entity>();
   
           const collidedEntities: Record<EntityId, Truthy> = {};
