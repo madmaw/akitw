@@ -6,13 +6,12 @@ const FLAG_DEBUG_SHORTENED_METHODS = ENVIRONMENT == 'test' && false;
 const FLAG_QUICK_COLLISIONS = ENVIRONMENT != 'ultra';
 const FLAG_CHECK_STARTS_OVERLAPPING = ENVIRONMENT == 'test';
 const FLAG_LOW_POLY_TERRAIN = true;
-const FLAG_SAFE_UNROTATED_VELOCITY = true;
 const FLAG_SHRINK_FACES = false;
 const FLAG_DEBUG_PHYSICS = ENVIRONMENT == 'test' && false;
 const FLAG_FAST_READ_CANVASES = ENVIRONMENT != 'ultra';
 const FLAG_CLOUDS = true || ENVIRONMENT != 'ultra';
 const FLAG_ENFORCE_BOUNDARY = false;
-const FLAG_SHORT_GLSL_VARIABLE_NAMES = true;
+const FLAG_SHORT_GLSL_VARIABLE_NAMES = ENVIRONMENT != 'test';;
 const FLAG_UNPACK_CHECK_ORIGINALS = ENVIRONMENT == 'test';
 const FLAG_UNPACK_USE_ORIGINALS = ENVIRONMENT == 'test';
 // doesn't seem to help, also CC bugs out on the animation unpacker for some reason

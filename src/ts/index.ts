@@ -2375,7 +2375,7 @@ window.onload = () => {
                     (targetTime - previous[0])/det
                   );
                   const targetCameraPosition = vectorNScaleThenAdd(
-                    vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3 * Math.cos(player.xRotation)]),
+                    vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3 * Math.cos(player.xRotation * 2)]),
                     vector3TransformMatrix4(
                       cameraRotateMatrix,
                       0,
@@ -2734,11 +2734,8 @@ window.onload = () => {
               ]);
               (entity as BaseDynamicEntity).collisionVelocityLoss -= v[2];
   
-              // avoid rounding errors by ensuring that any collision bounces out at 
-              // at least EPSILON velocity
-              if (FLAG_SAFE_UNROTATED_VELOCITY) {
-                outputV[2] = Math.max(outputV[2], EPSILON/9 * duplicateCollisionCount);
-              }
+              // avoid rounding errors by ensuring that any collision bounces out
+              outputV[2] = Math.max(outputV[2], 1e-6 * duplicateCollisionCount * 9);
               if (FLAG_DEBUG_PHYSICS) {
                 // console.log('  velocity s', vectorNLength(v), v);
                 entity.logs.push(['  velocity s', vectorNLength(outputV), outputV]);

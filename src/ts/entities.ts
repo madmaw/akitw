@@ -47,7 +47,7 @@ type EntityFactory = (scale: number) => DynamicEntity;
 
 const standardAttractions: Partial<Record<EntityType, number>> = {
   // will attempt to kill baby dragons
-  [ENTITY_TYPE_BABY_DRAGON]: -2,
+  [ENTITY_TYPE_BABY_DRAGON]: -5,
   [ENTITY_TYPE_PLAYER_CONTROLLED]: -3,
   [ENTITY_TYPE_FIRE]: -3,
   [ENTITY_TYPE_FIREBALL]: -4,
