@@ -1490,54 +1490,7 @@ window.onload = () => {
   populate([[0, 0], [WORLD_DIMENSION, WORLD_DIMENSION]]);
 
   const playerRadius = .3;
-  // add in a "player"
-  const player: DragonEntity<DragonPartIds> = {
-    entityType: ENTITY_TYPE_PLAYER_CONTROLLED,
-    resolutions: [0, 1],
-    entityBody: DRAGON_PART,
-    joints: {
-      [DRAGON_PART_ID_BODY]: {},
-      [DRAGON_PART_ID_NECK]: {},
-      [DRAGON_PART_ID_HEAD]: {},
-      [DRAGON_PART_ID_TAIL]: {},
-      [DRAGON_PART_ID_QUAD_RIGHT]: {},
-      [DRAGON_PART_ID_QUAD_LEFT]: {},
-      [DRAGON_PART_ID_SHIN_RIGHT]: {},
-      [DRAGON_PART_ID_SHIN_LEFT]: {},
-      [DRAGON_PART_ID_WING_1_RIGHT]: {},
-      [DRAGON_PART_ID_WING_2_RIGHT]: {},
-      [DRAGON_PART_ID_WING_3_RIGHT]: {},
-      [DRAGON_PART_ID_CLAW_RIGHT]: {},
-    },
-    bounds: rect3FromRadius(playerRadius),
-    // collision radius must fit within the bounds, so the model render radius will almost certainly
-    // be larger than that
-    collisionRadius: playerRadius,
-    id: nextEntityId++,
-    pos: [
-      WORLD_DIMENSION*.5,
-      WORLD_DIMENSION*.48,
-      terrain(.5, .48) + playerRadius + .1,
-    ],
-    renderGroupId: nextRenderGroupId++,
-    xRotation: 0,
-    yRotation: 0,
-    zRotation: 0,
-    health: 9,
-    velocity: [0, 0, 0],
-    maximumLateralVelocity: .01,
-    maximumLateralAcceleration: .00001,
-    gravity: DEFAULT_GRAVITY,
-    collisionGroup: COLLISION_GROUP_PLAYER,
-    collisionMask: COLLISION_GROUP_TERRAIN
-      | COLLISION_GROUP_SCENERY
-      | COLLISION_GROUP_ENEMY
-      | COLLISION_GROUP_ITEMS,
-    inverseMass: 2,
-    shadows: 1,
-    modelVariant: VARIANT_DRAGON,
-  };
-  addEntity(player);
+  let player: DragonEntity<DragonPartIds> | undefined;
   const camera: CameraEntity = {
     entityType: ENTITY_TYPE_CAMERA,
     bounds: rect3FromRadius(.4),
@@ -1545,7 +1498,7 @@ window.onload = () => {
     collisionGroup: COLLISION_GROUP_NONE,
     collisionMask: COLLISION_GROUP_TERRAIN,
     id: nextEntityId++,
-    pos: player.pos,
+    pos: [WORLD_DIMENSION/2, 0, 9],
     renderGroupId: nextRenderGroupId++,
     resolutions: [0],
     velocity: [0, 0, 0],
@@ -1643,22 +1596,73 @@ window.onload = () => {
   window.onmousedown = () => {
     setKeyState(INPUT_FIRE, 1);
     Z.requestPointerLock();
+    if (!player || player.dead) {
+      player = {
+        entityType: ENTITY_TYPE_PLAYER_CONTROLLED,
+        resolutions: [0, 1],
+        entityBody: DRAGON_PART,
+        joints: {
+          [DRAGON_PART_ID_BODY]: {},
+          [DRAGON_PART_ID_NECK]: {},
+          [DRAGON_PART_ID_HEAD]: {},
+          [DRAGON_PART_ID_TAIL]: {},
+          [DRAGON_PART_ID_QUAD_RIGHT]: {},
+          [DRAGON_PART_ID_QUAD_LEFT]: {},
+          [DRAGON_PART_ID_SHIN_RIGHT]: {},
+          [DRAGON_PART_ID_SHIN_LEFT]: {},
+          [DRAGON_PART_ID_WING_1_RIGHT]: {},
+          [DRAGON_PART_ID_WING_2_RIGHT]: {},
+          [DRAGON_PART_ID_WING_3_RIGHT]: {},
+          [DRAGON_PART_ID_CLAW_RIGHT]: {},
+        },
+        bounds: rect3FromRadius(playerRadius),
+        // collision radius must fit within the bounds, so the model render radius will almost certainly
+        // be larger than that
+        collisionRadius: playerRadius,
+        id: nextEntityId++,
+        pos: [
+          WORLD_DIMENSION*.5,
+          WORLD_DIMENSION*.47,
+          terrain(.5, .47) + playerRadius + .1,
+        ],
+        renderGroupId: nextRenderGroupId++,
+        xRotation: 0,
+        yRotation: 0,
+        zRotation: 0,
+        health: 9,
+        velocity: [0, 0, 0],
+        maximumLateralVelocity: .01,
+        maximumLateralAcceleration: .00001,
+        gravity: DEFAULT_GRAVITY,
+        collisionGroup: COLLISION_GROUP_PLAYER,
+        collisionMask: COLLISION_GROUP_TERRAIN
+          | COLLISION_GROUP_SCENERY
+          | COLLISION_GROUP_ENEMY
+          | COLLISION_GROUP_ITEMS,
+        inverseMass: 2,
+        shadows: 1,
+        modelVariant: VARIANT_DRAGON,
+      };
+      addEntity(player);
+    }
   };
   window.onmouseup = () => {
     setKeyState(INPUT_FIRE, 0);
   };
   window.onmousemove = (e: MouseEvent) => {
-    const movement: ReadonlyVector2 = [e.movementX, e.movementY];
-    const rotation = vectorNLength(movement)/399;
-    if (rotation > EPSILON) {
-      camera.zRotation -= movement[0]/399;
-      camera.xRotation = Math.max(
-        -PI_05_1DP,
-        Math.min(
-          PI_02_1DP,
-          camera.xRotation - movement[1]/199,
-        ),
-      );
+    if (player) {
+      const movement: ReadonlyVector2 = [e.movementX, e.movementY];
+      const rotation = vectorNLength(movement)/399;
+      if (rotation > EPSILON) {
+        camera.zRotation -= movement[0]/399;
+        camera.xRotation = Math.max(
+          -PI_05_1DP,
+          Math.min(
+            PI_02_1DP,
+            camera.xRotation - movement[1]/199,
+          ),
+        );
+      }        
     }
     if (FLAG_PREVENT_DEFAULT_ON_MOUSE || FLAG_PREVENT_DEFAULT) {
       e.preventDefault();
@@ -1879,7 +1883,7 @@ window.onload = () => {
 
     // always update player and camera, and always update the player first so the camera
     // is looking at the right spot
-    [player, camera, ...entities].forEach((entity, i) => {
+    [...(player ? [player] : []), camera, ...entities].forEach((entity, i) => {
       // the entity has not been removed by someone else's update
       // allow camera and player to move out of bounds and still be updated
       if (i < 2 || entity.lastTile.entities[entity.id]) {
@@ -2355,34 +2359,39 @@ window.onload = () => {
           }
           if (entity.entityType == ENTITY_TYPE_CAMERA) {
             if (FLAG_SLOW_CAMERA) {
-              camera.previousPlayerPositions ||= [];
-              let previous: [number, ReadonlyVector3] = [time, player.pos];
-              camera.previousPlayerPositions.push(previous);
-              const targetTime = time - 99;
-              while (camera.previousPlayerPositions[0][0] < targetTime) {
-                previous = camera.previousPlayerPositions.shift();
+              if (player) {
+                camera.previousPlayerPositions ||= [];
+                let previous: [number, ReadonlyVector3] = [time, player.pos];
+                camera.previousPlayerPositions.push(previous);
+                const targetTime = time - 99;
+                while (camera.previousPlayerPositions[0][0] < targetTime) {
+                  previous = camera.previousPlayerPositions.shift();
+                }
+                const current = camera.previousPlayerPositions[0];
+ 
+                const det = current[0] - previous[0];
+                if (det) {
+                  const targetPlayerPos = vectorNScaleThenAdd(
+                    previous[1],
+                    vectorNScaleThenAdd(current[1], previous[1], -1),
+                    (targetTime - previous[0])/det
+                  );
+                  const targetCameraPosition = vectorNScaleThenAdd(
+                    vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3]),
+                    vector3TransformMatrix4(
+                      cameraRotateMatrix,
+                      0,
+                      cameraZoom,
+                      0,
+                    ),
+                  );
+                  const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, camera.pos, -1);
+                  camera.velocity = vectorNScale(
+                    deltaCameraPosition,
+                    Math.min(1/cappedDelta, .05/(vectorNLength(deltaCameraPosition))),
+                  ) as any;  
+                }  
               }
-              const current = camera.previousPlayerPositions[0];
-
-              const targetPlayerPos = vectorNScaleThenAdd(
-                previous[1],
-                vectorNScaleThenAdd(current[1], previous[1], -1),
-                (targetTime - previous[0])/(current[0] - previous[0])
-              );
-              const targetCameraPosition = vectorNScaleThenAdd(
-                vectorNScaleThenAdd(targetPlayerPos, [0, 0, 1.3]),
-                vector3TransformMatrix4(
-                  cameraRotateMatrix,
-                  0,
-                  cameraZoom,
-                  0,
-                ),
-              );
-              const deltaCameraPosition = vectorNScaleThenAdd(targetCameraPosition, camera.pos, -1);
-              camera.velocity = vectorNScale(
-                deltaCameraPosition,
-                1/cappedDelta,
-              ) as any;
             } else {
               const targetCameraPosition = vectorNScaleThenAdd(
                 vectorNScaleThenAdd(player.pos, [0, 0, 1]),
@@ -3154,7 +3163,7 @@ window.onload = () => {
 
     const orderedShadows = shadows.sort((a, b) => {
       const [da, db] = [a, b].map(
-        v => vectorNLength(vectorNScaleThenAdd(player.pos, v, -1))
+        v => vectorNLength(vectorNScaleThenAdd(camera.pos, v, -1))
       );
       return da - db;
     }).slice(0, MAX_SHADOWS);
@@ -3175,7 +3184,7 @@ window.onload = () => {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.uniformMatrix4fv(uProjectionMatrix, false, cameraPositionAndProjectionMatrix as any);
     gl.uniform3fv(uCameraPosition, camera.pos as any);
-    gl.uniform4f(uFocusPositionAndWaterLevel, ...player.pos, Math.sin(time/2e3)/9);
+    gl.uniform4f(uFocusPositionAndWaterLevel, ...(player?.pos || camera.pos), Math.sin(time/2e3)/9);
     gl.uniform4fv(
       uShadows,
       [
@@ -3207,7 +3216,7 @@ window.onload = () => {
     gl.bindVertexArray(skyCylinderModel.vao);
     gl.uniform4f(
       uWorldPosition,
-      ...player.pos.slice(0, 2) as Vector2,
+      ...camera.pos.slice(0, 2) as Vector2,
       0,
       0,
     );

@@ -175,6 +175,20 @@ module.exports = function (grunt) {
             }, {
               from: "<div id=\"fps\"></div>",
               to: ""
+            }, {
+              from: "</div>",
+              to: ""
+            }, {
+              from: "</h1>",
+              to: ""
+            }]
+          },
+          css: {
+            src: ['dist/index.css'],
+            overwrite: true,
+            replacements: [{ 
+              from: "#fps,",
+              to: ""
             }]
           },
           html2: {
@@ -462,6 +476,7 @@ module.exports = function (grunt) {
     'copy',
     'cssmin', 
     'replace:html', 
+    'replace:css', 
     //'replace:js0',
     'replace:js00',
     'replace:js1',

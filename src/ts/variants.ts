@@ -29,7 +29,7 @@ type Variant = {
 const TERRAIN_COLORS: readonly number[] = [
   // sand
   .7, .7, .4, 1,
-  .5, .4, .2, 1,
+  .6, .5, .2, 1,
   // grass
   .2, .5, .1, 1,
   .1, .7, .3, .8,
