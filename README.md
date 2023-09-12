@@ -10,13 +10,14 @@ Live the life of a dragon on a small island
 * set fire to hungry leopards
 
 Controls
-* Mouse: look/aim
+* Mouse: Look/Aim
 * Left Mouse Button: expel contents of stomach
-* Space: jump/flap
-* Hold Space: glide
+* Space: Jump/Flap
+* Hold Space: Glide
 * WASD (on ground): Move 
 * W (while gliding): Turn to match camera
 * Release W (while gliding and holding something): Drop 
+* Shift: Walk
 
 Flapping and gliding take the angle of the wing/body into account. Facing upward will brake, downward will accelerate, left or right will turn in that direction. Gliding is much easier to control than flying by flapping alone. Use of a mouse (not a track pad and definitely not touch/mobile) is recommended.
 
