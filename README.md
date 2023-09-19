@@ -85,17 +85,21 @@ The geometry comes from a few places. For the terrain, it's generated as require
 
 For the animals and plants, it's just a billboard that always faces the camera.
 
-For the dragon is a bunch of convex shapes stuck together with a skeleton and some animations. The convex shapes are described using planes, but ended up being packed into strings. 
+For the dragon is a bunch of convex shapes stuck together with a skeleton and some animations. The convex shapes are described using planes, but ended up being packed into strings. The geometry is described using the same data structure that the collision detection uses.
 
-### Ocean, Fog, Lasers, and Fireballs
+Each plane has some metadata that describes how the textures map to it and whether it should have its normals averaged with its neighbours
 
-I spent a few days trying to make a space laser kind of dragon breath attack in the shader, with limited success, then just went with a ball, also in the shader. Because fire was being done in the shader, I needed an enclosed environment to render it against, so I added a skybox (technically a cylinder since I didn't want to be bothered with dealing with the attenuation that a cube would bring). Without the skybox you wouldn't have been able to shoot above the horizon!
+### Ocean, Fog, Shadows, Lasers, and Fireballs
+
+I spent a few days trying to make a space laser kind of dragon breath attack in the shader, with limited success, then just went with a ball, also in the shader. Because fire was being done in the shader, I needed an enclosed environment to render it against, so I added a skybox (technically a cylinder since I didn't want to be bothered with dealing with the attenuation at the corners of a cube). Without the skybox you wouldn't have been able to shoot above the horizon!
 
 Then deleted all of that and just went with a geometry fireball, which looks fine. I kept the skycylinder however.
 
-The ocean is also done in the fragment shader. Anything with a z below 0 is rendered blue. Again this relies on the skycylinder to work. 
+The ocean is also done in the fragment shader. Anything with a z below 0 is rendered blue. Again this relies on the skycylinder to work. If you fly out over the sea it's basically impossible to gauge altitude. I think it would have been pretty straight forward to put a texture on the surface of the ocean, which would mitigate this.
 
-I also wanted there to be a slight fog to give distant objects a sense of perspective. To prevent there from being a noticable difference between the sky and the fog on distant mountains, I made the fog light blue-ish. There's probably a better way?
+I also wanted there to be a slight fog to give distant objects a sense of perspective. Fog doesn't apply to the sky cylinder, but to prevent there from being a noticable difference between the sky and the fog on distant mountains, I made the fog light blue-ish. There's probably a better way?
+
+Finally the shadows are also done in the shader. They're not real shadows, they're just circles and don't even respect the direction of the light. There needed to be shadows to help you gauge your altitude. There is a limit of 9 shadows that can be active at a given time as they're quite expensive, but with multiple GPUs I suspect this calculation is done in parallel.
 
 ### Game-like Experience
 
@@ -115,6 +119,9 @@ I had a reasonable flight simulator and some nice graphics, but no game, no ince
   * Baby dragons also grow as you feed them
 * There appears to be a bug in the collision detection when standing on the top of mountains where you stand too high off the ground.
 * Angling the dragon upward while gliding will air-brake, but turning left or right and angling upward does not lose much (any?) speed. I needed a way to land on the nest without just crashing into it at full speed
+* Different animals have different weights. Picking up a cow is really hard, but it can be done if you have enough momentum. 
+* The dragon can drown
+* If you hold shift the dragon walks instead of runs
 
 ### Optimisations, Minifications and Omissions
 
