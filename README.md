@@ -79,7 +79,7 @@ Goodbye my precious buffer of 5Kb, hello geometry. As it turned out, I didn't ma
 
 The wings in particular we horrible as there were three segments that joined at strange angles and offsets. Eventually I got the magic combination of matrices in the right order and the wings looked vaguely dragon-like. The run animation where it puts its head down and charges like a pitbull was accidental, but it amused me and implied the dragon has a certain kind of personality, so I kept it.
 
-# Geometry
+### Geometry
 
 The geometry comes from a few places. For the terrain, it's generated as required from the height map.
 
