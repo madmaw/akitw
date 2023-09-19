@@ -85,7 +85,7 @@ The geometry comes from a few places. For the terrain, it's generated as require
 
 For the animals and plants, it's just a billboard that always faces the camera.
 
-For the dragon is a bunch of convex shapes stuck together with a skeleton and some animations. The convex shapes are described using planes, but ended up being packed into strings.
+For the dragon is a bunch of convex shapes stuck together with a skeleton and some animations. The convex shapes are described using planes, but ended up being packed into strings. 
 
 ### Ocean, Fog, Lasers, and Fireballs
 
@@ -125,3 +125,5 @@ I had a reasonable flight simulator and some nice graphics, but no game, no ince
   * The geometry generation code was pretty large, so having a flag where I packed the generated geometry into strings, and let CC tree-shake out the unused code saved a bunch of space
   * I tried to do the same thing with animations, but it didn't help and CC broke the animation string!
 * Roadroller just gets better and better, stuff that saved space a year ago (e.g. packing into strings, renaming PI to 3) barely makes an difference this time around
+* The texture for the dragon uses the same code as the texture for the sand but with more bumps. 
+* The logic for the placement of the trees uses the same code as the logic for generating clusters of rocks in the rocky terrain texture
